@@ -7,7 +7,8 @@
 # 必填位置參數（置於選用旗標之後）：
 #   <sub-repo-abs-path>      子 repo 的絕對路徑
 #   <kunsu-abs-path>         軍師根目錄的絕對路徑
-#   <roles-comma-separated>  以逗號分隔的角色字串（至少一個；例如 "前端 UI 實作" 或 "後端,DevOps"）
+#   <roles-comma-separated>  以逗號分隔的角色代碼（至少一個，宜短、kebab-case；例如 "frontend" 或 "backend,devops"）
+#                            代碼含空白或超過 30 字元時，會向 stderr 輸出 WARN（不阻斷寫入，疑為誤填整句角色說明）
 #
 # 選用旗標：
 #   --registry <path>  覆寫預設的 ~/.claude/kunsu-registry.json（供測試與 dogfooding 用）
@@ -91,6 +92,16 @@ if not roles:
         file=sys.stderr
     )
     sys.exit(2)
+
+# 軟警告（ADR 007 Decision 8，不阻斷寫入）：角色代碼宜短、kebab-case；
+# 含空白（半形或全形）或超過 30 字元時，疑為誤填整句角色說明而非代碼，向 stderr 提示。
+for _r in roles:
+    if (' ' in _r) or ('　' in _r) or (len(_r) > 30):
+        print(
+            f"WARN：角色代碼「{_r}」含空白或超過 30 字元，疑為誤填整句角色說明而非代碼"
+            "（代碼宜短、kebab-case）；仍會寫入，請確認。",
+            file=sys.stderr
+        )
 
 # 讀取現有 registry（或建新空物件）
 if os.path.exists(registry_path):

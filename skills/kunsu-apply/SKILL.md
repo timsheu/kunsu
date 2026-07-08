@@ -4,7 +4,7 @@ version: 0.1.0
 description: |
   在子專案 session 向軍師（規劃協調中心）投遞「申請加入」：自動偵測子專案路徑、
   顯示名稱與技術棧，從全域反向註冊表 ~/.claude/kunsu-registry.json 撈出軍師清單
-  供點選，使用者只需填角色描述與環境限制，寫成申請檔投遞至目標軍師的
+  供點選，使用者只需填角色代碼、角色說明與環境限制，寫成申請檔投遞至目標軍師的
   docs/applications/ 申請信箱。審核與正式登記由軍師端的 add-project 執行。
   Use when asked to「申請加入軍師」「投遞申請」「加入軍師」「向軍師申請」
   「把這個專案申請加入軍師」「kunsu apply」「apply to kunsu」.
@@ -19,7 +19,7 @@ allowed-tools:
 # kunsu-apply — 向軍師投遞申請加入
 
 在子專案 session 一鍵投遞「申請加入軍師」：能自動偵測就不問、能點選就不打字，
-使用者只需手填角色描述與環境限制。
+使用者只需手填角色代碼、角色說明與環境限制。
 
 ---
 
@@ -80,9 +80,12 @@ test -d "<KUNSU_ROOT>/docs/applications" && echo "ok" || echo "missing"
 以單次 `AskUserQuestion` 收集：
 
 1. **顯示名稱**：預設值為步驟 1 的目錄名，可修改。
-2. **角色描述**：一行說明協作職責；此字串為**提議值**，軍師核准時可修改後定案（角色字串定案權在軍師）。
-3. **環境限制（選填）**：特殊限制或已知約束；留空即「無」。
-4. **能否自我驗證**：`y` = 可在該 repo 執行測試驗收；`n` = 需人工或跨 repo。
+2. **提議角色代碼**：短、kebab-case，即交接文件 `to:` 的比對鍵；此為**提議值**，軍師核准時可修改後定案（代碼定案權在軍師）。宜 ≤ 20 字、不含軍師名前綴。
+3. **角色說明（選填）**：一行職責描述，display-only；留空為「無」。軍師核准時寫入其 CLAUDE.md 說明欄。
+4. **環境限制（選填）**：特殊限制或已知約束；留空即「無」。
+5. **能否自我驗證**：`y` = 可在該 repo 執行測試驗收；`n` = 需人工或跨 repo。
+
+**提議代碼撞名早期檢查（最佳努力、非權威）**：讀 registry 中目標軍師（`entry.kunsu == <KUNSU_ROOT>`）已登記的代碼集合，若提議代碼命中則提示並列出既有代碼、建議改碼。此檢查看不到在途待審申請，僅為早期訊號——最終唯一性由軍師端 `add-project` 核准時強制。
 
 ### 步驟 6：產生申請檔
 
@@ -93,7 +96,8 @@ bash "$CLAUDE_SKILL_DIR/scripts/new-application.sh" \
   "<KUNSU_ROOT>" \
   "<顯示名稱>" \
   "<SUB_ROOT>" \
-  "<角色描述>" \
+  "<提議角色代碼>" \
+  "<角色說明或「無」>" \
   "<環境限制或「無」>" \
   "<y/n>" \
   "<技術棧摘要或「待補充」>"
@@ -110,7 +114,8 @@ bash "$CLAUDE_SKILL_DIR/scripts/new-application.sh" \
 
 申請檔：<完整路徑>
 目標軍師：<KUNSU_ROOT>
-提議角色：<角色描述>
+提議角色代碼：<提議角色代碼>
+角色說明：<角色說明或「無」>
 
 本次寫入僅此一個新檔案（申請信箱協議授權範圍內），未觸碰軍師其他任何檔案，
 未寫入全域註冊表。
@@ -128,7 +133,7 @@ bash "$CLAUDE_SKILL_DIR/scripts/new-application.sh" \
 | 項目 | 慣例 |
 |------|------|
 | 申請檔命名 | `{YYYY-MM-DD}-{顯示名稱 slug}-application.md`；同日同名加 `-2`、`-3`… |
-| frontmatter | `type: kunsu-application`、`name`、`path`、`proposed_role`、`constraints`、`self_verify`、`stack`、`created`、`status: pending` |
+| frontmatter | `type: kunsu-application`、`name`、`path`、`proposed_role`（提議角色代碼）、`role_desc`（角色說明，選填）、`constraints`、`self_verify`、`stack`、`created`、`status: pending` |
 | `path` 欄位 | 子專案絕對路徑；軍師端以此作為分組與重複登記判斷的鍵 |
 | 信箱目錄 | `docs/applications/`（一律在軍師 repo 內，頂層投遞、`archive/` 歸檔） |
 | 審核端 | 軍師 session 的 `add-project`（`/kunsu-init` 子指令）；掃描端另有 `/kunsu-inbox` 軍師模式回報新申請 |

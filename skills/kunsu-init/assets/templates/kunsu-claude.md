@@ -12,8 +12,8 @@
 
 ## 關聯專案（唯讀參考，不可寫入）
 
-| 專案 | 路徑 | 角色 |
-|------|------|------|
+| 專案 | 路徑 | 角色代碼 | 角色說明 |
+|------|------|---------|---------|
 {{PROJECT_ROWS}}
 
 {{PROJECT_CONSTRAINTS}}
@@ -81,7 +81,8 @@
   type: kunsu-application
   name: {顯示名稱}
   path: {子專案絕對路徑}
-  proposed_role: {提議角色描述}
+  proposed_role: {提議角色代碼（kebab-case，即 handoff to:）}
+  role_desc: {角色說明，一行職責，選填，留空為「無」}
   constraints: {環境限制，無則為「無」}
   self_verify: {y/n}
   stack: {技術棧摘要，缺則為「待補充」}
@@ -89,7 +90,7 @@
   status: pending
   ---
   ```
-- **審核（僅軍師 session）**：以 `/kunsu-init add-project`（kunsu-init 子指令）掃描待審申請逐筆審核（核准／修改角色描述後核准／退回）。**核准當下才寫入本 CLAUDE.md 關聯專案表與全域註冊表（單點登記）**——待審申請不進任何正式登記，避免半登記狀態。角色字串定案權在軍師，核准時可修改子專案提議的描述。
+- **審核（僅軍師 session）**：以 `/kunsu-init add-project`（kunsu-init 子指令）掃描待審申請逐筆審核（核准／修改角色代碼後核准／退回）。**核准當下才寫入本 CLAUDE.md 關聯專案表與全域註冊表（單點登記）**——待審申請不進任何正式登記，避免半登記狀態。角色代碼定案權在軍師，核准時可修改子專案提議的代碼與說明。
 - **歸檔（僅軍師 session）**：處理完的申請由軍師更新 frontmatter（`status: approved` 或 `rejected`，退回附 `decision_note` 原因）後歸檔至 `docs/applications/archive/`——先 `git add` 再 `git mv`（待審申請通常是 untracked，直接 `git mv` 會失敗）。此搬移是授權操作；反向搬移（`archive/` → 頂層）與頂層申請檔的修改、刪除均視為異常，適用上方 tripwire 規則。
 
 ## 文件導航

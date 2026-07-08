@@ -109,9 +109,9 @@ git rev-parse --show-toplevel
 
 對 `SUBREPO_ENTRIES` 中的每個條目，**依軍師分組**執行以下掃描。
 
-**4a-1. 收集此軍師的全部已知角色：**
+**4a-1. 收集此軍師的全部已知角色代碼：**
 
-掃描整個 registry，找出所有 `entry.kunsu == kunsu_path` 的條目，將其 `roles` 陣列取聯集，得到 `ALL_KNOWN_ROLES`。這用於後續的「to: 不符清單」核對。
+掃描整個 registry，找出所有 `entry.kunsu == kunsu_path` 的條目，將其 `roles` 陣列（角色代碼集合）取聯集，得到 `ALL_KNOWN_ROLES`。這用於後續的「to: 不符清單」核對——handoff `to:` 值即角色代碼，精確比對此集合。
 
 **4a-2. 掃描軍師的交接文件：**
 
@@ -192,7 +192,7 @@ frontmatter 範本：
 ---
 title: {交接標題} — 回覆
 type: handoff-reply
-from: {我的角色}
+from: {我的角色代碼}
 to: {交接文件的 from 值}
 in_reply_to: {原交接檔名（含 .md 後綴）}
 created: YYYY-MM-DD
@@ -204,9 +204,9 @@ status: submitted
 
 ```
 ⚠️ to: 不符清單（{N} 份）
-以下交接文件的 to: 值不屬於此軍師已登記的任何角色，可能是拼寫錯誤或尚未以 add-project 登記：
+以下交接文件的 to: 值不在此軍師已登記的任何角色代碼集合中，可能是拼寫錯誤或尚未以 add-project 登記：
 - {HANDOFF_FILENAME}: to: {unknown_value}
-請核查拼寫，或以 add-project 在此軍師補登記對應角色。
+請核查拼寫，或以 add-project 在此軍師補登記對應角色代碼。
 ```
 
 **若「待接手」與「已回覆待確認」皆為空（本角色無任何待處理交接）：**
