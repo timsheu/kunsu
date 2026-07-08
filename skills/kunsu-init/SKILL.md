@@ -352,7 +352,7 @@ test -d "<CURRENT_REPO_ROOT>/docs/applications" && echo "ok" || echo "missing"
        - 任一插入錨點不存在（CLAUDE.md 經手改）→ 略過該處，留待核查回報。
     3. **完成核查（兩條，防半更新）**：
        - `grep -c 'docs/applications/' "<CURRENT_REPO_ROOT>/CLAUDE.md"` 應大於 0（申請信箱協議已插入）。
-       - `grep -c '唯一的例外授權' "<CURRENT_REPO_ROOT>/CLAUDE.md"` 應為 0（舊單信箱 bullet 已改寫；非零表示協議停在自相矛盾的半更新狀態）。
+       - `grep -c '信箱範圍是唯一的例外授權' "<CURRENT_REPO_ROOT>/CLAUDE.md"` 應為 0（舊單信箱 bullet 已改寫；非零表示協議停在自相矛盾的半更新狀態）。pattern 須用舊 bullet 專屬前綴「信箱範圍是唯一的例外授權」（與上方步驟 2「改寫舊 bullet」所指涉的字串一致）；**勿改回較短的「唯一的例外授權」——範本現行雙信箱 bullet 本身即「兩個信箱是唯一的例外授權…」，含該短子字串，會被命中而把正確遷移誤判成半更新**。
        任一條核查失敗 → 明確回報失敗項目：「目錄已補建，但 CLAUDE.md 協議文字補入不完整（申請信箱章節缺失／舊『唯一例外授權』bullet 未改寫）。請對照範本 `kunsu-claude.md` 手動補正。」**不回滾已建目錄**，繼續步驟 ③。
   - **n → 拒絕遷移**：記錄「軍師未遷移，本次跳過申請掃描」，直接跳至步驟 ⑤（訪談路徑）。
 
