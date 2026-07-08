@@ -1,11 +1,13 @@
 ---
-status: 未處理
+status: 已解決
 date: 2026-07-08
 source: manual
 severity: high
 ---
 
 # 轉 public 前的隱私清理：本機路徑與客戶專案名去識別化
+
+**解決依據**：現行檔案去識別化＋orphan 重建單筆初始 commit `25cfc48`，force push 覆蓋 origin/main；全量備份 bundle 留存於 repo 外。
 
 repo 目前為 GitHub private，轉 public 前需完成隱私清理。已 commit 檔案含本機絕對路徑（/Users/<使用者名稱>/...）、使用者名稱與客戶專案名（已去識別化）、ebook 母本路徑，且同樣存在於歷史 commit 中。
 
