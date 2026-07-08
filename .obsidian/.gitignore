@@ -1,0 +1,18 @@
+# Obsidian vault 設定：共用「設定」但排除機器特定／高頻變動的工作區與快取。
+#
+# 納入版控（不在此清單）：
+#   app.json            ← userIgnoreFilters（隱藏程式碼目錄）
+#   appearance.json     ← 外觀
+#   core-plugins.json   ← 核心外掛啟用清單
+#   community-plugins.json ← 啟用 Dataview 後產生，記錄社群外掛啟用清單
+#   bookmarks.json      ← HOME 書籤
+#   plugins/            ← Dataview 程式碼，一併備份讓 clone 即可用
+
+# 每次開關 vault／拖動面板都會變動，純機器狀態，不該污染 git
+workspace.json
+workspace-mobile.json
+
+# 本機快取與還原暫存
+.trash/
+cache/
+file-recovery/

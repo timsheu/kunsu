@@ -1,0 +1,78 @@
+# kunsu
+
+kunsu（軍師，台語 kun-su）——為多 repo AI 協作建立「軍師」（規劃協調中心）的 scaffolding 工具組：以純 skill＋範本快速建立唯讀的軍師 repo，並以全域反向註冊表自動化跨 session 傳令。本專案是工具母體——skill 原始碼在此開發與版控，部署目標為 `~/.claude/skills/`。
+
+## 核心規範（Invariants）
+
+1. **純 skill＋範本，不建編譯型工具** — 交付物是 markdown 範本、skill 指令文件與少量膠水腳本（shell），不建立 Rust／Go／Python 等需要獨立維護的工具專案。理由見 [docs/adr/2026-07-06-adr-candidate-001-pure-skill-no-injection.md](docs/adr/2026-07-06-adr-candidate-001-pure-skill-no-injection.md)。
+2. **絕不注入子 repo** — 工具產出的軍師對其子專案唯讀；本工具本身也不在任何目標 repo 寫入 managed section 或設定。所有機器路徑的**常設登記**只存在於兩處：各軍師自己 CLAUDE.md 的關聯專案表，以及全域註冊表 `~/.claude/kunsu-registry.json`（申請信箱中待審申請的 `path` 欄位為暫態投遞內容，核准即轉入上述正式登記、歸檔後僅為歷史紀錄，見 ADR 006）。
+3. **開發與部署分離** — skill 原始碼在本 repo 版控，經 `install.sh` 部署（symlink 或 copy）至 `~/.claude/skills/`，不直接在 `~/.claude` 內開發。與 `~/.claude/rules` 既有的 install.sh 模式一致。
+4. **範本母本唯讀參考** — 抽象化來源為 ebook 專案群規劃中心（本機私有路徑，略），僅唯讀查閱，不回頭修改母本。
+
+## 專案結構
+
+```
+CLAUDE.md
+CONCEPTS.md            → 領域詞彙表（實體、具名流程、狀態概念；/ce-compound 維護）
+docs/
+  README.md            → 文件中心主索引
+  brainstorms/         → 需求（種子：2026-07-06 需求彙整）
+  plans/               → 實作計畫（/ce-plan 產出）
+  adr/                 → ADR（001–005 accepted、006 proposed）
+  solutions/           → 可重用學習與解法（/ce-compound 產出，YAML frontmatter 依 module/tags/problem_type 可搜尋）
+skills/                → skill 原始碼
+  handoff/             → 通用交接原語（v0.2.1，2026-07-06 自部署目錄併入，見 ADR 003）
+    SKILL.md           → add／reply／list／done 子指令
+    scripts/           → new-handoff.sh、new-handoff-reply.sh
+  kunsu-init/          → 軍師 scaffolding
+    SKILL.md           → 訪談→查證→產檔→vault→git→註冊表主流程＋add-project 子指令（申請審核制）
+    scripts/registry-merge.sh → 註冊表 read-merge-write（python3）
+    assets/templates/  → 軍師範本（CLAUDE.md／CONCEPTS.md／README／HOME dataview 區塊＋PLACEHOLDERS.md）
+    assets/solutions/  → 兩篇種子沉澱文件（自母本通用化）
+  kunsu-inbox/         → 跨 session 傳令自動化
+    SKILL.md           → 模式偵測（獨立雙判斷）＋子 repo／軍師雙模式
+    scripts/scan-replies.sh → 未 commit 回覆掃描＋tripwire（porcelain）
+    scripts/scan-applications.sh → 申請信箱掃描＋tripwire（雙側核驗授權歸檔）
+  kunsu-apply/         → 子專案端投遞申請加入
+    SKILL.md           → 自動偵測＋registry 選軍師＋守門與冪等預檢
+    scripts/new-application.sh → 申請檔產檔（frontmatter＋防撞）
+install.sh             → 部署至 ~/.claude/skills/（預設 copy、--link 開發模式）
+```
+
+## 文件導航
+
+| 入口 | 說明 |
+|------|------|
+| [docs/README.md](docs/README.md) | 文件中心主索引 |
+| [docs/brainstorms/2026-07-06-planner-toolkit-requirements.md](docs/brainstorms/2026-07-06-planner-toolkit-requirements.md) | 種子需求：問題定義、ce-team 教訓、母本解剖、方案設計 |
+| [docs/adr/](docs/adr/) | ADR（001–004 於 2026-07-06、005 於 2026-07-07 審定為 accepted；006 申請信箱 proposed） |
+| [docs/plans/2026-07-06-001-feat-planner-toolkit-skills-plan.md](docs/plans/2026-07-06-001-feat-planner-toolkit-skills-plan.md) | 實作計畫（12 條 requirements、7 個實作單元，已執行完畢） |
+| [docs/plans/2026-07-07-001-feat-application-inbox-plan.md](docs/plans/2026-07-07-001-feat-application-inbox-plan.md) | 申請信箱實作計畫（R1–R20、六個實作單元） |
+
+## 開發狀態
+
+### 已完成
+- 種子需求文件與兩份 ADR Candidate（2026-07-06，由 ebook 規劃中心 session 的設計討論彙整而來）。
+- 兩份 ADR 經兩輪 `/ce-doc-review`（5 persona、14 項修正）審定為 accepted（2026-07-06）。
+- 實作計畫（[docs/plans/2026-07-06-001-feat-planner-toolkit-skills-plan.md](docs/plans/2026-07-06-001-feat-planner-toolkit-skills-plan.md)）與全部三件交付物：`/kunsu-init` skill（含範本抽取、`add-project` 子指令、`registry-merge.sh`）、`/kunsu-inbox` skill（含 `scan-replies.sh`）、`install.sh`（2026-07-06）。
+- 端到端 dogfooding 驗證 19 場景全數通過（暫存目錄實跑 scaffold＋handoff 往返＋inbox 雙模式＋add-project；發現並修復同日多份回覆的檔名排序缺陷）。
+- `/handoff` skill（v0.2.1）自部署目錄逐字併入 `skills/handoff/`，隨 toolkit 共同維護與散布；本 repo 為其開發母體，改動一律「改 repo 再 install」（ADR 003，2026-07-06）。
+- 詞彙統一遷移（「規劃中心」→「軍師」）：README、兩份 SKILL.md 文案、腳本訊息、範本內容與檔名（`planner-*.md` → `kunsu-*.md`）、solutions 種子文件、註冊表欄位 `planner` → `kunsu` 全面改稱；歷史快照（ADR 001–003、plans、brainstorms）與母本指稱維持原貌（[ADR 005](docs/adr/2026-07-07-adr-candidate-005-unify-kunsu-terminology.md)，2026-07-07）。
+- 申請信箱功能：例外授權擴為雙信箱（scaffold 內建 `docs/applications/`），新增 `/kunsu-apply` 子專案端投遞 skill 與 `scan-applications.sh`，`add-project` 改為掃描審核制（核准當下單點登記、內建舊軍師遷移），`/kunsu-inbox` 軍師模式一併回報新申請（[ADR 006 candidate](docs/adr/2026-07-07-adr-candidate-006-application-inbox-dual-mailbox.md)，2026-07-07）。
+
+### 尚未實作／後續評估
+- SessionStart hook（第二階段，待 `/kunsu-inbox` 用出實際手感後再評估，ADR 002 Decision 3）。
+- `/handoff` skill 升版改查註冊表（現已內建於本 repo，施工地點明確；仍為獨立延後決策，ADR 002 Decision 6）。
+- 角色改名的追溯修復機制（ADR 002 Deferred / Open Questions；現行為 add-project 警告掃描）。
+
+### 相關資產（唯讀參考）
+
+| 資產 | 路徑 | 用途 |
+|------|------|------|
+| ebook 專案群規劃中心 | （本機私有路徑，略） | 範本母本；其 `docs/solutions/` 有兩篇模式沉澱文件 |
+| 全域 /init-obsidian-vault skill | `~/.claude/skills/init-obsidian-vault` | scaffold 的 Obsidian vault 步驟直接呼叫（軟依賴，未安裝時略過） |
+| ce-team（先前嘗試） | （本機私有路徑，略） | 失敗教訓來源，不沿用其程式碼 |
+
+## 版本控制
+
+本目錄為獨立 git repo。不主動 commit，除非使用者明確要求。
