@@ -99,7 +99,7 @@ git rev-parse --show-toplevel
 | 是 | 否 | 僅執行步驟 4a（子 repo 模式）|
 | 否 | 是 | 僅執行步驟 4b（軍師模式）|
 | 是 | 是 | 步驟 4a 與 4b 合併執行（巢狀拓撲）|
-| 否 | 否 | 報錯並停止：`CURRENT_ROOT` 不在任何已知登記中。請以 `/kunsu-init` 建立軍師，或以 `add-project` 子指令將此 repo 登記至現有軍師。|
+| 否 | 否 | 報錯並停止：`CURRENT_ROOT` 不在任何已知登記中。請以 `/kunsu-init` 建立軍師，或以 `/kunsu-init add-project` 子指令將此 repo 登記至現有軍師。|
 
 **重要：不以目錄存在與否作為判斷依據。** 任何跑過 `/handoff reply` 的一般 repo 都有 `docs/handoffs/replies/`，以目錄判斷會造成誤判。
 
@@ -263,7 +263,7 @@ bash ~/.claude/skills/kunsu-inbox/scripts/scan-applications.sh "{CURRENT_ROOT}"
 
 收到 {M} 份新申請（未 commit，等待審核）：
 {每行列出：  - {路徑}}
-→ 以 add-project 逐筆審核（核准當下才正式登記）。
+→ 以 /kunsu-init add-project 逐筆審核（核准當下才正式登記）。
 
 （各段為零時改列：目前沒有未 commit 的新回覆。／目前沒有待審申請。）
 ```

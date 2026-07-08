@@ -34,7 +34,7 @@ fi
 APPS_DIR="$KUNSU_ROOT/docs/applications"
 if [[ ! -d "$APPS_DIR" ]]; then
   echo "錯誤：目標軍師尚無申請信箱（$APPS_DIR 不存在）。" >&2
-  echo "請先於軍師目錄的 session 執行 add-project 完成遷移（補建申請信箱），再重新投遞。" >&2
+  echo "請先於軍師目錄的 session 執行 /kunsu-init add-project 完成遷移（補建申請信箱），再重新投遞。" >&2
   exit 1
 fi
 
@@ -75,7 +75,7 @@ done
   printf '| 環境限制 | %s |\n' "$CONSTRAINTS"
   printf '| 能否自我驗證 | %s |\n' "$SELF_VERIFY"
   printf '| 技術棧 | %s |\n' "$STACK"
-  printf '\n> 本檔案為定案快照，待審期間任何人不得編輯。審核由軍師 session 以 `add-project` 執行；\n'
+  printf '\n> 本檔案為定案快照，待審期間任何人不得編輯。審核由軍師 session 以 `/kunsu-init add-project` 執行；\n'
   printf '> 核准當下才寫入軍師 CLAUDE.md 關聯專案表與全域註冊表，處理完由軍師歸檔至 `archive/`。\n'
 } > "$file"
 

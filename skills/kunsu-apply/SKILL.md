@@ -63,7 +63,7 @@ test -d "<KUNSU_ROOT>/docs/applications" && echo "ok" || echo "missing"
 ```
 
 - **missing** → 報錯終止，不寫入任何檔案：
-  > 目標軍師 `<KUNSU_ROOT>` 尚無申請信箱（`docs/applications/` 不存在）。請先於該軍師目錄的 session 執行 `add-project`，依提示完成遷移（補建申請信箱與協議文字），再重新投遞。
+  > 目標軍師 `<KUNSU_ROOT>` 尚無申請信箱（`docs/applications/` 不存在）。請先於該軍師目錄的 session 執行 `/kunsu-init add-project`，依提示完成遷移（補建申請信箱與協議文字），再重新投遞。
 - **ok** → 繼續步驟 4。
 
 ### 步驟 4：重複投遞預檢
@@ -115,7 +115,7 @@ bash "$CLAUDE_SKILL_DIR/scripts/new-application.sh" \
 本次寫入僅此一個新檔案（申請信箱協議授權範圍內），未觸碰軍師其他任何檔案，
 未寫入全域註冊表。
 
-下一步：到軍師目錄的 session 執行 add-project 審核此申請；
+下一步：到軍師目錄的 session 執行 /kunsu-init add-project 審核此申請；
 核准當下才會寫入軍師 CLAUDE.md 關聯專案表與 ~/.claude/kunsu-registry.json。
 ```
 
