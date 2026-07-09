@@ -34,7 +34,7 @@ kunsu 專案的文件集合。專案定位與核心規範見上層 [CLAUDE.md](.
 | [adr/2026-07-06-adr-003-integrate-handoff-into-toolkit.md](adr/2026-07-06-adr-003-integrate-handoff-into-toolkit.md) | ADR 003（accepted）：/handoff 併入 toolkit 維護與散布；/init-obsidian-vault 維持外部 |
 | [adr/2026-07-06-adr-004-rebrand-kunsu.md](adr/2026-07-06-adr-004-rebrand-kunsu.md) | ADR 004（accepted）：rebrand 為 kunsu（軍師），體系 skill 改 kunsu- 前綴，/handoff 不變 |
 | [adr/2026-07-07-adr-candidate-005-unify-kunsu-terminology.md](adr/2026-07-07-adr-candidate-005-unify-kunsu-terminology.md) | ADR 005（accepted）：詞彙統一，scaffold 產物正式稱「軍師」，機器識別字趁零部署窗口一併改 |
-| [adr/2026-07-07-adr-candidate-006-application-inbox-dual-mailbox.md](adr/2026-07-07-adr-candidate-006-application-inbox-dual-mailbox.md) | ADR 006（proposed）：申請信箱——例外授權擴為雙信箱，投遞與審核分離、單點登記 |
+| [adr/2026-07-07-adr-candidate-006-application-inbox-dual-mailbox.md](adr/2026-07-07-adr-candidate-006-application-inbox-dual-mailbox.md) | ADR 006（accepted）：申請信箱——例外授權擴為雙信箱，投遞與審核分離、單點登記（「僅有的兩個」語義後由 ADR 008 修訂為三） |
 | [adr/2026-07-08-adr-candidate-007-role-code-description-separation.md](adr/2026-07-08-adr-candidate-007-role-code-description-separation.md) | ADR 007（accepted）：角色識別正規化——角色代碼（比對鍵）與角色說明（描述）分離 |
 | [adr/2026-07-08-adr-candidate-008-report-inbox-triple-mailbox.md](adr/2026-07-08-adr-candidate-008-report-inbox-triple-mailbox.md) | ADR 008（accepted）：上報信箱——例外授權擴為三信箱，子專案主動上報入軍師記錄 |
 | [brainstorms/2026-07-07-application-inbox-requirements.md](brainstorms/2026-07-07-application-inbox-requirements.md) | 需求：申請信箱與 add-project 對話式改造（R1–R15、驗收例） |

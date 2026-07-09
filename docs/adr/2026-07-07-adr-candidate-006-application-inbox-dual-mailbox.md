@@ -2,14 +2,17 @@
 title: ADR Candidate 006 — 申請信箱：例外授權自單一信箱擴為雙信箱
 date: 2026-07-07
 type: adr
-status: proposed
+status: accepted
 ---
 
 # ADR 006：申請信箱——例外授權自單一信箱擴為雙信箱
 
-> 狀態：**Proposed**（2026-07-07 隨申請信箱功能實作提出，待審定；上游決策脈絡見
-> [brainstorm](../brainstorms/2026-07-07-application-inbox-requirements.md) 與
-> [實作計畫](../plans/2026-07-07-001-feat-application-inbox-plan.md)，兩者均經使用者逐項確認）。
+> 狀態：**Accepted**（2026-07-09 審定。2026-07-07 隨申請信箱功能實作提出，上游決策
+> 脈絡見 [brainstorm](../brainstorms/2026-07-07-application-inbox-requirements.md) 與
+> [實作計畫](../plans/2026-07-07-001-feat-application-inbox-plan.md)，兩者均經使用者
+> 逐項確認；功能實作後經 dogfooding 與兩軍師 live 使用驗證。本 ADR「僅有的兩個」
+> 語義已由 [ADR 008](2026-07-08-adr-candidate-008-report-inbox-triple-mailbox.md)
+> 修訂為「僅有的三個」，主文維持原貌。）
 
 ## Context
 
