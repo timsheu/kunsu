@@ -66,7 +66,7 @@
 - **同步時機**：使用者主動要求「同步進度」或「看一下回覆」時，軍師讀取 `docs/handoffs/replies/` 下尚未處理的回覆，彙整進 `docs/plans/`（更新決策、記錄落差）；不主動輪詢。
 - **對方可用全域 `/handoff reply` 指令回覆**：全域 `~/.claude/skills/handoff`（v0.2.0+）已原生支援此回覆信箱模式。**但該指令以「執行當下的工作目錄」往上找 `CLAUDE.md` 定位專案根**——各接手方 session 預設工作目錄是它們自己的 repo（各自也有 `CLAUDE.md`），若不先 `cd` 到軍師目錄（`{{PLANNER_ROOT_PATH}}`）再執行 `/handoff reply`，會誤判成對方自己專案的根、把回覆寫進錯誤的 repo。**每份交接文件的「回覆方式」段落都必須明確附上這個 `cd` 步驟**，並提供「用絕對路徑手動建檔」作為備援做法，避免此陷阱重演。
 - **三個信箱是唯一的例外授權，不是全域寫入權**：對方 session 被允許寫入的範圍僅限（1）在 `docs/handoffs/replies/` 新增回覆檔案、（2）在 `docs/applications/` 頂層新增申請檔案（見下方「申請信箱協議」）、（3）在 `docs/reports/` 頂層新增上報檔案（見下方「上報信箱協議」），不包含編輯本目錄下任何既有檔案（含交接文件本體、`docs/plans/`、`CLAUDE.md` 等）。這是刻意限縮範圍的例外，不是放寬 Invariant #2 的對等關係——軍師仍完全不寫對方 repo，對方僅能寫這三個信箱資料夾，範圍不對稱是刻意的。
-- **同步回覆前先核對寫入範圍（tripwire）**：每次讀取 `docs/handoffs/replies/` 準備彙整回覆前，先跑 `git status`／`git diff` 確認本次外部寫入**只落在**三個信箱的授權範圍內（`docs/handoffs/replies/` 底下的新檔案、`docs/applications/` 頂層的新申請檔案、`docs/reports/` 頂層的新上報檔案）。若發現任何檔案是在此範圍之外被新增、修改或刪除（含交接文件本體、申請檔本體、`docs/plans/`、`CLAUDE.md` 等），視為異常：停下、不要採信或彙整該次內容，回報使用者確認後再處理，不自行清理或覆蓋。（軍師自己執行的授權歸檔搬移——申請頂層→`archive/`、上報頂層→`archive/`、交接→`archive/`——不屬外部寫入，申請信箱與上報信箱的授權搬移並已被掃描規則豁免。）
+- **同步回覆前先核對寫入範圍（tripwire）**：每次讀取 `docs/handoffs/replies/` 準備彙整回覆前，先跑 `git status`／`git diff` 確認本次外部寫入**只落在**三個信箱的授權範圍內（`docs/handoffs/replies/` 底下的新檔案、`docs/applications/` 頂層的新申請檔案、`docs/reports/` 頂層的新上報檔案）。若發現任何檔案是在此範圍之外被新增、修改或刪除（含交接文件本體、申請檔本體、`docs/plans/`、`CLAUDE.md` 等），視為異常：停下、不要採信或彙整該次內容，回報使用者確認後再處理，不自行清理或覆蓋。（軍師自己執行的授權歸檔搬移——申請頂層→`archive/`、上報頂層→`archive/`、交接與其回覆→`archive/`——不屬外部寫入，三個信箱的授權歸檔搬移均已被掃描規則豁免。）
 
 ## 申請信箱協議（`docs/applications/`）
 
@@ -112,7 +112,7 @@
   ---
   ```
 - **「未 commit 即未處理」慣例**：上報檔在子專案 session 以 `/kunsu-report` 投遞後為 untracked 狀態；軍師端 `/kunsu-inbox` 以 `scan-reports.sh` 偵測並回報新上報份數。軍師 commit 後代表上報已納入版控，進入待審閱狀態。
-- **歸檔（僅軍師 session）**：軍師彙整上報內容進規劃記錄後，依序三步驟歸檔——（1）以 `Edit` 更新上報檔 frontmatter `status: submitted` → `archived`；（2）`git add <檔名>`；（3）`git mv <檔名> archive/<檔名>`——順序不可倒置（untracked 檔案直接 `git mv` 會以「not under version control」失敗，必須先 `git add` 使其進入暫存區才能安全搬移）。此搬移是授權操作，已被 `scan-reports.sh` 豁免，不誤觸 tripwire。
+- **歸檔（僅軍師 session）**：軍師彙整上報內容進規劃記錄後，依序四步驟歸檔——（1）以 `Edit` 更新上報檔 frontmatter `status: submitted` → `archived`；（2）`git add <檔名>`；（3）`git mv <檔名> archive/<檔名>`；（4）**確認 commit**——AskUserQuestion 確認後 commit 本次歸檔（訊息 `docs: 歸檔上報 <檔名>`；`git add` 對象為 `archive/` 目的地路徑——`git mv` 不暫存 working tree 的內容修改，`status` 更新靠這步帶入；取消則保留歸檔結果並附可手動執行的指令）。步驟（1）–（3）順序不可倒置（untracked 檔案直接 `git mv` 會以「not under version control」失敗，必須先 `git add` 使其進入暫存區才能安全搬移），且必須**連續執行**、步驟（3）完成前不執行 `/kunsu-inbox`（Edit 後的中間態不在掃描豁免範圍內）。此搬移是授權操作，已被 `scan-reports.sh` 豁免，不誤觸 tripwire。
 
 ## 文件導航
 
@@ -134,4 +134,4 @@
 
 ## 版本控制
 
-本目錄為獨立 git repo，與各子專案的 repo 完全分離。僅在此處對 `.md` 文件變更執行 commit；不主動 commit，除非使用者明確要求。
+本目錄為獨立 git repo，與各子專案的 repo 完全分離。僅在此處對 `.md` 文件變更執行 commit；不主動 commit，除非使用者明確要求。**協議流程尾端的確認 commit 屬授權操作**——add-project 審核歸檔、上報歸檔第（4）步、`/handoff` 各子指令尾端的 commit 均經 AskUserQuestion 逐次確認後才執行，逐次確認即為「使用者明確要求」的一種形式，與本規範相容。
