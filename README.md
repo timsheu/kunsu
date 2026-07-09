@@ -25,7 +25,7 @@
 
 - **純 skill＋範本，零編譯依賴**——交付物只有 markdown 與少量 shell 膠水腳本。
 - **絕不注入子專案**——子 repo 完全不知道軍師存在；所有機器路徑的常設登記只存在於軍師 CLAUDE.md 的關聯專案表與全域註冊表 `~/.claude/kunsu-registry.json` 兩處。
-- **例外授權雙信箱**——子專案 session 對軍師 repo 的寫入僅限兩個信箱各新增新檔案：回覆信箱（`docs/handoffs/replies/`）與申請信箱（`docs/applications/`）；tripwire 核對守住這條邊界。
+- **例外授權三信箱**——子專案 session 對軍師 repo 的寫入僅限三個信箱各新增新檔案：回覆信箱（`docs/handoffs/replies/`）、申請信箱（`docs/applications/`）與上報信箱（`docs/reports/`）；tripwire 核對守住這條邊界。
 - **傳令自動化、審核閘門不動**——`/kunsu-inbox` 只告知不開工、不主動輪詢；方案核准與驗收照舊由使用者把關。
 
 ## 安裝
