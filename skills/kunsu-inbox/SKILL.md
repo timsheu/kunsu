@@ -1,6 +1,6 @@
 ---
 name: kunsu-inbox
-version: 0.1.0
+version: 0.2.0
 description: |
   查詢跨 repo 協作信箱：列出軍師（規劃協調中心）中待接手的交接文件，或回報新抵達的回覆。
   觸發語：/kunsu-inbox、檢查信箱、有沒有待接手的交接、有沒有新的 handoff、
@@ -8,8 +8,8 @@ description: |
   查看交接狀態、kunsu inbox、kunsu-inbox。
   依當前 repo 在 ~/.claude/kunsu-registry.json 中的身分自動選擇模式：
   - 子 repo 模式：列出所屬軍師中 to: 為本角色的待接手與已回覆待確認交接文件
-  - 軍師模式：回報 docs/handoffs/replies/ 新回覆與 docs/applications/ 新申請的
-    未 commit 份數，並執行 tripwire 核對
+  - 軍師模式：回報 docs/handoffs/replies/ 新回覆、docs/applications/ 新申請與
+    docs/reports/ 新上報的未 commit 份數，並執行 tripwire 核對
   - 巢狀拓撲（兩者皆符合）：合併輸出兩種模式的結果
 allowed-tools:
   - Bash
@@ -30,7 +30,7 @@ allowed-tools:
 
 1. **只告知不開工** — `/kunsu-inbox` 只回報信箱狀態，不自動接手任何交接文件、不自動執行任何後續動作。一切動工須使用者明確指示。
 2. **不主動輪詢** — 本 skill 僅在使用者觸發時執行一次，不設定任何定時執行或背景監聽。
-3. **兩個信箱是唯讀邊界的唯一例外** — 軍師的 `docs/handoffs/replies/`（接手方建立新回覆檔案）與 `docs/applications/` 頂層（子專案以 `/kunsu-apply` 建立新申請檔案）是僅有的兩個授權寫入點。軍師其他任何目錄均屬唯讀。
+3. **三個信箱是唯讀邊界的唯一例外** — 軍師的 `docs/handoffs/replies/`（接手方建立新回覆檔案）、`docs/applications/` 頂層（子專案以 `/kunsu-apply` 建立新申請檔案）與 `docs/reports/` 頂層（子專案以 `/kunsu-report` 建立新上報檔案）是僅有的三個授權寫入點。軍師其他任何目錄均屬唯讀。
 
 ---
 
@@ -221,19 +221,21 @@ status: submitted
 
 ### 步驟 4b：軍師模式
 
-**4b-1. 呼叫掃描腳本（兩支）：**
+**4b-1. 呼叫掃描腳本（三支）：**
 
 ```bash
 bash ~/.claude/skills/kunsu-inbox/scripts/scan-replies.sh "{CURRENT_ROOT}"
 bash ~/.claude/skills/kunsu-inbox/scripts/scan-applications.sh "{CURRENT_ROOT}"
+bash ~/.claude/skills/kunsu-inbox/scripts/scan-reports.sh "{CURRENT_ROOT}"
 ```
 
-各自記錄 stdout 輸出與 exit code。`scan-applications.sh` 對無 `docs/applications/` 的舊版軍師輸出零筆、exit 0（向後相容，不報錯）。任一腳本以非 0 且非 2 的 exit code 結束（如 1：參數錯誤或非 git 根）→ 停下回報該腳本的 stderr，不繼續彙整。
+依序執行，各自記錄 stdout 輸出與 exit code。`scan-applications.sh` 對無 `docs/applications/` 的舊版軍師輸出零筆、exit 0（向後相容，不報錯）；`scan-reports.sh` 對無 `docs/reports/` 的舊版軍師同樣輸出零筆、exit 0（向後相容設計）。任一腳本以非 0 且非 2 的 exit code 結束（如 1：參數錯誤或非 git 根）→ 停下回報該腳本的 stderr，不繼續彙整。
 
 **4b-2. 解析腳本輸出：**
 
 - 每行 `NEW_REPLY:<路徑>` → 新回覆路徑清單（路徑為相對於軍師根的路徑）
 - 每行 `NEW_APPLICATION:<路徑>` → 新申請路徑清單
+- 每行 `NEW_REPORT:<路徑>` → 新上報路徑清單
 - 每行 `TRIPWIRE:<XY> <路徑>` → 意外變更清單
 
 **4b-3. tripwire 判斷（任一腳本 exit code 2）：**
@@ -249,11 +251,11 @@ bash ~/.claude/skills/kunsu-inbox/scripts/scan-applications.sh "{CURRENT_ROOT}"
 {每行列出：  {XY} {路徑}}
 
 請確認這些變更是否預期。若為正常操作（如手動建立新交接、/handoff done 的歸檔搬移
-尚未 commit），確認並 commit 後再執行 /kunsu-inbox。（申請信箱的授權歸檔搬移已被
+尚未 commit），確認並 commit 後再執行 /kunsu-inbox。（申請與上報信箱的授權歸檔搬移已被
 掃描規則豁免，正常情況不會出現在此清單。）
 ```
 
-**4b-4. 正常輸出（兩支腳本皆 exit code 0）：**
+**4b-4. 正常輸出（三支腳本皆 exit code 0）：**
 
 ```
 ## 軍師信箱
@@ -265,7 +267,11 @@ bash ~/.claude/skills/kunsu-inbox/scripts/scan-applications.sh "{CURRENT_ROOT}"
 {每行列出：  - {路徑}}
 → 以 /kunsu-init add-project 逐筆審核（核准當下才正式登記）。
 
-（各段為零時改列：目前沒有未 commit 的新回覆。／目前沒有待審申請。）
+收到 {K} 份新上報（未 commit，等待審閱）：
+{每行列出：  - {路徑}}
+→ 開檔審閱後依上報信箱協議歸檔（Edit status → git add → git mv）。
+
+（各段為零時改列：目前沒有未 commit 的新回覆。／目前沒有待審申請。／目前沒有待閱上報。）
 ```
 
 > **「未 commit 即未處理」** 的前提：軍師的慣例是彙整回覆後才 commit，因此 uncommitted 回覆視為尚未處理的標記。若提前 commit，已彙整者在此不再顯示。
