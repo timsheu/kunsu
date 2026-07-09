@@ -37,9 +37,11 @@ kunsu 專案的文件集合。專案定位與核心規範見上層 [CLAUDE.md](.
 | [adr/2026-07-07-adr-candidate-006-application-inbox-dual-mailbox.md](adr/2026-07-07-adr-candidate-006-application-inbox-dual-mailbox.md) | ADR 006（accepted）：申請信箱——例外授權擴為雙信箱，投遞與審核分離、單點登記（「僅有的兩個」語義後由 ADR 008 修訂為三） |
 | [adr/2026-07-08-adr-candidate-007-role-code-description-separation.md](adr/2026-07-08-adr-candidate-007-role-code-description-separation.md) | ADR 007（accepted）：角色識別正規化——角色代碼（比對鍵）與角色說明（描述）分離 |
 | [adr/2026-07-08-adr-candidate-008-report-inbox-triple-mailbox.md](adr/2026-07-08-adr-candidate-008-report-inbox-triple-mailbox.md) | ADR 008（accepted）：上報信箱——例外授權擴為三信箱，子專案主動上報入軍師記錄 |
+| [adr/2026-07-09-adr-candidate-009-protocol-commit-confirmation.md](adr/2026-07-09-adr-candidate-009-protocol-commit-confirmation.md) | ADR 009（accepted）：協議 commit 逐次確認制——確認 commit 升格協議步驟、投遞端不對稱維持、handoffs 授權歸檔豁免 |
 | [brainstorms/2026-07-07-application-inbox-requirements.md](brainstorms/2026-07-07-application-inbox-requirements.md) | 需求：申請信箱與 add-project 對話式改造（R1–R15、驗收例） |
 | [plans/2026-07-06-001-feat-planner-toolkit-skills-plan.md](plans/2026-07-06-001-feat-planner-toolkit-skills-plan.md) | 實作計畫：kunsu-init 與 kunsu-inbox skill 工具組（已執行完畢） |
 | [plans/2026-07-06-002-feat-integrate-handoff-skill-plan.md](plans/2026-07-06-002-feat-integrate-handoff-skill-plan.md) | 實作計畫：/handoff 併入 toolkit（已執行完畢） |
 | [plans/2026-07-07-001-feat-application-inbox-plan.md](plans/2026-07-07-001-feat-application-inbox-plan.md) | 實作計畫：申請信箱（R1–R20、六個實作單元） |
 | [plans/2026-07-08-001-refactor-role-code-description-separation-plan.md](plans/2026-07-08-001-refactor-role-code-description-separation-plan.md) | 實作計畫：角色代碼／說明分離（R1–R22、九個實作單元，已執行完畢） |
 | [plans/2026-07-08-002-feat-report-inbox-plan.md](plans/2026-07-08-002-feat-report-inbox-plan.md) | 實作計畫：上報信箱（R1–R25、八個實作單元，已執行完畢） |
+| [plans/2026-07-09-001-feat-protocol-commit-confirmation-plan.md](plans/2026-07-09-001-feat-protocol-commit-confirmation-plan.md) | 實作計畫：協議 commit 逐次確認制與 handoffs 授權歸檔豁免（R1–R20、八個實作單元） |

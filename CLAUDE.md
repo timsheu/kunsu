@@ -18,11 +18,11 @@ docs/
   README.md            → 文件中心主索引
   brainstorms/         → 需求（種子：2026-07-06 需求彙整）
   plans/               → 實作計畫（/ce-plan 產出）
-  adr/                 → ADR（001–005 accepted、006 proposed）
+  adr/                 → ADR（001–009 全數 accepted）
   solutions/           → 可重用學習與解法（/ce-compound 產出，YAML frontmatter 依 module/tags/problem_type 可搜尋）
 skills/                → skill 原始碼
-  handoff/             → 通用交接原語（v0.3.1，2026-07-06 自部署目錄併入，見 ADR 003）
-    SKILL.md           → add／reply／list／done 子指令（reply 含 kunsu 語境分支）
+  handoff/             → 通用交接原語（v0.4.0，2026-07-06 自部署目錄併入，見 ADR 003）
+    SKILL.md           → add／reply／list／done 子指令（reply 含 kunsu 語境分支；add／done／本地 reply 尾端確認 commit）
     scripts/           → new-handoff.sh、new-handoff-reply.sh
   kunsu-init/          → 軍師 scaffolding
     SKILL.md           → 訪談→查證→產檔→vault→git→註冊表主流程＋add-project 子指令（申請審核制）
@@ -31,7 +31,7 @@ skills/                → skill 原始碼
     assets/solutions/  → 兩篇種子沉澱文件（自母本通用化）
   kunsu-inbox/         → 跨 session 傳令自動化
     SKILL.md           → 模式偵測（獨立雙判斷）＋子 repo／軍師雙模式
-    scripts/scan-replies.sh → 未 commit 回覆掃描＋tripwire（porcelain）
+    scripts/scan-replies.sh → 未 commit 回覆掃描＋tripwire（done 授權歸檔豁免、雙側核驗）
     scripts/scan-applications.sh → 申請信箱掃描＋tripwire（雙側核驗授權歸檔）
     scripts/scan-reports.sh → 上報信箱掃描＋tripwire（結構同 scan-applications.sh）
   kunsu-apply/         → 子專案端投遞申請加入
