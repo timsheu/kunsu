@@ -1,6 +1,6 @@
 ---
 name: kunsu-init
-version: 0.1.0
+version: 0.2.0
 description: |
   為多 repo AI 協作場景 scaffold 一個「軍師」（規劃協調中心）：以訪談收集子專案清單，
   自動查證路徑並讀取技術棧，填入固定不變量（5 條 Invariants、回覆信箱協議與
@@ -296,7 +296,7 @@ bash "$CLAUDE_SKILL_DIR/scripts/registry-merge.sh" \
 - **`$CLAUDE_SKILL_DIR` 定位**：由 Claude Code harness 注入，指向此 skill 目錄（例如部署後為 `~/.claude/skills/kunsu-init/`）；若未注入，以 `Read` 查閱此 SKILL.md 所在路徑後推算。
 - **範本固定段落來源**：抽取自 ebook 專案群規劃中心母本（本機私有路徑，略），含 5 條 Invariants、回覆信箱協議全文（含 cd 陷阱說明、Method 2 備援、tripwire、不對稱授權）、工作流程六步驟。各軍師自持一份，消除對母本路徑的依賴。
 - **`registry-merge.sh` 的 python3 依賴**：macOS 系統自帶 python3（Xcode CLT），腳本已在缺失時給出安裝提示。不引入 jq 或其他外部依賴。
-- **為何 git commit 允許**：步驟 ⑥ 的 commit 是新建軍師 repo 的初始 commit，不是對既有 repo 的未授權提交，且需使用者明確確認後才執行。
+- **為何 git commit 允許**：步驟 ⑥ 的 commit 是新建軍師 repo 的初始 commit，不是對既有 repo 的未授權提交，且需使用者明確確認後才執行。add-project 步驟 ⑩ 的確認 commit 同理——依 ADR 009，逐次確認即為使用者明確要求，允許理由擴為「協議流程尾端對自身產出的收斂 commit」。
 - **Obsidian vault 呼叫既有 skill 的腳本**：直接呼叫 `init-vault.sh` 的固定部分（建立 .obsidian/），HOME.md 由本 skill 產生（含 handoffs dataview 附加），不重複執行 init-obsidian-vault 的完整流程。
 
 ---
@@ -595,6 +595,11 @@ bash "$CLAUDE_SKILL_DIR/scripts/registry-merge.sh" \
 
 若有技術棧降級為「待補充」的子專案，一併回報。
 
-**commit 提醒**（走申請路徑時必附）：
+**確認 commit（協議步驟，走申請路徑時必執行）**：
 
-> 本次審核產生的變更（CLAUDE.md、申請歸檔搬移）尚未 commit。歸檔搬移已被掃描規則豁免、不會誤觸 tripwire，但建議儘早 commit 以維持「未 commit 即未處理」慣例的清晰度。（依本 repo 規範不主動 commit，請使用者確認後自行執行或指示執行。）
+依 ADR 009，本次審核產出以「確認一次 → commit」收斂，維持「未 commit 即未處理」慣例的清晰度：
+
+1. **核對**：`git status --porcelain` 確認本次審核產出的具體路徑（軍師 `CLAUDE.md`、`docs/applications/archive/<各歸檔檔名>`）確有待提交變更。無變更（使用者已自行 commit）→ 回報「相關檔案已提交，無需操作」，**不產生空 commit**。
+2. **確認**：AskUserQuestion「是否 commit 本次審核產出？（訊息：`docs: 審核申請 <子專案顯示名>（核准）`，多筆審核時併列於同一訊息）」。
+3. **確認後執行**：`git add` 上述具體路徑（**不含** `~/.claude/kunsu-registry.json`——registry 為 repo 外全域檔案，不屬任何 repo 的版控範圍；亦不用 `git add -A`）→ `git commit`。**絕不 push**。
+4. **取消時**：登記與歸檔結果保留、不回退任何操作，回報可稍後手動執行的完整 `git add`＋`git commit` 指令。（歸檔搬移已被掃描規則豁免，未 commit 期間不會誤觸 tripwire。）
