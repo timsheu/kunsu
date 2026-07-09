@@ -1,6 +1,6 @@
 ---
 name: kunsu-inbox
-version: 0.2.0
+version: 0.3.0
 description: |
   查詢跨 repo 協作信箱：列出軍師（規劃協調中心）中待接手的交接文件，或回報新抵達的回覆。
   觸發語：/kunsu-inbox、檢查信箱、有沒有待接手的交接、有沒有新的 handoff、
@@ -250,9 +250,10 @@ bash ~/.claude/skills/kunsu-inbox/scripts/scan-reports.sh "{CURRENT_ROOT}"
 信箱授權範圍外有未 commit 的變更：
 {每行列出：  {XY} {路徑}}
 
-請確認這些變更是否預期。若為正常操作（如手動建立新交接、/handoff done 的歸檔搬移
-尚未 commit），確認並 commit 後再執行 /kunsu-inbox。（申請與上報信箱的授權歸檔搬移已被
-掃描規則豁免，正常情況不會出現在此清單。）
+請確認這些變更是否預期。若為正常操作（如手動建立新交接、或剛執行 /handoff add
+尚未確認 commit），確認並 commit 後再執行 /kunsu-inbox。（三個信箱的授權歸檔搬移
+——交接與其回覆、申請、上報——均已被掃描規則豁免，/handoff done 的歸檔搬移
+正常情況不會出現在此清單。）
 ```
 
 **4b-4. 正常輸出（三支腳本皆 exit code 0）：**
@@ -269,7 +270,7 @@ bash ~/.claude/skills/kunsu-inbox/scripts/scan-reports.sh "{CURRENT_ROOT}"
 
 收到 {K} 份新上報（未 commit，等待審閱）：
 {每行列出：  - {路徑}}
-→ 開檔審閱後依上報信箱協議歸檔（Edit status → git add → git mv）。
+→ 開檔審閱後依上報信箱協議四步驟歸檔（Edit status → git add → git mv → 確認 commit）。
 
 （各段為零時改列：目前沒有未 commit 的新回覆。／目前沒有待審申請。／目前沒有待閱上報。）
 ```
@@ -290,7 +291,7 @@ bash ~/.claude/skills/kunsu-inbox/scripts/scan-reports.sh "{CURRENT_ROOT}"
 
 ## 依賴聲明
 
-本 skill 依賴同 toolkit 內建的 `/handoff` skill（v0.2.1，原始碼位於本 repo `skills/handoff/`）所定義的下列慣例。兩者共同發版、慣例定義以本 repo 為準；更新 handoff 的以下行為時需同步核查本 skill：
+本 skill 依賴同 toolkit 內建的 `/handoff` skill（v0.4.0，原始碼位於本 repo `skills/handoff/`）所定義的下列慣例。兩者共同發版、慣例定義以本 repo 為準；更新 handoff 的以下行為時需同步核查本 skill：
 
 | 項目 | 慣例 |
 |------|------|
@@ -299,6 +300,8 @@ bash ~/.claude/skills/kunsu-inbox/scripts/scan-reports.sh "{CURRENT_ROOT}"
 | `status` 可能值 | `submitted`（預設）/ `partial` / `blocked` / `done` |
 | 信箱目錄 | `docs/handoffs/replies/`（一律在軍師 repo 內）|
 | `in_reply_to` 比對方式 | 精確字串比對，含後綴 |
+| done 歸檔搬移 | 頂層交接→`archive/`、其回覆→`archive/replies/` 成對搬移，即 `scan-replies.sh` 授權豁免的兩個 rename 形狀（可攜帶 `status: done` 修改，porcelain 呈現 `RM`）|
+| 流程尾端確認 commit | add／done／reply（本地語境）經 AskUserQuestion 確認後 commit（ADR 009）；kunsu 語境 reply 不 commit——未 commit 即本 skill 的新回覆偵測訊號 |
 
 另依賴同 toolkit 內建的 `/kunsu-apply` skill 所定義的申請信箱目錄慣例
 （`docs/applications/` 頂層投遞、`archive/` 歸檔——本 skill 的掃描只看 git 狀態
