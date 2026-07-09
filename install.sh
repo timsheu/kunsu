@@ -11,7 +11,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SKILLS=(handoff kunsu-init kunsu-inbox kunsu-apply kunsu-report)
+SKILLS=(handoff kunsu-init kunsu-inbox kunsu-apply kunsu-report kunsu-list)
 TARGET_DIR="${HOME}/.claude/skills"
 MODE="copy"
 
@@ -88,4 +88,4 @@ for d in "${deployed[@]}"; do
   fi
 done
 echo ""
-echo "新開 Claude Code session 即可使用 /handoff、/kunsu-init、/kunsu-inbox、/kunsu-apply 與 /kunsu-report。"
+echo "新開 Claude Code session 即可使用 /handoff、/kunsu-init、/kunsu-inbox、/kunsu-apply、/kunsu-report 與 /kunsu-list。"
