@@ -345,13 +345,13 @@ PYEOF
 
 ---
 
-### ②：申請信箱遷移偵測
+### ②-a：申請信箱遷移偵測
 
 ```bash
 test -d "<CURRENT_REPO_ROOT>/docs/applications" && echo "ok" || echo "missing"
 ```
 
-- **ok** → 繼續步驟 ③。
+- **ok** → 記錄 `APP_MIGRATION=ok`，繼續執行 ②-b。
 - **missing**（舊版 scaffold 的軍師）→ 以 `AskUserQuestion` 提議遷移：「本軍師尚無申請信箱（`docs/applications/`）。是否補建並在 CLAUDE.md 補入申請信箱協議？補建後子專案才能以 `/kunsu-apply` 投遞申請。（y/n）」
   - **y → 執行遷移三步：**
     1. **補建目錄**：
@@ -367,8 +367,45 @@ test -d "<CURRENT_REPO_ROOT>/docs/applications" && echo "ok" || echo "missing"
     3. **完成核查（兩條，防半更新）**：
        - `grep -c 'docs/applications/' "<CURRENT_REPO_ROOT>/CLAUDE.md"` 應大於 0（申請信箱協議已插入）。
        - `grep -c '信箱範圍是唯一的例外授權' "<CURRENT_REPO_ROOT>/CLAUDE.md"` 應為 0（舊單信箱 bullet 已改寫；非零表示協議停在自相矛盾的半更新狀態）。pattern 須用舊 bullet 專屬前綴「信箱範圍是唯一的例外授權」（與上方步驟 2「改寫舊 bullet」所指涉的字串一致）；**勿改回較短的「唯一的例外授權」——範本現行雙信箱 bullet 本身即「兩個信箱是唯一的例外授權…」，含該短子字串，會被命中而把正確遷移誤判成半更新**。
-       任一條核查失敗 → 明確回報失敗項目：「目錄已補建，但 CLAUDE.md 協議文字補入不完整（申請信箱章節缺失／舊『唯一例外授權』bullet 未改寫）。請對照範本 `kunsu-claude.md` 手動補正。」**不回滾已建目錄**，繼續步驟 ③。
-  - **n → 拒絕遷移**：記錄「軍師未遷移，本次跳過申請掃描」，直接跳至步驟 ⑤（訪談路徑）。
+       任一條核查失敗 → 明確回報失敗項目：「目錄已補建，但 CLAUDE.md 協議文字補入不完整（申請信箱章節缺失／舊『唯一例外授權』bullet 未改寫）。請對照範本 `kunsu-claude.md` 手動補正。」**不回滾已建目錄**，記錄 `APP_MIGRATION=migrated`（目錄已建），繼續執行 ②-b。
+    → 三步執行完畢：記錄 `APP_MIGRATION=migrated`，繼續執行 ②-b。
+  - **n → 拒絕遷移**：記錄 `APP_MIGRATION=skipped`，繼續執行 ②-b。
+
+---
+
+### ②-b：上報信箱遷移偵測
+
+> **兩段偵測各自獨立、依序執行、單段失敗回報後，後段照常執行。**
+
+```bash
+test -d "<CURRENT_REPO_ROOT>/docs/reports" && echo "ok" || echo "missing"
+```
+
+- **ok** → 記錄 `REPORT_MIGRATION=ok`，繼續（見下方統一跳轉）。
+- **missing**（尚未補建上報信箱的軍師）→ 以 `AskUserQuestion` 提議遷移：「本軍師尚無上報信箱（`docs/reports/`）。是否補建並在 CLAUDE.md 補入上報信箱協議？補建後子專案才能以 `/kunsu-report` 投遞上報。（y/n）」
+  - **y → 執行遷移三步：**
+    1. **補建目錄**：
+       ```bash
+       mkdir -p "<CURRENT_REPO_ROOT>/docs/reports/archive"
+       touch "<CURRENT_REPO_ROOT>/docs/reports/.gitkeep"
+       touch "<CURRENT_REPO_ROOT>/docs/reports/archive/.gitkeep"
+       ```
+    2. **補協議文字**：以 `Read` 讀取 `$CLAUDE_SKILL_DIR/assets/templates/kunsu-claude.md`（`$CLAUDE_SKILL_DIR` 若未定義，改用此 SKILL.md 所在目錄的絕對路徑），取出「上報信箱協議」整個章節，以 `Edit` 更新軍師 CLAUDE.md：
+       - 在 `## 文件導航` 標題之前插入「## 上報信箱協議」整段（置於「申請信箱協議」章節之後，與範本逐字相同），並在文件導航表補 `docs/reports/` 與 `docs/reports/archive/` 兩列。
+       - 將回覆信箱協議中「**兩個信箱是唯一的例外授權**」bullet 改寫為範本現行的三信箱表述（「三個信箱是唯一的例外授權…」）；tripwire bullet 的核對範圍同步擴及 `docs/reports/` 頂層，並更新授權歸檔括號說明列入上報信箱。
+       - 任一插入錨點不存在（CLAUDE.md 經手改）→ 略過該處，留待核查回報。
+    3. **完成核查（兩條，防半更新）**：
+       - `grep -c 'docs/reports/' "<CURRENT_REPO_ROOT>/CLAUDE.md"` 應大於 0（上報信箱協議已插入）。
+       - `grep -c '兩個信箱是唯一的例外授權' "<CURRENT_REPO_ROOT>/CLAUDE.md"` 應為 0（雙信箱 bullet 已改寫為三信箱表述；此為軍師 CLAUDE.md 雙信箱版 bullet 的專屬前綴，三信箱改寫後不復存在）。**勿縮短核查字串為「唯一的例外授權」——三信箱新 bullet 本身即「三個信箱是唯一的例外授權…」，含該短子串，會把正確遷移誤判成半更新**；並注意此處核查的是軍師 CLAUDE.md 的 bullet 文字，與 kunsu-inbox SKILL.md 的「兩個信箱是唯讀邊界的唯一例外」措辭不同，請勿混用。
+       任一條核查失敗 → 明確回報失敗項目：「目錄已補建，但 CLAUDE.md 協議文字補入不完整（上報信箱章節缺失／雙信箱 bullet 未改寫為三信箱表述）。請對照範本 `kunsu-claude.md` 手動補正。」**不回滾已建目錄**，記錄 `REPORT_MIGRATION=migrated`（目錄已建），繼續（見下方統一跳轉）。
+    → 三步執行完畢：記錄 `REPORT_MIGRATION=migrated`，繼續（見下方統一跳轉）。
+  - **n → 拒絕遷移**：記錄 `REPORT_MIGRATION=skipped`，繼續（見下方統一跳轉）。
+
+**②-b 完成後統一跳轉**：
+- `APP_MIGRATION=skipped` → 記錄「軍師未遷移，本次跳過申請掃描」，跳至步驟 ⑤（訪談路徑）。
+- `APP_MIGRATION=ok` 或 `APP_MIGRATION=migrated` → 繼續步驟 ③。
+
+（`REPORT_MIGRATION` 結果不影響此跳轉——上報信箱缺失僅擋 `/kunsu-report` 投遞，不擋申請審核流程。）
 
 ---
 
