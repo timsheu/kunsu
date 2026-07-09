@@ -10,6 +10,10 @@
 | `plans/` | 跨專案功能規劃（含各端拆分與介接規格） | `/ce-plan` |
 | `handoffs/` | 交給各子專案 session 的交接文件 | `/handoff` |
 | `handoffs/replies/` | 接手方 session 的回覆信箱（唯讀，對方寫） | — |
+| `applications/` | 子專案申請信箱（頂層對方寫，待審不可變） | `/kunsu-apply`（子專案端） |
+| `applications/archive/` | 已處理申請歸檔（軍師管理） | — |
+| `reports/` | 子專案上報信箱（頂層對方寫，軍師審閱歸檔） | `/kunsu-report`（子專案端） |
+| `reports/archive/` | 已處理上報歸檔（軍師管理） | — |
 | `adr/` | 跨專案架構決策紀錄與候選 | 手動 / `/ce-plan` 產出 ADR Candidate |
 | `modules/` | 跨專案模組地圖、資料流向說明 | 手動維護 |
 | `solutions/` | 可重用學習與解法 | `/ce-compound` |

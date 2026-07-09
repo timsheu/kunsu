@@ -133,11 +133,14 @@ touch "<PLANNER_ROOT_PATH>/docs/handoffs/replies/.gitkeep"
 mkdir -p "<PLANNER_ROOT_PATH>/docs/applications/archive"
 touch "<PLANNER_ROOT_PATH>/docs/applications/.gitkeep"
 touch "<PLANNER_ROOT_PATH>/docs/applications/archive/.gitkeep"
+mkdir -p "<PLANNER_ROOT_PATH>/docs/reports/archive"
+touch "<PLANNER_ROOT_PATH>/docs/reports/.gitkeep"
+touch "<PLANNER_ROOT_PATH>/docs/reports/archive/.gitkeep"
 mkdir -p "<PLANNER_ROOT_PATH>/docs/solutions/architecture-patterns"
 mkdir -p "<PLANNER_ROOT_PATH>/docs/solutions/conventions"
 ```
 
-> `docs/applications/` 是申請信箱（`/kunsu-apply` 投遞、`add-project` 審核），與 `docs/handoffs/replies/` 同屬例外授權信箱。`.gitkeep` 佔位確保 clone 後目錄存在，否則掃描腳本在首份申請抵達前無從核對。
+> `docs/applications/` 是申請信箱（`/kunsu-apply` 投遞、`add-project` 審核），與 `docs/handoffs/replies/` 同屬例外授權信箱。`.gitkeep` 佔位確保 clone 後目錄存在，否則掃描腳本在首份申請抵達前無從核對。`docs/reports/` 是上報信箱（子專案以 `/kunsu-report` 主動上報、軍師審閱歸檔）。`.gitkeep` 佔位確保 clone 後目錄存在，否則掃描腳本在首份上報抵達前無從核對。
 
 ### ④-5 複製 solutions 種子文件
 
@@ -168,6 +171,8 @@ docs/
     replies/           → 回覆信箱（對方 session 寫入）
   applications/        → 申請信箱（/kunsu-apply 投遞、add-project 審核）
     archive/           → 已處理申請歸檔
+  reports/             → 上報信箱（/kunsu-report 投遞，軍師審閱歸檔）
+    archive/           → 已處理上報歸檔
   solutions/           → 可重用學習與解法（/ce-compound 產出）
     architecture-patterns/
     conventions/
@@ -212,6 +217,7 @@ bash "$HOME/.claude/skills/init-obsidian-vault/scripts/init-vault.sh" \
 3. 將 **Dataview 區塊移除**：軍師初始只有 solutions 有 frontmatter，其餘空目錄無 frontmatter 可查。只保留 HOME.md 基礎入口區塊。
 4. 以 `Write` 寫至 `<PLANNER_ROOT_PATH>/docs/HOME.md`。
 5. 以 `Read` 讀取 `$CLAUDE_SKILL_DIR/assets/templates/home-dataview-handoffs.md`，以**追加**方式（另起新行 `\n\n` 後）附加至 `docs/HOME.md`：以 `Edit` 在 HOME.md 末尾附加整個 dataview 區塊。
+6. 以 `Read` 讀取 `$CLAUDE_SKILL_DIR/assets/templates/home-dataview-reports.md`，以**追加**方式（另起新行 `\n\n` 後）附加至 `docs/HOME.md`：以 `Edit` 在 HOME.md 末尾附加整個上報 dataview 區塊。
 
 ---
 
@@ -262,7 +268,7 @@ bash "$CLAUDE_SKILL_DIR/scripts/registry-merge.sh" \
 
 ## 步驟 ⑧：驗收核查
 
-逐項核對以下八項，以表格或清單形式回報「通過 / 未通過 + 說明」：
+逐項核對以下十一項，以表格或清單形式回報「通過 / 未通過 + 說明」：
 
 | 項目 | 查核方式 | 不變量編號 |
 |------|----------|-----------|
@@ -271,6 +277,9 @@ bash "$CLAUDE_SKILL_DIR/scripts/registry-merge.sh" \
 | `docs/applications/.gitkeep` 存在 | `test -f "<PLANNER_ROOT_PATH>/docs/applications/.gitkeep"` | ADR 006 申請信箱結構 |
 | `docs/applications/archive/.gitkeep` 存在 | `test -f "<PLANNER_ROOT_PATH>/docs/applications/archive/.gitkeep"` | ADR 006 申請信箱結構 |
 | CLAUDE.md 含申請信箱協議 | `grep -c 'docs/applications/' "<PLANNER_ROOT_PATH>/CLAUDE.md"` 應大於 0 | ADR 006 申請信箱結構 |
+| `docs/reports/.gitkeep` 存在 | `test -f "<PLANNER_ROOT_PATH>/docs/reports/.gitkeep"` | ADR 008 上報信箱結構 |
+| `docs/reports/archive/.gitkeep` 存在 | `test -f "<PLANNER_ROOT_PATH>/docs/reports/archive/.gitkeep"` | ADR 008 上報信箱結構 |
+| CLAUDE.md 含上報信箱協議 | `grep -c 'docs/reports/' "<PLANNER_ROOT_PATH>/CLAUDE.md"` 應大於 0 | ADR 008 上報信箱結構 |
 | 軍師根目錄為 git repo | `test -d "<PLANNER_ROOT_PATH>/.git"` | ADR 001 結構不變量 |
 | CLAUDE.md 無殘留 `{{...}}` 佔位符 | `grep -c '{{' "<PLANNER_ROOT_PATH>/CLAUDE.md"` 應為 0 | 範本渲染完整 |
 | docs/README.md 無殘留 `{{...}}` 佔位符 | `grep -c '{{' "<PLANNER_ROOT_PATH>/docs/README.md"` 應為 0 | 範本渲染完整 |

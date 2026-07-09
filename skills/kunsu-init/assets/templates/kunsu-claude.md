@@ -65,8 +65,8 @@
   ```
 - **同步時機**：使用者主動要求「同步進度」或「看一下回覆」時，軍師讀取 `docs/handoffs/replies/` 下尚未處理的回覆，彙整進 `docs/plans/`（更新決策、記錄落差）；不主動輪詢。
 - **對方可用全域 `/handoff reply` 指令回覆**：全域 `~/.claude/skills/handoff`（v0.2.0+）已原生支援此回覆信箱模式。**但該指令以「執行當下的工作目錄」往上找 `CLAUDE.md` 定位專案根**——各接手方 session 預設工作目錄是它們自己的 repo（各自也有 `CLAUDE.md`），若不先 `cd` 到軍師目錄（`{{PLANNER_ROOT_PATH}}`）再執行 `/handoff reply`，會誤判成對方自己專案的根、把回覆寫進錯誤的 repo。**每份交接文件的「回覆方式」段落都必須明確附上這個 `cd` 步驟**，並提供「用絕對路徑手動建檔」作為備援做法，避免此陷阱重演。
-- **兩個信箱是唯一的例外授權，不是全域寫入權**：對方 session 被允許寫入的範圍僅限（1）在 `docs/handoffs/replies/` 新增回覆檔案、（2）在 `docs/applications/` 頂層新增申請檔案（見下方「申請信箱協議」），不包含編輯本目錄下任何既有檔案（含交接文件本體、`docs/plans/`、`CLAUDE.md` 等）。這是刻意限縮範圍的例外，不是放寬 Invariant #2 的對等關係——軍師仍完全不寫對方 repo，對方僅能寫這兩個信箱資料夾，範圍不對稱是刻意的。
-- **同步回覆前先核對寫入範圍（tripwire）**：每次讀取 `docs/handoffs/replies/` 準備彙整回覆前，先跑 `git status`／`git diff` 確認本次外部寫入**只落在**兩個信箱的授權範圍內（`docs/handoffs/replies/` 底下的新檔案、`docs/applications/` 頂層的新申請檔案）。若發現任何檔案是在此範圍之外被新增、修改或刪除（含交接文件本體、申請檔本體、`docs/plans/`、`CLAUDE.md` 等），視為異常：停下、不要採信或彙整該次內容，回報使用者確認後再處理，不自行清理或覆蓋。（軍師自己執行的授權歸檔搬移——申請頂層→`archive/`、交接→`archive/`——不屬外部寫入，申請信箱的授權搬移並已被掃描規則豁免。）
+- **三個信箱是唯一的例外授權，不是全域寫入權**：對方 session 被允許寫入的範圍僅限（1）在 `docs/handoffs/replies/` 新增回覆檔案、（2）在 `docs/applications/` 頂層新增申請檔案（見下方「申請信箱協議」）、（3）在 `docs/reports/` 頂層新增上報檔案（見下方「上報信箱協議」），不包含編輯本目錄下任何既有檔案（含交接文件本體、`docs/plans/`、`CLAUDE.md` 等）。這是刻意限縮範圍的例外，不是放寬 Invariant #2 的對等關係——軍師仍完全不寫對方 repo，對方僅能寫這三個信箱資料夾，範圍不對稱是刻意的。
+- **同步回覆前先核對寫入範圍（tripwire）**：每次讀取 `docs/handoffs/replies/` 準備彙整回覆前，先跑 `git status`／`git diff` 確認本次外部寫入**只落在**三個信箱的授權範圍內（`docs/handoffs/replies/` 底下的新檔案、`docs/applications/` 頂層的新申請檔案、`docs/reports/` 頂層的新上報檔案）。若發現任何檔案是在此範圍之外被新增、修改或刪除（含交接文件本體、申請檔本體、`docs/plans/`、`CLAUDE.md` 等），視為異常：停下、不要採信或彙整該次內容，回報使用者確認後再處理，不自行清理或覆蓋。（軍師自己執行的授權歸檔搬移——申請頂層→`archive/`、上報頂層→`archive/`、交接→`archive/`——不屬外部寫入，申請信箱與上報信箱的授權搬移並已被掃描規則豁免。）
 
 ## 申請信箱協議（`docs/applications/`）
 
@@ -93,6 +93,27 @@
 - **審核（僅軍師 session）**：以 `/kunsu-init add-project`（kunsu-init 子指令）掃描待審申請逐筆審核（核准／修改角色代碼後核准／退回）。**核准當下才寫入本 CLAUDE.md 關聯專案表與全域註冊表（單點登記）**——待審申請不進任何正式登記，避免半登記狀態。角色代碼定案權在軍師，核准時可修改子專案提議的代碼與說明。
 - **歸檔（僅軍師 session）**：處理完的申請由軍師更新 frontmatter（`status: approved` 或 `rejected`，退回附 `decision_note` 原因）後歸檔至 `docs/applications/archive/`——先 `git add` 再 `git mv`（待審申請通常是 untracked，直接 `git mv` 會失敗）。此搬移是授權操作；反向搬移（`archive/` → 頂層）與頂層申請檔的修改、刪除均視為異常，適用上方 tripwire 規則。
 
+## 上報信箱協議（`docs/reports/`）
+
+子專案 session 向本軍師主動上報情報的入口，屬「任何檔案永遠只有一個作者」例外授權設計的第三信箱。
+
+- **投遞（`docs/reports/` 頂層 `*.md`）**：僅子專案 session 以 `/kunsu-report` 新增上報檔（每份上報一個新檔案），不編輯信箱內任何既有檔案、不寫入 `archive/` 子目錄。上報為 append-only 情報，同主題多次投遞合法，同日同名自動加 `-2`、`-3`（永遠新增，絕不覆寫）。
+- **上報是情報，不是反向委派**：軍師對上報**不承諾回覆或執行**。若子專案的實際意圖是「要軍師做某事」，由軍師讀取上報後自行開 plan 或發起 handoff 追蹤；`docs/reports/` 不作為反向任務佇列，不設回覆機制。
+- **上報檔命名**：`{YYYY-MM-DD}-{slug}-report.md`，同日同名自動加 `-2`、`-3`。
+- **上報檔 frontmatter**：
+  ```yaml
+  ---
+  title: {上報標題}
+  type: report
+  from: {角色代碼}
+  created: YYYY-MM-DD
+  status: submitted
+  tags: [report]
+  ---
+  ```
+- **「未 commit 即未處理」慣例**：上報檔在子專案 session 以 `/kunsu-report` 投遞後為 untracked 狀態；軍師端 `/kunsu-inbox` 以 `scan-reports.sh` 偵測並回報新上報份數。軍師 commit 後代表上報已納入版控，進入待審閱狀態。
+- **歸檔（僅軍師 session）**：軍師彙整上報內容進規劃記錄後，依序三步驟歸檔——（1）以 `Edit` 更新上報檔 frontmatter `status: submitted` → `archived`；（2）`git add <檔名>`；（3）`git mv <檔名> archive/<檔名>`——順序不可倒置（untracked 檔案直接 `git mv` 會以「not under version control」失敗，必須先 `git add` 使其進入暫存區才能安全搬移）。此搬移是授權操作，已被 `scan-reports.sh` 豁免，不誤觸 tripwire。
+
 ## 文件導航
 
 | 入口 | 說明 |
@@ -104,6 +125,8 @@
 | docs/handoffs/replies/ | 接手方 session 的回覆信箱（唯讀，對方寫） |
 | docs/applications/ | 子專案申請加入的申請信箱（頂層對方寫，待審不可變） |
 | docs/applications/archive/ | 已處理申請的歸檔區（軍師管理） |
+| docs/reports/ | 子專案主動上報的上報信箱（頂層對方寫，軍師審閱歸檔） |
+| docs/reports/archive/ | 已處理上報的歸檔區（軍師管理） |
 | docs/adr/ | 跨專案架構決策 |
 | docs/modules/ | 跨專案模組地圖 |
 | docs/solutions/ | 可重用學習與解法（可依 `module`／`tags`／`problem_type` frontmatter 搜尋） |
