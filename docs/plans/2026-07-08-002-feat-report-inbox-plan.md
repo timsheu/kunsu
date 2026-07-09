@@ -1,7 +1,7 @@
 ---
 title: "feat: 上報信箱——docs/reports/ 第三信箱與 /kunsu-report skill"
 type: feat
-status: active
+status: completed
 date: 2026-07-08
 origin: docs/adr/2026-07-08-adr-candidate-008-report-inbox-triple-mailbox.md
 ---

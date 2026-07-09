@@ -21,6 +21,7 @@ kunsu 專案的文件集合。專案定位與核心規範見上層 [CLAUDE.md](.
 - **角色識別正規化（2026-07-08）**：「角色」拆為**角色代碼**（比對鍵）與**角色說明**（display-only）；範本雙欄、CONCEPTS 拆詞、四支 SKILL＋`registry-merge.sh` 軟警告＋`add-project` 唯一性權威強制點，並遷移 ivm／ebook 兩軍師 live registry 與 CLAUDE.md（**修復 ivm `/kunsu-inbox` false-negative**）。經兩輪 `/ce-doc-review`（15 項修正）審定（ADR 007 accepted）。
 - **/handoff reply 路由補洞（2026-07-08，v0.3.0）**：子專案口語「回覆軍師」未命中任何 skill、回覆錯投軍師 `docs/handoffs/` 頂層（tripwire 如設計攔截）。修補三處：description 觸發詞補口語、reply 新增 kunsu 語境分支（未給 slug 時查 registry 定位軍師與待回交接）、`new-handoff-reply.sh` 落點改從原交接檔位置推算（跨 repo 回覆保證落在軍師 `replies/`，含 archive 與非 handoffs 路徑防呆），五場景實測通過。
 - **上報信箱提案（2026-07-08）**：孤兒回覆事件暴露「子專案主動上報」無正式管道，起草 ADR 008 candidate——例外授權擴為三信箱（`docs/reports/`）、以「有無對應交接」結構判準分界 reply／report、中文定名「上報」（口語「回報」偏 reply 故歸 reply 觸發，「稟報軍師」列 report 觸發別名）、雙向重導兜底灰帶、`/kunsu-report` 投遞 skill，待審定後另立實作計畫。
+- **上報信箱落地（2026-07-09）**：ADR 008 全量實作——`/kunsu-report`、`scan-reports.sh`、`/kunsu-inbox` 第三段、scaffold 與 add-project 三信箱化、母體同步、ivm／ebook live 遷移與 ivm 孤兒上報歸位；八單元 maker（sonnet）／verifier 分離執行、dogfooding 全過（[實作計畫](plans/2026-07-08-002-feat-report-inbox-plan.md)）。
 - **下一步**：於真實專案群首輪使用 `/kunsu-init` 建立軍師（如 ebook 中心加入 iOS 時的 add-project 案例），累積手感後評估 SessionStart hook（ADR 002 第二階段）。
 
 ## 文件清單
@@ -41,3 +42,4 @@ kunsu 專案的文件集合。專案定位與核心規範見上層 [CLAUDE.md](.
 | [plans/2026-07-06-002-feat-integrate-handoff-skill-plan.md](plans/2026-07-06-002-feat-integrate-handoff-skill-plan.md) | 實作計畫：/handoff 併入 toolkit（已執行完畢） |
 | [plans/2026-07-07-001-feat-application-inbox-plan.md](plans/2026-07-07-001-feat-application-inbox-plan.md) | 實作計畫：申請信箱（R1–R20、六個實作單元） |
 | [plans/2026-07-08-001-refactor-role-code-description-separation-plan.md](plans/2026-07-08-001-refactor-role-code-description-separation-plan.md) | 實作計畫：角色代碼／說明分離（R1–R22、九個實作單元，已執行完畢） |
+| [plans/2026-07-08-002-feat-report-inbox-plan.md](plans/2026-07-08-002-feat-report-inbox-plan.md) | 實作計畫：上報信箱（R1–R25、八個實作單元，已執行完畢） |
