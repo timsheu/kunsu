@@ -22,6 +22,7 @@ kunsu 專案的文件集合。專案定位與核心規範見上層 [CLAUDE.md](.
 - **/handoff reply 路由補洞（2026-07-08，v0.3.0）**：子專案口語「回覆軍師」未命中任何 skill、回覆錯投軍師 `docs/handoffs/` 頂層（tripwire 如設計攔截）。修補三處：description 觸發詞補口語、reply 新增 kunsu 語境分支（未給 slug 時查 registry 定位軍師與待回交接）、`new-handoff-reply.sh` 落點改從原交接檔位置推算（跨 repo 回覆保證落在軍師 `replies/`，含 archive 與非 handoffs 路徑防呆），五場景實測通過。
 - **上報信箱提案（2026-07-08）**：孤兒回覆事件暴露「子專案主動上報」無正式管道，起草 ADR 008 candidate——例外授權擴為三信箱（`docs/reports/`）、以「有無對應交接」結構判準分界 reply／report、中文定名「上報」（口語「回報」偏 reply 故歸 reply 觸發，「稟報軍師」列 report 觸發別名）、雙向重導兜底灰帶、`/kunsu-report` 投遞 skill，待審定後另立實作計畫。
 - **上報信箱落地（2026-07-09）**：ADR 008 全量實作——`/kunsu-report`、`scan-reports.sh`、`/kunsu-inbox` 第三段、scaffold 與 add-project 三信箱化、母體同步、ivm／ebook live 遷移與 ivm 孤兒上報歸位；八單元 maker（sonnet）／verifier 分離執行、dogfooding 全過（[實作計畫](plans/2026-07-08-002-feat-report-inbox-plan.md)）。
+- **協議 commit 逐次確認制（2026-07-10）**：ADR 009 落地——流程尾端 commit 升格為 AskUserQuestion 確認制（handoff v0.4.0、kunsu-init v0.2.0、kunsu-inbox v0.3.0），投遞端不對稱維持；`scan-replies.sh` 補 done 授權歸檔豁免（雙側核驗三形狀、RM 陷阱實測修正）；範本與 ivm／ebook 兩軍師 live 遷移；fixture 十四場景＋e2e dogfooding 九場景全過（[實作計畫](plans/2026-07-09-001-feat-protocol-commit-confirmation-plan.md)）。
 - **下一步**：於真實專案群首輪使用 `/kunsu-init` 建立軍師（如 ebook 中心加入 iOS 時的 add-project 案例），累積手感後評估 SessionStart hook（ADR 002 第二階段）。
 
 ## 文件清單

@@ -1,7 +1,7 @@
 ---
 title: "feat: 協議 commit 逐次確認制與 handoffs 授權歸檔豁免"
 type: feat
-status: active
+status: completed
 date: 2026-07-09
 ---
 
