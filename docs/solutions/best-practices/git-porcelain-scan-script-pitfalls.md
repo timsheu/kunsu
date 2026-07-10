@@ -1,5 +1,5 @@
 ---
-title: 撰寫 git porcelain 掃描腳本的三個陷阱
+title: 撰寫 git porcelain 掃描腳本的四個陷阱
 date: "2026-07-07"
 category: best-practices
 module: kunsu-toolkit-scripts
@@ -14,7 +14,7 @@ applies_when:
 tags: [git-porcelain, shell-script, core-quotepath, git-mv, untracked-files, glob-pattern, macos, kunsu-inbox]
 ---
 
-# 撰寫 git porcelain 掃描腳本的三個陷阱
+# 撰寫 git porcelain 掃描腳本的四個陷阱
 
 ## Context
 
@@ -99,6 +99,37 @@ elif [[ "$path_part" == docs/applications/* ]]; then
 fi
 ```
 
+### 陷阱四：`git mv` 不暫存 working tree 的內容修改（porcelain 呈現 `RM`）
+
+對「已 commit 且 working tree 有未暫存修改」的檔案執行 `git mv`，只有 rename 進入
+index，**內容修改仍留在 working tree**——porcelain 呈現 `RM old -> new`（rename
+已 stage、修改未 stage），且 **staged 內容是舊版**。ADR 009 落地時實測發現：
+`/handoff done` 的「Edit `status: done` → `git mv` 至 archive」序列若在 commit 前
+不補 `git add`，commit 進 archive 的檔案仍是 `status: open` 的舊版，且因檔案已在
+歸檔區、掃描豁免範圍內，此錯誤**不會自我暴露**。
+
+**錯誤假設**
+
+```bash
+# 誤以為 git mv 會把當前內容一併 stage
+sed -i '' 's/status: open/status: done/' docs/handoffs/foo.md   # Edit（未 stage）
+git mv docs/handoffs/foo.md docs/handoffs/archive/foo.md
+git commit -m "docs: 歸檔交接 foo.md"
+git show HEAD:docs/handoffs/archive/foo.md   # → 仍是 status: open！
+```
+
+**正確寫法**
+
+```bash
+# commit 前對「搬移目的地路徑」git add，把內容修改帶入
+git mv docs/handoffs/foo.md docs/handoffs/archive/foo.md
+git add docs/handoffs/archive/foo.md
+git commit -m "docs: 歸檔交接 foo.md"
+```
+
+掃描端配套：rename 豁免規則只驗路徑形狀、不看 XY 狀態碼，`RM` 行與 `R ` 行同樣
+豁免（`scan-replies.sh` rename 分支的設計前提）。
+
 ## Why This Matters
 
 | 陷阱 | 失敗模式 |
@@ -106,8 +137,9 @@ fi
 | untracked `git mv` 失敗 | 歸檔指令非零退出、流程中斷，申請卡在頂層維持 `pending`，形成需人工介入的卡死狀態 |
 | `core.quotepath` octal escape | 含中文檔名的申請被**靜默忽略**——路徑不符任何分類分支、整筆流走，tripwire 也不觸發，申請無聲消失 |
 | glob 跨 `/` 誤匹配 | 已歸檔的檔案被再次報為新申請、重複進入審核；分類邊界（授權豁免 vs 異常）整體失效 |
+| `git mv` 不暫存內容修改（`RM`） | 歸檔 commit 帶入的是舊版內容（如 `status` 未更新），檔案已入豁免範圍、錯誤永不自我暴露，狀態機語意靜默失效 |
 
-三者的共同性質是**靜默或半靜默失敗**：不修不會立刻噴錯到使用者面前，而是讓資料流在某處無聲斷掉。
+四者的共同性質是**靜默或半靜默失敗**：不修不會立刻噴錯到使用者面前，而是讓資料流在某處無聲斷掉。
 
 ## When to Apply
 
@@ -115,6 +147,7 @@ fi
 - 以 bash `[[ ]]` glob 對含子目錄的樹狀結構分類時：子目錄分支排在頂層分支之前，並以 `${path#prefix}` 是否含 `/` 二次驗證「頂層」。
 - 需要 `git mv` 的檔案可能尚未 commit 時：一律先 `git add` 再 `git mv`，同時讓 porcelain 結果可預期（`A` 或 `R`）。
 - 類比既有腳本前，先確認目錄深度假設一致——單層結構的 pattern 不可直接套用到有子目錄的結構。
+- 「Edit 後 `git mv` 再 commit」的流程：commit 前一律對搬移目的地路徑 `git add`，勿假設 `git mv` 已暫存內容修改。
 
 ## Examples
 
