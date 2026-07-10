@@ -15,12 +15,12 @@
 #   2 — tripwire 觸發（docs/handoffs/ 下有授權範圍外的未 commit 變更）
 #
 # 分類規則（if/elif 順序即授權邊界，不可調換）：
-#   1. docs/handoffs/archive/* 一律靜默略過 —— 歸檔區由軍師 session 管理
-#      （/handoff done 的授權歸檔），不做狀態欄篩選，與 scan-applications.sh
-#      對 archive/ 的取捨一致：untracked 檔先 git add 再 git mv 後在 porcelain
-#      呈現為 archive/ 下的 A 新增而非 rename，亦涵蓋在此分支。此分支必須
-#      最先評估：bash [[ ]] 的 docs/handoffs/replies/*.md pattern 中 `*` 可跨
-#      `/`，會同時匹配 archive/replies/ 內檔案。
+#   1. 非 rename 的 docs/handoffs/archive/* 變更一律靜默略過 —— 歸檔區由軍師
+#      session 管理（/handoff done 的授權歸檔），不做狀態欄篩選，與
+#      scan-applications.sh 對 archive/ 的取捨一致：untracked 檔先 git add 再
+#      git mv 後在 porcelain 呈現為 archive/ 下的 A 新增而非 rename，亦涵蓋在
+#      此分支。此分支必須最先評估：後方 catch-all `docs/handoffs/*` 會匹配
+#      archive/ 下所有路徑，archive 分支必須先行攔截。
 #   2. replies/ 頂層 <名稱>.md（名稱不含 /）：?? 或 index A ＝新回覆；其餘
 #      狀態（修改已 commit 的回覆等）＝靜默忽略（不計新回覆、不觸發 tripwire，
 #      沿舊版行為）。
@@ -33,8 +33,9 @@
 #     b. src 為 docs/handoffs/replies/ 頂層 .md 且 dst 位於
 #        docs/handoffs/archive/replies/
 #   其餘涉及 docs/handoffs/ 任一側的搬移（含 archive/→頂層、replies/→頂層
-#   等反向或越界搬移）＝tripwire。不驗 src/dst basename 同名（/handoff done
-#   的 git mv 天然同名，與 scan-applications.sh／scan-reports.sh 一致）。
+#   等反向或越界搬移，以及 archive/ 內部搬移——「靜默略過」僅指非 rename 的
+#   路徑變更）＝tripwire，與 scan-applications.sh 行為一致。不驗 src/dst
+#   basename 同名（/handoff done 的 git mv 天然同名，與另兩支腳本一致）。
 #
 # 授權邊界的威脅模型（為何 archive/ 靜默豁免是可接受取捨）：
 #   投遞腳本（new-handoff-reply.sh）只往 replies/ 頂層寫；會寫 archive/ 的

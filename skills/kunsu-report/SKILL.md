@@ -1,6 +1,6 @@
 ---
 name: kunsu-report
-version: 0.1.0
+version: 0.1.1
 description: |
   在子專案 session 向已登記的軍師（規劃協調中心）投遞「主動上報」：自動偵測子專案
   路徑，從全域反向註冊表 ~/.claude/kunsu-registry.json 取得本 repo 自身條目（限
@@ -173,4 +173,4 @@ printf '%s' "$BODY" | bash "$CLAUDE_SKILL_DIR/scripts/new-report.sh" \
 | 信箱目錄 | `docs/reports/`（一律在軍師 repo 內，頂層投遞、`archive/` 歸檔） |
 | 軟依賴 | `~/.claude/kunsu-registry.json`（缺失時硬停於步驟 3）；目標軍師已遷移的 `docs/reports/`（缺失時硬停於步驟 6） |
 | 掃描端 | 軍師 session 的 `/kunsu-inbox`（軍師模式）；`scan-reports.sh` 回報新上報份數 |
-| 歸檔 | 由軍師 session 手動執行三步驟：Edit `status` → `git add` → `git mv` 至 `archive/`（untracked 檔案須先 `git add` 才能 `git mv`，順序不可顛倒） |
+| 歸檔 | 由軍師 session 手動執行四步驟：Edit `status` → `git add` → `git mv` 至 `archive/` → 確認 commit（untracked 檔案須先 `git add` 才能 `git mv`，順序不可顛倒） |

@@ -236,7 +236,7 @@ bash ~/.claude/skills/kunsu-inbox/scripts/scan-reports.sh "{CURRENT_ROOT}"
 - 每行 `NEW_REPLY:<路徑>` → 新回覆路徑清單（路徑為相對於軍師根的路徑）
 - 每行 `NEW_APPLICATION:<路徑>` → 新申請路徑清單
 - 每行 `NEW_REPORT:<路徑>` → 新上報路徑清單
-- 每行 `TRIPWIRE:<XY> <路徑>` → 意外變更清單
+- 每行 `TRIPWIRE:<XY> <路徑>`（或 rename 形式 `TRIPWIRE:<XY> <src> -> <dst>`，路徑欄為雙側複合字串）→ 意外變更清單
 
 **4b-3. tripwire 判斷（任一腳本 exit code 2）：**
 
@@ -252,8 +252,8 @@ bash ~/.claude/skills/kunsu-inbox/scripts/scan-reports.sh "{CURRENT_ROOT}"
 
 請確認這些變更是否預期。若為正常操作（如手動建立新交接、或剛執行 /handoff add
 尚未確認 commit），確認並 commit 後再執行 /kunsu-inbox。（三個信箱的授權歸檔搬移
-——交接與其回覆、申請、上報——均已被掃描規則豁免，/handoff done 的歸檔搬移
-正常情況不會出現在此清單。）
+——交接與其回覆、申請、上報——均已被掃描規則豁免；/handoff done 若中斷於
+Edit 與 git mv 之間，頂層 ` M` 中間態亦會觸發，續行完成歸檔並 commit 即收斂。）
 ```
 
 **4b-4. 正常輸出（三支腳本皆 exit code 0）：**
