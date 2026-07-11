@@ -11,7 +11,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SKILLS=(handoff kunsu-init kunsu-inbox kunsu-apply kunsu-report kunsu-list)
+SKILLS=(handoff kunsu-init kunsu-inbox kunsu-apply kunsu-report kunsu-list kunsu-dashboard)
 TARGET_DIR="${HOME}/.claude/skills"
 MODE="copy"
 
@@ -89,3 +89,6 @@ for d in "${deployed[@]}"; do
 done
 echo ""
 echo "新開 Claude Code session 即可使用 /handoff、/kunsu-init、/kunsu-inbox、/kunsu-apply、/kunsu-report 與 /kunsu-list。"
+echo ""
+echo "kunsu-dashboard 不是 Claude Code skill，不透過任何觸發語啟動——"
+echo "見 ${TARGET_DIR}/kunsu-dashboard/SKILL.md 的安裝與啟動說明（pip install -r requirements.txt 後 python3 app/main.py --port <port>）。"
