@@ -40,12 +40,19 @@ def _reg(
     healthy: list[str] | None = None,
     stale: list[str] | None = None,
     error: str | None = None,
+    raw: dict | None = None,
 ) -> RegistryResult:
-    """建立 RegistryResult 測試用實例。"""
+    """建立 RegistryResult 測試用實例。
+
+    raw 對應 registry.py load_registry() 回傳的原始 JSON 結構，main.py
+    的身分判斷（軍師 vs 子專案）直接讀這個欄位，不再重新開檔讀取
+    （code review 修正：消除雙重讀取的競態，見 registry.py raw 欄位說明）。
+    """
     return RegistryResult(
         healthy=healthy or [],
         stale=stale or [],
         registry_error=error,
+        raw=raw or {},
     )
 
 
@@ -118,13 +125,13 @@ def test_tripwire_kunsu_shown_other_sections_normal(monkeypatch, client):
 
     monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
         healthy=[KUNSU_A, KUNSU_B, SUBREPO],
+        raw={
+            SUBREPO: [
+                {"kunsu": KUNSU_A, "roles": ["worker"]},
+                {"kunsu": KUNSU_B, "roles": ["writer"]},
+            ]
+        },
     ))
-    monkeypatch.setattr("app.main._load_raw_registry", lambda _: {
-        SUBREPO: [
-            {"kunsu": KUNSU_A, "roles": ["worker"]},
-            {"kunsu": KUNSU_B, "roles": ["writer"]},
-        ]
-    })
     monkeypatch.setattr("app.main.scan_kunsu", lambda path: (
         _scan(path, tripwire_lines=["TRIPWIRE:RM docs/handoffs/old.md"])
         if path == KUNSU_A
@@ -158,10 +165,8 @@ def test_happy_path_kunsu_and_subrepo_both_rendered(monkeypatch, client):
 
     monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
         healthy=[KUNSU, SUBREPO],
+        raw={SUBREPO: [{"kunsu": KUNSU, "roles": ["dev"]}]},
     ))
-    monkeypatch.setattr("app.main._load_raw_registry", lambda _: {
-        SUBREPO: [{"kunsu": KUNSU, "roles": ["dev"]}]
-    })
     monkeypatch.setattr("app.main.scan_kunsu", lambda p: _scan(
         p, new_replies=[" docs/handoffs/reply.md"]
     ))
@@ -248,8 +253,8 @@ def test_nested_topology_appears_in_both_sections(monkeypatch, client):
 
     monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
         healthy=[PARENT, NESTED, CHILD],
+        raw=registry_data,
     ))
-    monkeypatch.setattr("app.main._load_raw_registry", lambda _: registry_data)
     monkeypatch.setattr("app.main.scan_kunsu", lambda p: _scan(p))
     monkeypatch.setattr("app.main.get_subrepo_status", lambda *a, **k: _subrepo())
 
@@ -280,12 +285,9 @@ def test_stale_path_shows_stale_card(monkeypatch, client):
     monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
         healthy=[KUNSU],
         stale=[STALE],
-    ))
-    monkeypatch.setattr("app.main._load_raw_registry", lambda _: {
-        # KUNSU 沒有子 repo，也不是任何條目的 kunsu 值
+        # raw 預設 {}：KUNSU 沒有子 repo，也不是任何條目的 kunsu 值
         # → 不觸發 scan_kunsu 或 get_subrepo_status
-    })
-    # KUNSU 在 kunsu_paths / subrepo_paths 皆為空（raw data {}），不需要 mock scan
+    ))
 
     resp = client.get("/")
     assert resp.status_code == 200
@@ -301,6 +303,39 @@ def test_stale_path_shows_stale_card(monkeypatch, client):
     assert "⛔" not in html
 
 
+# ── Test 6b: 子專案所屬軍師為 stale（code review 修正的迴歸測試）────────────
+
+def test_subrepo_with_stale_kunsu_shows_unreachable_not_empty(monkeypatch, client):
+    """子專案所屬軍師本身 stale → 顯示「軍師不可達」，不得誤報「無待處理交接文件」。
+
+    Regression: code review 發現先前版本會對 stale 軍師仍呼叫
+    get_subrepo_status，該函式對不存在的路徑靜默回傳空結果，
+    使頁面誤顯示「無待處理交接文件」，讓使用者誤以為真的沒有待辦事項。
+    """
+    SUBREPO = "/fake/subrepo"
+    STALE_KUNSU = "/fake/stale-kunsu"
+
+    monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
+        healthy=[SUBREPO],
+        stale=[STALE_KUNSU],
+        raw={SUBREPO: [{"kunsu": STALE_KUNSU, "roles": ["dev"]}]},
+    ))
+
+    def _fail_if_called(*a, **k):
+        raise AssertionError(
+            "get_subrepo_status 不應在所屬軍師 stale 時被呼叫"
+        )
+    monkeypatch.setattr("app.main.get_subrepo_status", _fail_if_called)
+
+    resp = client.get("/")
+    assert resp.status_code == 200
+    html = resp.text
+
+    assert "軍師不可達" in html
+    assert STALE_KUNSU in html
+    assert "無待處理交接文件" not in html
+
+
 # ── Test 7: to: 不符清單 ──────────────────────────────────────────────────────
 
 def test_unknown_to_shown_as_separate_warning_list(monkeypatch, client):
@@ -310,10 +345,8 @@ def test_unknown_to_shown_as_separate_warning_list(monkeypatch, client):
 
     monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
         healthy=[KUNSU, SUBREPO],
+        raw={SUBREPO: [{"kunsu": KUNSU, "roles": ["dev"]}]},
     ))
-    monkeypatch.setattr("app.main._load_raw_registry", lambda _: {
-        SUBREPO: [{"kunsu": KUNSU, "roles": ["dev"]}]
-    })
     monkeypatch.setattr("app.main.scan_kunsu", lambda p: _scan(p))
     monkeypatch.setattr("app.main.get_subrepo_status", lambda *a, **k: _subrepo(
         unknown=[UnknownToItem(filename="mystery.md", to_value="ghost-role")]
@@ -344,10 +377,8 @@ def test_xss_in_handoff_title_is_escaped(monkeypatch, client):
 
     monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
         healthy=[KUNSU, SUBREPO],
+        raw={SUBREPO: [{"kunsu": KUNSU, "roles": ["dev"]}]},
     ))
-    monkeypatch.setattr("app.main._load_raw_registry", lambda _: {
-        SUBREPO: [{"kunsu": KUNSU, "roles": ["dev"]}]
-    })
     monkeypatch.setattr("app.main.scan_kunsu", lambda p: _scan(p))
     monkeypatch.setattr("app.main.get_subrepo_status", lambda *a, **k: _subrepo(
         pending=[_handoff(filename="task.md", title=XSS_TITLE)]
@@ -410,8 +441,8 @@ def test_integration_all_status_types_rendered(monkeypatch, client):
     monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
         healthy=[KUNSU_TRIPWIRE, KUNSU_NORMAL, SUBREPO_PENDING, SUBREPO_AWAITING, SUBREPO_UNKNOWN],
         stale=[STALE],
+        raw=registry_data,
     ))
-    monkeypatch.setattr("app.main._load_raw_registry", lambda _: registry_data)
     monkeypatch.setattr("app.main.scan_kunsu", mock_scan)
     monkeypatch.setattr("app.main.get_subrepo_status", mock_subrepo)
 

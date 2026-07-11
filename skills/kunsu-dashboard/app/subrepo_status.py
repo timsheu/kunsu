@@ -85,11 +85,26 @@ def _parse_frontmatter(content: str) -> dict:
     Returns:
         解析後的 dict；若無 frontmatter 或解析失敗則回傳空 dict。
     """
-    if not content.startswith("---"):
+    # 開頭分隔符須為獨立一行（'---\n' 或整份內容恰為 '---'），
+    # 避免誤判如 '---title: ...'（無換行）這類非標準開頭。
+    if not (content.startswith("---\n") or content == "---"):
         return {}
 
-    # 尋找第二個 '---'（frontmatter 結束標記，至少從 position 3 開始搜尋）
-    end = content.find("\n---", 3)
+    # 尋找結束分隔符：須為獨立一行（'\n---\n' 或以 '\n---' 結尾），
+    # 避免 YAML 值中剛好有一行以 '---' 開頭時被誤判為結束標記，
+    # 提前截斷 frontmatter、遺漏後面的必要欄位。
+    search_from = 3
+    end = -1
+    while True:
+        candidate = content.find("\n---", search_from)
+        if candidate == -1:
+            break
+        after = candidate + len("\n---")
+        if after == len(content) or content[after] == "\n":
+            end = candidate
+            break
+        search_from = after
+
     if end == -1:
         return {}
 
@@ -174,8 +189,11 @@ def get_subrepo_status(
                 continue
 
             fm = _parse_frontmatter(content)
-            in_reply_to = fm.get("in_reply_to", "") or ""
-            status = fm.get("status", "") or ""
+            # str() 強制轉換：YAML 可能將非預期格式的值解析為 bool/int 等
+            # 非字串型別（比照 created 欄位已有的處理，見下方 4a-2 區塊），
+            # 避免型別不符導致 replies_index 的 key 比對永遠失敗。
+            in_reply_to = str(fm.get("in_reply_to") or "")
+            status = str(fm.get("status") or "")
             if not in_reply_to:
                 continue
 

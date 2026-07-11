@@ -11,6 +11,7 @@ test_registry.py — skills/kunsu-dashboard/app/registry.py 的單元測試
 """
 
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -61,6 +62,23 @@ class TestHappyPath:
         assert str(sub_path) in result.healthy
         assert str(kunsu_path) in result.healthy
         assert result.stale == []
+
+    def test_raw_field_carries_parsed_registry_data(self, tmp_path):
+        """raw 欄位帶回已解析的原始 JSON，供呼叫端做身分判斷不需重新開檔
+
+        （code review 修正：main.py 先前會重新讀一次 registry 檔案，
+        兩次獨立讀取之間存在競態；raw 欄位讓兩者共用同一次讀取結果）。
+        """
+        kunsu_path = make_git_repo(tmp_path / "my-kunsu")
+        sub_path = make_git_repo(tmp_path / "my-subrepo")
+        data = {str(sub_path): [{"kunsu": str(kunsu_path), "roles": ["writer"]}]}
+
+        registry_file = tmp_path / "registry.json"
+        write_registry(registry_file, data)
+
+        result = load_registry(registry_file)
+
+        assert result.raw == data
 
     def test_multiple_subrepos_same_kunsu(self, tmp_path):
         """多個子專案對應同一軍師 → 子專案路徑與軍師路徑皆進 healthy（軍師不重複計算）。"""
@@ -120,6 +138,25 @@ class TestEdgeCases:
         assert result.healthy == []
         assert result.stale == []
 
+    def test_unreadable_file_returns_error_not_exception(self, tmp_path):
+        """Regression（code review C7）：檔案存在但無讀取權限 → registry_error
+        回傳，不得讓 PermissionError／OSError 穿透拋出。
+
+        os.path.exists() 對權限不足的檔案仍回傳 True（只需要上層目錄的
+        執行權限），所以真正的防護必須在 open() 的例外處理上。
+        """
+        registry_file = tmp_path / "registry.json"
+        write_registry(registry_file, {})
+        os.chmod(registry_file, 0o000)
+        try:
+            result = load_registry(registry_file)
+        finally:
+            os.chmod(registry_file, 0o644)  # 讓 pytest 的暫存目錄清理不失敗
+
+        assert result.registry_error is not None
+        assert result.healthy == []
+        assert result.stale == []
+
     def test_empty_registry_object(self, tmp_path):
         """Scenario 4：registry 為合法空物件 {} → healthy 與 stale 皆空，registry_error 為 None。"""
         registry_file = tmp_path / "registry.json"
@@ -158,6 +195,30 @@ class TestErrorPaths:
         assert str(kunsu_path) in result.healthy
         # non_git_dir 不應出現在 healthy
         assert str(non_git_dir) not in result.healthy
+
+    def test_subdirectory_of_repo_is_stale_not_root(self, tmp_path):
+        """Regression（code review C6）：登記路徑是 git repo 的子目錄而非根目錄
+
+        → 標記 stale，不得誤判為 healthy。`git rev-parse --show-toplevel`
+        對 repo 內任何子目錄都會 exit 0，若只看 exit code 不比對輸出路徑，
+        會與既有 scan-*.sh 腳本的根目錄檢查不一致（腳本會拒絕執行）。
+        """
+        kunsu_path = make_git_repo(tmp_path / "my-kunsu")
+        subdir = kunsu_path / "not-the-root"
+        subdir.mkdir()
+
+        registry_file = tmp_path / "registry.json"
+        write_registry(registry_file, {
+            str(tmp_path / "irrelevant-sub"): [
+                {"kunsu": str(subdir), "roles": ["writer"]}
+            ]
+        })
+
+        result = load_registry(registry_file)
+
+        assert result.registry_error is None
+        assert str(subdir) in result.stale
+        assert str(subdir) not in result.healthy
 
     def test_path_does_not_exist(self, tmp_path):
         """Scenario 6：登記路徑完全不存在 → 標記 stale，不拋例外。"""

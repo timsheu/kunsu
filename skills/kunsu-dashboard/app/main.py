@@ -13,7 +13,6 @@ ADR 010 Decision 1.5：所有端點僅回傳 text/html，不提供任何 JSON／
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import sys
 from html import escape
@@ -59,21 +58,6 @@ def _get_registry_path() -> str:
     在 request 時呼叫（非模組匯入時），確保測試透過 monkeypatch.setenv 覆寫有效。
     """
     return os.environ.get("KUNSU_REGISTRY_PATH", _DEFAULT_REGISTRY)
-
-
-def _load_raw_registry(registry_path: str) -> dict:
-    """讀取 registry JSON 原始資料，用於身分判斷。
-
-    RegistryResult 只含路徑清單，身分判斷（軍師 vs 子專案）需要原始 JSON 結構。
-    任何例外（檔案不存在、JSON 損壞等）靜默回傳空 dict；
-    錯誤情境已由 load_registry 處理，此函式無需重複回報。
-    """
-    try:
-        with open(registry_path, "r", encoding="utf-8") as f:
-            data = json.loads(f.read())
-        return data if isinstance(data, dict) else {}
-    except Exception:
-        return {}
 
 
 # ── 身分判斷輔助 ──────────────────────────────────────────────────────────────
@@ -194,6 +178,22 @@ def _html_stale(path: str) -> str:
         '<span class="lbl-stale">⚠ stale：</span>'
         f'<code>{escape(path)}</code>'
         '（路徑不存在或非有效 git repo）'
+        '</div>'
+    )
+
+
+def _html_subrepo_kunsu_unreachable(path: str, kunsu_path: str) -> str:
+    """子專案所屬軍師為 stale 時的卡片：明確標示軍師不可達，
+
+    不呼叫 get_subrepo_status（該函式對不存在的路徑會靜默回傳空結果，
+    容易被誤讀為「無待處理交接文件」）。
+    """
+    return (
+        '<div class="card card-subrepo card-stale">'
+        f'<h3>子專案：<code>{escape(path)}</code></h3>'
+        '<p class="lbl-stale">⚠ 所屬軍師不可達：'
+        f'<code>{escape(kunsu_path)}</code>'
+        '（路徑不存在或非有效 git repo，無法判斷待處理交接文件）</p>'
         '</div>'
     )
 
@@ -348,9 +348,11 @@ def index() -> HTMLResponse:
     if not reg.healthy and not reg.stale:
         return HTMLResponse(content=_page(_html_empty()))
 
-    # ── 讀原始 JSON 做身分判斷（軍師 vs 子專案） ──────────────────────────
-    # RegistryResult 只含路徑清單，身分判斷需要原始 JSON 結構。
-    data = _load_raw_registry(registry_path)
+    # ── 身分判斷（軍師 vs 子專案） ─────────────────────────────────────────
+    # reg.raw 是 load_registry 內部已解析的同一份資料，不再次開檔讀取——
+    # 避免兩次獨立讀檔之間的競態（registry 在兩次讀取之間被覆寫，導致健康
+    # 檢查結果與身分判斷結果基於不同版本的資料，見 U4 code review 修正）。
+    data = reg.raw
     kunsu_paths = _build_kunsu_paths(data)
     subrepo_paths = _build_subrepo_paths(data)
     healthy_set = set(reg.healthy)
@@ -384,6 +386,15 @@ def index() -> HTMLResponse:
                     if not kunsu_p or kunsu_p in seen_kunsu:
                         continue
                     seen_kunsu.add(kunsu_p)
+                    if kunsu_p in stale_set:
+                        # 所屬軍師本身 stale（路徑不存在或非有效 git repo），
+                        # 呼叫 get_subrepo_status 只會靜默回傳空結果，誤導
+                        # 使用者以為「無待處理交接文件」——改為明確告知軍師
+                        # 不可達，不呼叫 get_subrepo_status。
+                        subrepo_parts.append(
+                            _html_subrepo_kunsu_unreachable(path, kunsu_p)
+                        )
+                        continue
                     our_roles = _get_our_roles(data, path, kunsu_p)
                     all_known = _get_all_known_roles(data, kunsu_p)
                     status = get_subrepo_status(path, our_roles, all_known, kunsu_p)

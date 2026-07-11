@@ -315,3 +315,68 @@ def test_integration_real_scripts_against_git_fixture(
         f"Expected exactly one test report, got: {result.new_reports}"
     )
     assert matched_reports[0].startswith("docs/reports/")
+
+
+# ─── Regression（code review C1）：subprocess 逾時／找不到執行檔不得穿透例外 ──
+
+
+def test_timeout_expired_returns_script_error_not_exception():
+    """腳本逾時（TimeoutExpired）→ 回傳 script_error，不得讓例外穿透至呼叫端。"""
+    with patch("app.kunsu_scan.subprocess.run") as mock_run:
+        mock_run.side_effect = subprocess.TimeoutExpired(cmd="scan-replies.sh", timeout=15)
+        result = scan_kunsu("/fake/kunsu")
+
+    assert result.script_error is not None
+    assert "timed out" in result.script_error
+    assert result.tripwire_lines == []
+
+
+def test_bash_not_found_returns_script_error_not_exception():
+    """bash 執行檔不存在（FileNotFoundError）→ 回傳 script_error，不得讓例外穿透。"""
+    with patch("app.kunsu_scan.subprocess.run") as mock_run:
+        mock_run.side_effect = FileNotFoundError("bash: command not found")
+        result = scan_kunsu("/fake/kunsu")
+
+    assert result.script_error is not None
+    assert "failed to run" in result.script_error
+
+
+# ─── Regression（code review C3）：exit 2 但 stdout 無 TRIPWIRE: 行仍須標記 tripwire ──
+
+
+def test_exit2_with_no_tripwire_prefix_lines_still_flags_tripwire():
+    """exit code 2 但 stdout 沒有任何 TRIPWIRE: 前綴行（診斷輸出寫到 stderr 等情況）
+
+    → tripwire_lines 仍必須非空，不得讓呼叫端誤判為「正常、無新訊息」。
+    """
+    with patch("app.kunsu_scan.subprocess.run") as mock_run:
+        mock_run.side_effect = [
+            _make_proc(2, stdout="", stderr="unexpected write outside mailbox"),
+        ]
+        result = scan_kunsu("/fake/kunsu")
+
+    assert result.tripwire_lines != []
+    assert result.script_error is None
+
+
+# ─── Regression（code review C4）：前綴比對須侷限於該腳本自己的前綴 ──────────
+
+
+def test_script_output_only_matched_against_its_own_prefix():
+    """scan-replies.sh 的 stdout 若剛好含有其他前綴（NEW_APPLICATION:）開頭的行，
+
+    不得被誤植到 new_applications——每支腳本的輸出只比對它自己被指派的前綴。
+    """
+    with patch("app.kunsu_scan.subprocess.run") as mock_run:
+        mock_run.side_effect = [
+            _make_proc(0, stdout=(
+                "NEW_REPLY:docs/handoffs/replies/real-reply.md\n"
+                "NEW_APPLICATION:this-looks-like-an-application-but-came-from-scan-replies.sh\n"
+            )),
+            _make_proc(0, stdout=""),
+            _make_proc(0, stdout=""),
+        ]
+        result = scan_kunsu("/fake/kunsu")
+
+    assert result.new_replies == ["docs/handoffs/replies/real-reply.md"]
+    assert result.new_applications == []

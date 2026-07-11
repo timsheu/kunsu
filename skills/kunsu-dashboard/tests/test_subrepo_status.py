@@ -569,3 +569,105 @@ status: submitted
         assert len(result.awaiting_confirm) == 0
         assert len(result.unknown_to) == 0
         assert len(result.errors) == 0
+
+
+# ── Regression（code review C8）：frontmatter 內文含 '---' 開頭行不誤判為結束標記 ──
+
+
+class TestFrontmatterDelimiterRobustness:
+    def test_body_line_starting_with_dashes_does_not_truncate_frontmatter(
+        self, tmp_path
+    ):
+        """交接內文（frontmatter 之後）含以 '---' 開頭的行不影響 frontmatter 解析
+
+        ——用來確認新的結束標記判斷（須為獨立一行）沒有誤傷正常檔案。
+        """
+        kunsu, handoffs, replies = setup_kunsu(tmp_path)
+        content = """---
+title: 測試交接
+from: ebook-store
+to: my-role
+created: 2026-07-01
+status: open
+---
+
+正文開頭。
+---
+這行看起來像分隔符，但屬於內文，不是 frontmatter 的一部分。
+"""
+        (handoffs / "2026-07-01-test-handoff.md").write_text(
+            content, encoding="utf-8"
+        )
+
+        result = get_subrepo_status(
+            subrepo_path=str(tmp_path / "subrepo"),
+            our_roles={"my-role"},
+            all_known_roles={"my-role"},
+            kunsu_path=str(kunsu),
+        )
+
+        assert len(result.errors) == 0
+        assert len(result.pending) == 1
+        assert result.pending[0].title == "測試交接"
+
+
+# ── Regression（code review C9）：in_reply_to 型別強制轉為字串 ─────────────────
+
+
+class TestInReplyToTypeCoercion:
+    def test_normal_string_in_reply_to_still_matches(self, tmp_path):
+        """基本情境不因新增的 str() 轉換而退化：一般字串檔名仍正常比對成功。"""
+        kunsu, handoffs, replies = setup_kunsu(tmp_path)
+        make_handoff(handoffs, "2026-07-01-test-handoff.md", to_role="my-role")
+        make_reply(
+            replies,
+            "2026-07-01-test-handoff-reply-2026-07-06.md",
+            in_reply_to="2026-07-01-test-handoff.md",
+            status="submitted",
+        )
+
+        result = get_subrepo_status(
+            subrepo_path=str(tmp_path / "subrepo"),
+            our_roles={"my-role"},
+            all_known_roles={"my-role"},
+            kunsu_path=str(kunsu),
+        )
+
+        assert len(result.awaiting_confirm) == 1
+        assert len(result.pending) == 0
+
+    def test_non_string_in_reply_to_does_not_crash(self, tmp_path):
+        """in_reply_to 被 YAML 解析為非字串型別（如布林值）時不得拋例外。
+
+        這種值本來就不是合法的交接檔名，預期結果是交接文件仍列為「待接手」
+        （找不到相符的回覆），但不能讓型別不符直接讓函式崩潰。
+        """
+        kunsu, handoffs, replies = setup_kunsu(tmp_path)
+        make_handoff(handoffs, "2026-07-01-test-handoff.md", to_role="my-role")
+
+        replies.mkdir(parents=True, exist_ok=True)
+        reply_content = """---
+title: 回覆
+type: handoff-reply
+from: my-role
+to: ebook-store
+in_reply_to: true
+created: 2026-07-06
+status: submitted
+---
+"""
+        (replies / "2026-07-01-test-handoff-reply-2026-07-06.md").write_text(
+            reply_content, encoding="utf-8"
+        )
+
+        result = get_subrepo_status(
+            subrepo_path=str(tmp_path / "subrepo"),
+            our_roles={"my-role"},
+            all_known_roles={"my-role"},
+            kunsu_path=str(kunsu),
+        )
+
+        # 不拋例外即為此測試的主要目的；型別不符的回覆無法比對，
+        # 交接文件因找不到相符回覆而歸類為待接手。
+        assert len(result.pending) == 1
+        assert len(result.awaiting_confirm) == 0

@@ -100,23 +100,45 @@ def scan_kunsu(kunsu_path: str) -> KunsuScanResult:
         "NEW_REPORT:":      new_reports,
     }
 
-    for script_name, _expected_prefix in _SCRIPTS:
+    for script_name, expected_prefix in _SCRIPTS:
         script_path = _SCRIPTS_DIR / script_name
 
-        proc = subprocess.run(
-            ["bash", str(script_path), kunsu_path],
-            capture_output=True,
-            text=True,
-            timeout=15,
-        )
+        try:
+            proc = subprocess.run(
+                ["bash", str(script_path), kunsu_path],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+        except subprocess.TimeoutExpired:
+            return KunsuScanResult(
+                kunsu_path=kunsu_path,
+                new_replies=list(new_replies),
+                new_applications=list(new_applications),
+                new_reports=list(new_reports),
+                script_error=f"{script_name} timed out after 15s",
+            )
+        except OSError as e:
+            # bash 執行檔本身不存在等情況（FileNotFoundError 為 OSError 子類）；
+            # 比照 timeout，回報為腳本錯誤而非讓例外穿透到 FastAPI 路由層。
+            return KunsuScanResult(
+                kunsu_path=kunsu_path,
+                new_replies=list(new_replies),
+                new_applications=list(new_applications),
+                new_reports=list(new_reports),
+                script_error=f"{script_name} failed to run: {e}",
+            )
 
         if proc.returncode == 2:
-            # tripwire 觸發：收集所有 TRIPWIRE: 行，立即回傳，不再執行後續腳本
+            # tripwire 觸發：收集所有 TRIPWIRE: 行，立即回傳，不再執行後續腳本。
+            # 即使 stdout 中沒有任何 TRIPWIRE: 前綴行（如診斷輸出寫到 stderr），
+            # tripwire_lines 仍必須非空，否則呼叫端會誤判為「正常、無新訊息」
+            # ——exit code 2 本身就是安全邊界訊號，不能因為找不到明細行而消失。
             tripwire_lines = [
                 line
                 for line in proc.stdout.splitlines()
                 if line.startswith("TRIPWIRE:")
-            ]
+            ] or [f"TRIPWIRE: {script_name} exited 2 (no TRIPWIRE: line in stdout)"]
             return KunsuScanResult(
                 kunsu_path=kunsu_path,
                 new_replies=list(new_replies),
@@ -139,12 +161,13 @@ def scan_kunsu(kunsu_path: str) -> KunsuScanResult:
                 script_error=error_msg,
             )
 
-        # exit 0：逐行解析 stdout，依前綴分類至對應清單
+        # exit 0：逐行解析 stdout，只比對「這支腳本自己該有的前綴」
+        # （不可用全部三個前綴逐一嘗試——那樣任何一支腳本輸出剛好以另一支
+        # 腳本的前綴開頭的行，會被誤植到錯誤的清單）。
+        dest = _prefix_to_list[expected_prefix]
         for line in proc.stdout.splitlines():
-            for prefix, dest in _prefix_to_list.items():
-                if line.startswith(prefix):
-                    dest.append(line[len(prefix):])
-                    break
+            if line.startswith(expected_prefix):
+                dest.append(line[len(expected_prefix):])
 
     return KunsuScanResult(
         kunsu_path=kunsu_path,
