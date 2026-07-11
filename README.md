@@ -1,6 +1,6 @@
 # kunsu
 
-**kunsu**（軍師，台語 Tâi-lô *kun-su*，"the strategist"）——運籌帷幄而不上陣。為多 repo AI 協作建立「軍師」的 scaffolding 工具組：以純 skill＋markdown 範本，為 [Claude Code](https://claude.com/claude-code) 快速建立唯讀的軍師 repo（規劃一切、不執行任何實作），並以全域反向註冊表自動化跨 session 傳令。
+**kunsu**（軍師，台語 Tâi-lô *kun-su*，"the strategist"）——運籌帷幄而不上陣。為多 repo AI 協作建立「軍師」的 scaffolding 工具組：以純 skill＋markdown 範本，為 [Claude Code](https://claude.com/claude-code) 快速建立唯讀的軍師 repo（規劃一切、不執行任何實作），並以全域反向註冊表自動化跨 session 傳令（軍師沙盤為唯一例外，詳見 [ADR 010](docs/adr/2026-07-11-adr-candidate-010-dashboard-service-exception.md)）。
 
 ## 緣起
 

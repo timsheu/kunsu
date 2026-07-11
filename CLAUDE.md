@@ -1,6 +1,6 @@
 # kunsu
 
-kunsu（軍師，台語 kun-su）——為多 repo AI 協作建立「軍師」（規劃協調中心）的 scaffolding 工具組：以純 skill＋範本快速建立唯讀的軍師 repo，並以全域反向註冊表自動化跨 session 傳令。本專案是工具母體——skill 原始碼在此開發與版控，部署目標為 `~/.claude/skills/`。
+kunsu（軍師，台語 kun-su）——為多 repo AI 協作建立「軍師」（規劃協調中心）的 scaffolding 工具組：以純 skill＋範本快速建立唯讀的軍師 repo（軍師沙盤為唯一例外，見 [ADR 010](docs/adr/2026-07-11-adr-candidate-010-dashboard-service-exception.md)），並以全域反向註冊表自動化跨 session 傳令。本專案是工具母體——skill 原始碼在此開發與版控，部署目標為 `~/.claude/skills/`。
 
 ## 核心規範（Invariants）
 
