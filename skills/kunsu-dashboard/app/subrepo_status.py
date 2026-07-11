@@ -38,6 +38,8 @@ class HandoffInfo:
     created: str
     latest_reply_status: Optional[str]  # None 表示無回覆
     latest_reply_date: Optional[str]    # None 表示無回覆
+    raw_content: str = ""               # 檔案原始內容，供軍師沙盤展開式預覽使用
+    mtime: Optional[float] = None       # 檔案最後修改時間（epoch），供時間軸排序／顯示
 
 
 @dataclass(frozen=True)
@@ -145,7 +147,7 @@ def get_subrepo_status(
     """對子專案在指定軍師底下的交接文件進行分類判斷。
 
     複製 kunsu-inbox SKILL.md 步驟 4a-1 至 4a-4 的判斷邏輯，以 Python 實作，
-    供 Dashboard 的 HTML 渲染使用（不依賴 Claude Code session）。
+    供軍師沙盤的 HTML 渲染使用（不依賴 Claude Code session）。
 
     Args:
         subrepo_path:    已判定為 healthy 的子專案絕對路徑（供上下文使用）。
@@ -214,6 +216,7 @@ def get_subrepo_status(
 
         try:
             content = handoff_file.read_text(encoding="utf-8")
+            mtime = handoff_file.stat().st_mtime
         except (OSError, UnicodeDecodeError) as e:
             errors.append(ErrorItem(filename=filename, error=f"read error: {e}"))
             continue
@@ -272,6 +275,8 @@ def get_subrepo_status(
             created=created,
             latest_reply_status=latest_reply_status,
             latest_reply_date=latest_reply_date,
+            raw_content=content,
+            mtime=mtime,
         )
 
         # ── 依 SKILL.md 4a-3 表格分類 ─────────────────────────────────────────

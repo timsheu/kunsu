@@ -12,6 +12,8 @@ test_main.py — skills/kunsu-dashboard/app/main.py 的單元測試
   - 每個測試僅 patch 實際會被呼叫的函式，保持測試焦點明確。
 """
 
+import re
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -473,6 +475,259 @@ def test_integration_all_status_types_rendered(monkeypatch, client):
     # to: 不符清單
     assert "不符清單" in html
     assert "phantom-role" in html
+
+
+# ── Test 10: 子專案巢狀呈現於所屬軍師分組內 ──────────────────────────────────
+
+def test_subrepo_rendered_nested_within_its_kunsu_group(monkeypatch, client):
+    """子專案卡片應巢狀呈現於所屬軍師的分組容器內，而非獨立的頂層分組。
+
+    版面調整核心驗證：軍師與其子專案改為擺在一起，而非各自成一個區塊。
+    """
+    KUNSU = "/fake/kunsu-group-test"
+    SUBREPO = "/fake/subrepo-group-test"
+
+    monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
+        healthy=[KUNSU, SUBREPO],
+        raw={SUBREPO: [{"kunsu": KUNSU, "roles": ["dev"]}]},
+    ))
+    monkeypatch.setattr("app.main.scan_kunsu", lambda p: _scan(p))
+    monkeypatch.setattr("app.main.get_subrepo_status", lambda *a, **k: _subrepo())
+
+    resp = client.get("/")
+    assert resp.status_code == 200
+    html = resp.text
+
+    group_start = html.index('<details class="kunsu-group"')
+    group_end = html.index("</details>", group_start)
+    assert group_start < html.index(KUNSU) < html.index(SUBREPO) < group_end
+
+
+# ── Test 11: Stale 子專案巢狀呈現於健康軍師分組內 ────────────────────────────
+
+def test_stale_subrepo_nested_under_healthy_kunsu(monkeypatch, client):
+    """子專案本身 stale、但所屬軍師健康 → 以 stale 樣式巢狀呈現於軍師分組內，
+
+    不呼叫 get_subrepo_status（路徑不存在，呼叫該函式無意義）。
+    """
+    KUNSU = "/fake/kunsu-healthy-group"
+    STALE_SUBREPO = "/fake/subrepo-stale-nested"
+
+    monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
+        healthy=[KUNSU],
+        stale=[STALE_SUBREPO],
+        raw={STALE_SUBREPO: [{"kunsu": KUNSU, "roles": ["dev"]}]},
+    ))
+    monkeypatch.setattr("app.main.scan_kunsu", lambda p: _scan(p))
+
+    def _fail_if_called(*a, **k):
+        raise AssertionError("get_subrepo_status 不應在子專案自身 stale 時被呼叫")
+    monkeypatch.setattr("app.main.get_subrepo_status", _fail_if_called)
+
+    resp = client.get("/")
+    assert resp.status_code == 200
+    html = resp.text
+
+    group_start = html.index('<details class="kunsu-group"')
+    group_end = html.index("</details>", group_start)
+    assert group_start < html.index(KUNSU) < html.index(STALE_SUBREPO) < group_end
+    assert "card-subrepo card-stale" in html
+
+
+# ── Test 12: 展開式預覽 — 子專案待接手交接文件顯示 raw_content 與 mtime ──────
+
+def test_pending_handoff_shows_expandable_raw_content(monkeypatch, client):
+    """待接手交接文件以 <details> 展開式呈現 raw_content 與最後修改時間，
+
+    內容須經 escape()。
+    """
+    from datetime import datetime
+
+    KUNSU = "/fake/kunsu-detail"
+    SUBREPO = "/fake/subrepo-detail"
+    RAW = "---\ntitle: 任務\n---\n\n內文含 <b>標籤</b>。"
+    MTIME = 1_752_000_000.0  # 固定 epoch，避免測試因執行當下時間而浮動
+    expected_mtime_str = datetime.fromtimestamp(MTIME).strftime("%Y-%m-%d %H:%M")
+
+    monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
+        healthy=[KUNSU, SUBREPO],
+        raw={SUBREPO: [{"kunsu": KUNSU, "roles": ["dev"]}]},
+    ))
+    monkeypatch.setattr("app.main.scan_kunsu", lambda p: _scan(p))
+    # _handoff 輔助函式預設 raw_content=""／mtime=None，改用實際物件驗證需直接建構
+    from app.subrepo_status import HandoffInfo
+    monkeypatch.setattr("app.main.get_subrepo_status", lambda *a, **k: _subrepo(
+        pending=[HandoffInfo(
+            filename="task.md", title="Pending Task",
+            from_role="boss", to_role="worker", created="2026-07-01",
+            latest_reply_status=None, latest_reply_date=None,
+            raw_content=RAW, mtime=MTIME,
+        )]
+    ))
+
+    resp = client.get("/")
+    assert resp.status_code == 200
+    html = resp.text
+
+    assert "<details>" in html and "<summary>" in html
+    assert "Pending Task" in html
+    assert 'class="mtime"' in html and expected_mtime_str in html
+    # 原始內容經 escape() 後出現，未轉義版本不得出現（XSS 防護延伸至新功能）
+    assert "&lt;b&gt;標籤&lt;/b&gt;" in html
+    assert "<b>標籤</b>" not in html
+    # 摘要列版面：時間在前、<br> 換行、縮排（class="detail-name"）接檔名
+    mtime_pos = html.index('class="mtime"')
+    br_pos = html.index("<br>", mtime_pos)
+    name_pos = html.index('class="detail-name"', br_pos)
+    assert mtime_pos < br_pos < name_pos
+
+
+# ── Test 13: 展開式預覽 — 軍師新回覆讀取實際檔案內容與最後修改時間 ────────────
+
+def test_kunsu_new_reply_reads_actual_file_content(monkeypatch, client, tmp_path):
+    """軍師分組的新回覆項目應讀取 kunsu_path 底下對應相對路徑的實際檔案內容，
+
+    並顯示該檔案的實際最後修改時間（st_mtime）。
+    """
+    from datetime import datetime
+
+    kunsu_dir = tmp_path / "kunsu"
+    reply_rel = "docs/handoffs/replies/2026-07-11-foo-reply.md"
+    reply_path = kunsu_dir / reply_rel
+    reply_path.parent.mkdir(parents=True)
+    reply_path.write_text("---\ntitle: 回覆\n---\n\n實際回覆內容。", encoding="utf-8")
+    expected_mtime_str = datetime.fromtimestamp(
+        reply_path.stat().st_mtime
+    ).strftime("%Y-%m-%d %H:%M")
+
+    KUNSU = str(kunsu_dir)
+    SUBREPO = "/fake/subrepo-for-content-test"
+
+    monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
+        healthy=[KUNSU, SUBREPO],
+        raw={SUBREPO: [{"kunsu": KUNSU, "roles": ["dev"]}]},
+    ))
+    monkeypatch.setattr("app.main.scan_kunsu", lambda p: _scan(
+        p, new_replies=[reply_rel]
+    ))
+    monkeypatch.setattr("app.main.get_subrepo_status", lambda *a, **k: _subrepo())
+
+    resp = client.get("/")
+    assert resp.status_code == 200
+    html = resp.text
+
+    assert reply_rel in html
+    assert "實際回覆內容。" in html
+    assert 'class="mtime"' in html and expected_mtime_str in html
+
+
+# ── Test 13b: 分類標題列顯示多筆項目中最新的修改時間 ──────────────────────────
+
+def test_kunsu_category_heading_shows_latest_mtime_among_multiple_items(
+    monkeypatch, client, tmp_path
+):
+    """新回覆分類標題列應顯示該分類全部項目中「最新」的修改時間，非任意一筆。"""
+    import os
+    from datetime import datetime, timedelta
+
+    kunsu_dir = tmp_path / "kunsu"
+    replies_dir = kunsu_dir / "docs" / "handoffs" / "replies"
+    replies_dir.mkdir(parents=True)
+
+    older_rel = "docs/handoffs/replies/2026-07-01-older-reply.md"
+    newer_rel = "docs/handoffs/replies/2026-07-11-newer-reply.md"
+    older_path = kunsu_dir / older_rel
+    newer_path = kunsu_dir / newer_rel
+    older_path.write_text("較舊回覆", encoding="utf-8")
+    newer_path.write_text("較新回覆", encoding="utf-8")
+
+    # 明確拉開兩者的 mtime 差距，避免同一秒寫入導致排序無法驗證
+    now = newer_path.stat().st_mtime
+    older_mtime = now - 3600
+    os.utime(older_path, (older_mtime, older_mtime))
+
+    expected_latest_str = datetime.fromtimestamp(now).strftime("%Y-%m-%d %H:%M")
+    expected_older_str = datetime.fromtimestamp(older_mtime).strftime("%Y-%m-%d %H:%M")
+
+    KUNSU = str(kunsu_dir)
+    SUBREPO = "/fake/subrepo-for-latest-badge-test"
+
+    monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
+        healthy=[KUNSU, SUBREPO],
+        raw={SUBREPO: [{"kunsu": KUNSU, "roles": ["dev"]}]},
+    ))
+    monkeypatch.setattr("app.main.scan_kunsu", lambda p: _scan(
+        p, new_replies=[older_rel, newer_rel]
+    ))
+    monkeypatch.setattr("app.main.get_subrepo_status", lambda *a, **k: _subrepo())
+
+    resp = client.get("/")
+    assert resp.status_code == 200
+    html = resp.text
+
+    heading_end = html.index("</h4>")
+    heading = html[: heading_end + len("</h4>")]
+
+    assert "最新" in heading
+    assert expected_latest_str in heading
+    # 較舊項目的時間不應出現在標題列（只會出現在其自己的展開項目摘要裡）
+    if expected_older_str != expected_latest_str:
+        assert expected_older_str not in heading
+
+
+# ── Test 14: 軍師分組展開／折疊狀態反映有無進度 ──────────────────────────────
+
+def test_kunsu_group_open_state_reflects_activity(monkeypatch, client):
+    """有進度（新訊息／tripwire）或 stale 的軍師分組預設展開；
+
+    健康且無新訊息的軍師分組預設折疊，避免軍師一多列表就過長。
+    """
+    KUNSU_EMPTY = "/fake/kunsu-a-empty"
+    KUNSU_ACTIVE = "/fake/kunsu-b-active"
+    KUNSU_TRIPWIRE = "/fake/kunsu-c-tripwire"
+    STALE_KUNSU = "/fake/kunsu-d-stale"
+    SUBREPO_EMPTY = "/fake/subrepo-for-empty-kunsu"
+    SUBREPO_ACTIVE = "/fake/subrepo-for-active-kunsu"
+    SUBREPO_TRIPWIRE = "/fake/subrepo-for-tripwire-kunsu"
+    SUBREPO_FOR_STALE = "/fake/subrepo-for-stale-kunsu"
+
+    monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
+        healthy=[
+            KUNSU_EMPTY, KUNSU_ACTIVE, KUNSU_TRIPWIRE,
+            SUBREPO_EMPTY, SUBREPO_ACTIVE, SUBREPO_TRIPWIRE,
+        ],
+        stale=[STALE_KUNSU],
+        # 每個軍師都必須至少有一筆子專案 entry 指向它，才會被 _build_kunsu_paths
+        # 判定為「軍師」身分——單純列在 healthy 清單不足以觸發軍師分組渲染。
+        raw={
+            SUBREPO_EMPTY: [{"kunsu": KUNSU_EMPTY, "roles": ["dev"]}],
+            SUBREPO_ACTIVE: [{"kunsu": KUNSU_ACTIVE, "roles": ["dev"]}],
+            SUBREPO_TRIPWIRE: [{"kunsu": KUNSU_TRIPWIRE, "roles": ["dev"]}],
+            SUBREPO_FOR_STALE: [{"kunsu": STALE_KUNSU, "roles": ["dev"]}],
+        },
+    ))
+
+    def mock_scan(p):
+        if p == KUNSU_ACTIVE:
+            return _scan(p, new_replies=["docs/handoffs/replies/x.md"])
+        if p == KUNSU_TRIPWIRE:
+            return _scan(p, tripwire_lines=["TRIPWIRE:RM x.md"])
+        return _scan(p)  # KUNSU_EMPTY：無新訊息
+
+    monkeypatch.setattr("app.main.scan_kunsu", mock_scan)
+    monkeypatch.setattr("app.main.get_subrepo_status", lambda *a, **k: _subrepo())
+
+    resp = client.get("/")
+    assert resp.status_code == 200
+    html = resp.text
+
+    # sorted(kunsu_paths) 順序：a-empty, b-active, c-tripwire, d-stale
+    tags = re.findall(r'<details class="kunsu-group"( open)?>', html)
+    assert len(tags) == 4
+    assert tags[0] == ""       # KUNSU_EMPTY：無新訊息 → 折疊
+    assert tags[1] == " open"  # KUNSU_ACTIVE：有新回覆 → 展開
+    assert tags[2] == " open"  # KUNSU_TRIPWIRE：tripwire → 展開
+    assert tags[3] == " open"  # STALE_KUNSU：stale → 展開
 
 
 # ── Verification: Content-Type ────────────────────────────────────────────────

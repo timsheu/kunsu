@@ -139,6 +139,41 @@ class TestNoReplyIsPending:
         assert item.from_role == "ebook-store"
         assert item.created == "2026-07-01"
 
+    def test_pending_handoff_carries_raw_file_content(self, tmp_path):
+        """HandoffInfo.raw_content 應為檔案完整原始內容，供 Dashboard 展開式預覽使用。"""
+        kunsu, handoffs, replies = setup_kunsu(tmp_path)
+
+        path = make_handoff(handoffs, "2026-07-01-test-handoff.md", to_role="my-role")
+        expected_content = path.read_text(encoding="utf-8")
+
+        result = get_subrepo_status(
+            subrepo_path=str(tmp_path / "subrepo"),
+            our_roles={"my-role"},
+            all_known_roles={"my-role"},
+            kunsu_path=str(kunsu),
+        )
+
+        assert len(result.pending) == 1
+        assert result.pending[0].raw_content == expected_content
+        assert "交接內容。" in result.pending[0].raw_content
+
+    def test_pending_handoff_carries_mtime(self, tmp_path):
+        """HandoffInfo.mtime 應等於檔案實際的最後修改時間（st_mtime）。"""
+        kunsu, handoffs, replies = setup_kunsu(tmp_path)
+
+        path = make_handoff(handoffs, "2026-07-01-test-handoff.md", to_role="my-role")
+        expected_mtime = path.stat().st_mtime
+
+        result = get_subrepo_status(
+            subrepo_path=str(tmp_path / "subrepo"),
+            our_roles={"my-role"},
+            all_known_roles={"my-role"},
+            kunsu_path=str(kunsu),
+        )
+
+        assert len(result.pending) == 1
+        assert result.pending[0].mtime == expected_mtime
+
 
 # ── Test Scenario 2（Covers AE2）：最新回覆 submitted → 已回覆待確認 ─────────────
 

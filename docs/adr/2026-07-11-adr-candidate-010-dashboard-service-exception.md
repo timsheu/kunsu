@@ -1,11 +1,11 @@
 ---
-title: ADR Candidate 010 — kunsu 訊息聚合 Dashboard 對 Invariant 1 的例外
+title: ADR Candidate 010 — 軍師沙盤（kunsu dashboard）對 Invariant 1 的例外
 date: 2026-07-11
 type: adr
 status: accepted
 ---
 
-# ADR 010：kunsu 訊息聚合 Dashboard 對 Invariant 1 的例外
+# ADR 010：軍師沙盤（kunsu dashboard）對 Invariant 1 的例外
 
 > 狀態：**Accepted**（2026-07-11 經一輪 doc-review 後由使用者審定）。
 

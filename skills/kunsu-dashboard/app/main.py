@@ -1,5 +1,5 @@
 """
-main.py — kunsu Dashboard FastAPI 應用
+main.py — 軍師沙盤（kunsu dashboard）FastAPI 應用
 
 GET / 路由彙整全域反向註冊表所有軍師與子專案的訊息狀態，渲染為單頁 HTML。
 
@@ -15,8 +15,10 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+from datetime import datetime
 from html import escape
 from pathlib import Path
+from typing import Optional
 
 # ── 確保 skills/kunsu-dashboard/ 在 sys.path 中 ──────────────────────────────
 # 讓 `from app.xxx import ...` 在直接執行（python app/main.py）時也能解析。
@@ -75,11 +77,6 @@ def _build_kunsu_paths(data: dict) -> set[str]:
     return result
 
 
-def _build_subrepo_paths(data: dict) -> set[str]:
-    """提取所有子專案路徑——registry 頂層鍵集合。"""
-    return set(data.keys())
-
-
 def _get_our_roles(data: dict, subrepo_path: str, kunsu_path: str) -> set[str]:
     """取得子專案在指定軍師底下的角色代碼集合。"""
     roles: set[str] = set()
@@ -124,6 +121,10 @@ _CSS = (
     ".card-stale{border-color:#9e9e9e;background:#f9f9f9}"
     ".card-subrepo{border-color:#1e88e5}"
     ".card-error-state{border-color:#e53935;background:#fff5f5}"
+    ".kunsu-group{margin:1.5em 0}"
+    ".kunsu-group>summary{font-weight:700;font-size:1.05em;margin-bottom:.3em}"
+    ".subrepo-nested{margin-left:1.75em;padding-left:1em;"
+    "border-left:3px solid #e0e0e0}"
     ".lbl-tripwire{color:#b71c1c;font-weight:700}"
     ".lbl-script-error{color:#e65100;font-weight:700}"
     ".lbl-stale{color:#616161}"
@@ -132,8 +133,13 @@ _CSS = (
     ".empty{color:#888;font-style:italic}"
     ".filename{color:#777;font-size:.85em}"
     ".unknown-to-item{color:#7b1fa2}"
+    ".mtime{color:#999;font-size:.82em}"
+    ".detail-name{display:inline-block;padding-left:1.5em;margin-top:.15em}"
     "pre{white-space:pre-wrap;word-break:break-all;background:#f8f8f8;"
     "padding:.5em;border-radius:3px;font-size:.85em;margin:.3em 0}"
+    "details{margin:.3em 0}"
+    "summary{cursor:pointer;color:#1565c0}"
+    "summary:hover{text-decoration:underline}"
 )
 
 
@@ -145,10 +151,10 @@ def _page(body: str) -> str:
         '<!DOCTYPE html><html lang="zh-Hant"><head>'
         '<meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
-        '<title>kunsu Dashboard</title>'
+        '<title>軍師沙盤（kunsu dashboard）</title>'
         f'<style>{_CSS}</style>'
         '</head><body>'
-        '<h1>kunsu Dashboard</h1>'
+        '<h1>軍師沙盤（kunsu dashboard）</h1>'
         f'{body}'
         '<p style="color:#aaa;font-size:.8em;margin-top:3em">'
         '刷新瀏覽器頁面觸發全新掃描。</p>'
@@ -198,6 +204,134 @@ def _html_subrepo_kunsu_unreachable(path: str, kunsu_path: str) -> str:
     )
 
 
+def _read_related_file(base_path: str, rel_path: str) -> tuple[str, Optional[float]]:
+    """讀取 base_path 底下 rel_path 檔案內容與最後修改時間，供展開式預覽使用。
+
+    讀取失敗（檔案在掃描與渲染之間被搬移／歸檔，或權限問題等競態）不拋例外，
+    回傳錯誤提示字串與 None，避免單一檔案讀取失敗導致整頁渲染中斷。
+    """
+    full_path = Path(base_path) / rel_path
+    try:
+        content = full_path.read_text(encoding="utf-8")
+        mtime = full_path.stat().st_mtime
+    except (OSError, UnicodeDecodeError) as e:
+        return f"（無法讀取檔案內容：{e}）", None
+    return content, mtime
+
+
+def _format_mtime(mtime: Optional[float]) -> str:
+    """將檔案最後修改時間（epoch）格式化為可讀字串；None 時回傳空字串。"""
+    if mtime is None:
+        return ""
+    return datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
+
+
+def _html_detail(summary_html: str, content: str) -> str:
+    """展開式預覽卡片（原生 <details>/<summary>，無需 JS）。
+
+    summary_html 須為呼叫端已組好、必要字串已 escape() 的 HTML 片段；
+    content 為原始檔案內容，本函式負責 escape() 後包入 <pre>。
+    """
+    return (
+        f'<details><summary>{summary_html}</summary>'
+        f'<pre>{escape(content)}</pre></details>'
+    )
+
+
+def _html_summary_line(mtime_str: str, name_html: str) -> str:
+    """組出「時間在前、換行縮排接檔名」的 <summary> 內容。
+
+    name_html 須為呼叫端已組好、必要字串已 escape() 的 HTML 片段。
+    mtime_str 為空字串時（讀取失敗等情境找不到 mtime）僅顯示檔名，不留空行。
+    """
+    name_line = f'<span class="detail-name">{name_html}</span>'
+    if not mtime_str:
+        return name_line
+    return f'<span class="mtime">{escape(mtime_str)}</span><br>{name_line}'
+
+
+def _html_latest_badge(mtime: Optional[float]) -> str:
+    """分類標題列的「最新」時間標示；mtime 為 None 時回傳空字串。"""
+    s = _format_mtime(mtime)
+    return f' <span class="mtime">最新 {escape(s)}</span>' if s else ""
+
+
+def _render_kunsu_category(
+    base_path: str, rel_paths: list[str]
+) -> tuple[str, Optional[float]]:
+    """渲染軍師單一訊息分類（新回覆／新申請／新上報）的展開式清單。
+
+    回傳 (該分類全部項目的展開式 HTML, 分類中最新的檔案修改時間)，
+    後者供標題列「最新」標示使用，讓使用者不必逐一展開即可掌握時間流。
+    """
+    items_html: list[str] = []
+    mtimes: list[float] = []
+    for rel_path in rel_paths:
+        content, mtime = _read_related_file(base_path, rel_path)
+        if mtime is not None:
+            mtimes.append(mtime)
+        mtime_str = _format_mtime(mtime)
+        summary = _html_summary_line(mtime_str, f'<code>{escape(rel_path)}</code>')
+        items_html.append(_html_detail(summary, content))
+    latest = max(mtimes) if mtimes else None
+    return "".join(items_html), latest
+
+
+def _html_handoff_detail(h: HandoffInfo) -> str:
+    """單一交接文件的展開式預覽卡片，摘要列含標題、檔名與最後修改時間。"""
+    mtime_str = _format_mtime(h.mtime)
+    name_html = (
+        f'{escape(h.title)} '
+        f'<span class="filename">({escape(h.filename)})</span>'
+    )
+    summary = _html_summary_line(mtime_str, name_html)
+    return _html_detail(summary, h.raw_content)
+
+
+def _kunsu_group_open_and_label(
+    path: str, is_stale: bool, scan: Optional[KunsuScanResult]
+) -> tuple[bool, str]:
+    """判斷軍師分組預設是否展開，並組出摘要列文字。
+
+    有進度（新訊息／tripwire／腳本錯誤）或 stale 者預設展開；
+    健康且「無新訊息」的軍師預設折疊，避免軍師一多列表就過長。
+    """
+    esc = escape(path)
+    if is_stale:
+        return True, f'⚠ 軍師：<code>{esc}</code>（stale）'
+    if scan is None:
+        return True, f'軍師：<code>{esc}</code>'
+    if scan.tripwire_lines:
+        return True, f'⛔ 軍師：<code>{esc}</code>（tripwire 異常）'
+    if scan.script_error:
+        return True, f'⚠ 軍師：<code>{esc}</code>（腳本錯誤）'
+    total = len(scan.new_replies) + len(scan.new_applications) + len(scan.new_reports)
+    if total == 0:
+        return False, f'軍師：<code>{esc}</code>（無新訊息）'
+    return True, f'軍師：<code>{esc}</code>（{total} 則新訊息）'
+
+
+def _html_kunsu_stale(path: str) -> str:
+    """Stale 軍師卡片（路徑不存在或非有效 git repo），標籤與純子專案 stale 卡片區分。"""
+    return (
+        '<div class="card card-stale">'
+        f'<h3>軍師：<code>{escape(path)}</code></h3>'
+        '<span class="lbl-stale">⚠ stale（路徑不存在或非有效 git repo）</span>'
+        '</div>'
+    )
+
+
+def _html_subrepo_stale(path: str, kunsu_path: str) -> str:
+    """Stale 子專案卡片，巢狀呈現於所屬軍師分組底下。"""
+    return (
+        '<div class="card card-subrepo card-stale">'
+        f'<h3>子專案：<code>{escape(path)}</code></h3>'
+        f'<p>所屬軍師：<code>{escape(kunsu_path)}</code></p>'
+        '<span class="lbl-stale">⚠ stale（路徑不存在或非有效 git repo）</span>'
+        '</div>'
+    )
+
+
 def _html_kunsu(path: str, result: KunsuScanResult) -> str:
     """軍師卡片：tripwire／腳本錯誤／正常三種樣式。
 
@@ -237,19 +371,22 @@ def _html_kunsu(path: str, result: KunsuScanResult) -> str:
     else:
         parts: list[str] = []
         if result.new_replies:
-            items = "".join(f'<li>{escape(r)}</li>' for r in result.new_replies)
+            items, latest = _render_kunsu_category(path, result.new_replies)
+            badge = _html_latest_badge(latest)
             parts.append(
-                f'<h4>新回覆（{len(result.new_replies)}）</h4><ul>{items}</ul>'
+                f'<h4>新回覆（{len(result.new_replies)}）{badge}</h4>{items}'
             )
         if result.new_applications:
-            items = "".join(f'<li>{escape(a)}</li>' for a in result.new_applications)
+            items, latest = _render_kunsu_category(path, result.new_applications)
+            badge = _html_latest_badge(latest)
             parts.append(
-                f'<h4>新申請（{len(result.new_applications)}）</h4><ul>{items}</ul>'
+                f'<h4>新申請（{len(result.new_applications)}）{badge}</h4>{items}'
             )
         if result.new_reports:
-            items = "".join(f'<li>{escape(r)}</li>' for r in result.new_reports)
+            items, latest = _render_kunsu_category(path, result.new_reports)
+            badge = _html_latest_badge(latest)
             parts.append(
-                f'<h4>新上報（{len(result.new_reports)}）</h4><ul>{items}</ul>'
+                f'<h4>新上報（{len(result.new_reports)}）{badge}</h4>{items}'
             )
         inner = "".join(parts)
 
@@ -275,23 +412,13 @@ def _html_subrepo(path: str, kunsu_path: str, result: SubrepoStatusResult) -> st
     ]
 
     if result.pending:
-        items = "".join(
-            f'<li>{escape(h.title)}'
-            f' <span class="filename">({escape(h.filename)})</span></li>'
-            for h in result.pending
-        )
-        parts.append(
-            f'<h4>待接手（{len(result.pending)}）</h4><ul>{items}</ul>'
-        )
+        items = "".join(_html_handoff_detail(h) for h in result.pending)
+        parts.append(f'<h4>待接手（{len(result.pending)}）</h4>{items}')
 
     if result.awaiting_confirm:
-        items = "".join(
-            f'<li>{escape(h.title)}'
-            f' <span class="filename">({escape(h.filename)})</span></li>'
-            for h in result.awaiting_confirm
-        )
+        items = "".join(_html_handoff_detail(h) for h in result.awaiting_confirm)
         parts.append(
-            f'<h4>已回覆待確認（{len(result.awaiting_confirm)}）</h4><ul>{items}</ul>'
+            f'<h4>已回覆待確認（{len(result.awaiting_confirm)}）</h4>{items}'
         )
 
     if result.unknown_to:
@@ -354,65 +481,89 @@ def index() -> HTMLResponse:
     # 檢查結果與身分判斷結果基於不同版本的資料，見 U4 code review 修正）。
     data = reg.raw
     kunsu_paths = _build_kunsu_paths(data)
-    subrepo_paths = _build_subrepo_paths(data)
     healthy_set = set(reg.healthy)
     stale_set = set(reg.stale)
 
-    stale_parts: list[str] = []
-    kunsu_parts: list[str] = []
-    subrepo_parts: list[str] = []
-
-    for path in sorted(healthy_set | stale_set):
-        # Stale 路徑：顯示警示卡片後跳過後續判斷
-        if path in stale_set:
-            stale_parts.append(_html_stale(path))
+    # ── 軍師 → 所屬子專案 對照表（供分組巢狀渲染） ─────────────────────────
+    kunsu_to_subrepos: dict[str, set[str]] = {}
+    for sub_path, entries in data.items():
+        if not isinstance(entries, list):
             continue
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            kunsu_p = entry.get("kunsu", "")
+            if kunsu_p:
+                kunsu_to_subrepos.setdefault(kunsu_p, set()).add(sub_path)
 
-        # 軍師身分：呼叫 scan_kunsu 取得新訊息狀態
-        # 兩個 if 皆可能為真（巢狀拓撲），各自獨立渲染，不合併
-        if path in kunsu_paths:
-            scan = scan_kunsu(path)
-            kunsu_parts.append(_html_kunsu(path, scan))
+    # ── 依軍師分組：每個軍師卡片底下巢狀顯示其所屬子專案 ───────────────────
+    # 巢狀拓撲（同一路徑同時是軍師與子專案）：該路徑既會以自己的分組出現，
+    # 也會巢狀出現在「上游軍師」的分組底下——兩處各自獨立渲染，不合併。
+    group_parts: list[str] = []
+    covered: set[str] = set()
 
-        # 子專案身分：對每個所屬軍師呼叫 get_subrepo_status
-        if path in subrepo_paths:
-            entries = data.get(path) or []
-            seen_kunsu: set[str] = set()
-            if isinstance(entries, list):
-                for entry in entries:
-                    if not isinstance(entry, dict):
-                        continue
-                    kunsu_p = entry.get("kunsu", "")
-                    if not kunsu_p or kunsu_p in seen_kunsu:
-                        continue
-                    seen_kunsu.add(kunsu_p)
-                    if kunsu_p in stale_set:
-                        # 所屬軍師本身 stale（路徑不存在或非有效 git repo），
-                        # 呼叫 get_subrepo_status 只會靜默回傳空結果，誤導
-                        # 使用者以為「無待處理交接文件」——改為明確告知軍師
-                        # 不可達，不呼叫 get_subrepo_status。
-                        subrepo_parts.append(
-                            _html_subrepo_kunsu_unreachable(path, kunsu_p)
-                        )
-                        continue
-                    our_roles = _get_our_roles(data, path, kunsu_p)
-                    all_known = _get_all_known_roles(data, kunsu_p)
-                    status = get_subrepo_status(path, our_roles, all_known, kunsu_p)
-                    subrepo_parts.append(_html_subrepo(path, kunsu_p, status))
+    for kunsu_path in sorted(kunsu_paths):
+        if kunsu_path not in healthy_set and kunsu_path not in stale_set:
+            continue  # raw 與健康檢查結果不一致，理論上不應發生
+        covered.add(kunsu_path)
 
-    # ── 組裝頁面（軍師分組與子專案分組獨立呈現） ─────────────────────────
+        sub_paths = sorted(kunsu_to_subrepos.get(kunsu_path, ()))
+        nested_parts: list[str] = []
+        is_stale = kunsu_path in stale_set
+        scan: Optional[KunsuScanResult] = None
+
+        if is_stale:
+            kunsu_card = _html_kunsu_stale(kunsu_path)
+            for sp in sub_paths:
+                covered.add(sp)
+                # 所屬軍師本身 stale，呼叫 get_subrepo_status 只會靜默回傳
+                # 空結果，誤導使用者以為「無待處理交接文件」——改為明確告知
+                # 軍師不可達，不呼叫 get_subrepo_status。
+                nested_parts.append(_html_subrepo_kunsu_unreachable(sp, kunsu_path))
+        else:
+            scan = scan_kunsu(kunsu_path)
+            kunsu_card = _html_kunsu(kunsu_path, scan)
+            for sp in sub_paths:
+                covered.add(sp)
+                if sp in stale_set:
+                    nested_parts.append(_html_subrepo_stale(sp, kunsu_path))
+                    continue
+                our_roles = _get_our_roles(data, sp, kunsu_path)
+                all_known = _get_all_known_roles(data, kunsu_path)
+                status = get_subrepo_status(sp, our_roles, all_known, kunsu_path)
+                nested_parts.append(_html_subrepo(sp, kunsu_path, status))
+
+        is_open, summary_label = _kunsu_group_open_and_label(
+            kunsu_path, is_stale, scan
+        )
+        nested_html = (
+            f'<div class="subrepo-nested">{"".join(nested_parts)}</div>'
+            if nested_parts
+            else ""
+        )
+        open_attr = " open" if is_open else ""
+        group_parts.append(
+            f'<details class="kunsu-group"{open_attr}>'
+            f'<summary>{summary_label}</summary>'
+            f'{kunsu_card}{nested_html}'
+            '</details>'
+        )
+
+    # ── 未歸類的殘留路徑（理論上不應發生，防禦性 fallback） ───────────────
+    leftover_stale = [
+        p for p in sorted((healthy_set | stale_set) - covered) if p in stale_set
+    ]
+
+    # ── 組裝頁面 ───────────────────────────────────────────────────────────
     body_sections: list[str] = []
-    if stale_parts:
+    if group_parts:
         body_sections.append(
-            f'<section><h2>Stale 路徑</h2>{"".join(stale_parts)}</section>'
+            f'<section><h2>軍師與子專案</h2>{"".join(group_parts)}</section>'
         )
-    if kunsu_parts:
+    if leftover_stale:
         body_sections.append(
-            f'<section><h2>軍師</h2>{"".join(kunsu_parts)}</section>'
-        )
-    if subrepo_parts:
-        body_sections.append(
-            f'<section><h2>子專案</h2>{"".join(subrepo_parts)}</section>'
+            '<section><h2>Stale 路徑</h2>'
+            f'{"".join(_html_stale(p) for p in leftover_stale)}</section>'
         )
     if not body_sections:
         # healthy/stale 非空但身分未能識別（理論上不應發生）
@@ -424,7 +575,7 @@ def index() -> HTMLResponse:
 # ── 程式化啟動 ────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="kunsu Dashboard 本機服務")
+    parser = argparse.ArgumentParser(description="軍師沙盤（kunsu dashboard）本機服務")
     parser.add_argument(
         "--port",
         type=int,
