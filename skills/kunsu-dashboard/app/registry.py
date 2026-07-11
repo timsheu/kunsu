@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Optional
 
 
-@dataclass
+@dataclass(frozen=True)
 class RegistryResult:
     """Registry 讀取與路徑健康檢查的結構化結果。
 
