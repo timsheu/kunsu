@@ -1,7 +1,7 @@
 ---
 title: kunsu 訊息聚合本機 Dashboard
 type: feat
-status: active
+status: completed
 date: 2026-07-11
 origin: docs/brainstorms/2026-07-11-kunsu-dashboard-requirements.md
 ---
