@@ -3,7 +3,8 @@ subrepo_status.py — 子專案模式狀態判斷（4a Python 版）
 
 複製 skills/kunsu-inbox/SKILL.md 步驟 4a-1 至 4a-4 的邏輯：
 掃描軍師的交接文件頂層（不遞迴），對 to: 為本角色的交接文件判斷回覆狀態，
-分類為「待接手」、「已回覆待確認」、「to: 不符清單」、或「異常」。
+分類為「未接手」、「部分完成」、「已回覆待確認」、「to: 不符清單」、或「異常」，
+並帶出最新回覆的選填欄位 verify（驗收方式，ADR 011，display-only）。
 
 ⚠️ 維護提示：本模組邏輯對齊 skills/kunsu-inbox/SKILL.md 步驟 4a。
    修改 SKILL.md 步驟 4a 時，請同步更新本模組並重跑
@@ -38,6 +39,7 @@ class HandoffInfo:
     created: str
     latest_reply_status: Optional[str]  # None 表示無回覆
     latest_reply_date: Optional[str]    # None 表示無回覆
+    latest_reply_verify: Optional[str] = None  # 最新回覆的 verify 欄位；None 表示無回覆或缺省
     raw_content: str = ""               # 檔案原始內容，供軍師沙盤展開式預覽使用
     mtime: Optional[float] = None       # 檔案最後修改時間（epoch），供時間軸排序／顯示
 
@@ -63,13 +65,16 @@ class SubrepoStatusResult:
     """子專案在此軍師底下的交接文件分類結果。
 
     Attributes:
-        pending:          待接手（to∈our_roles，無回覆或 status: partial/blocked）
+        not_picked_up:    未接手（to∈our_roles，無任何回覆）
+        partial_done:     部分完成（to∈our_roles，最新回覆 status: partial/blocked
+                          或未知值——有回覆就不是未接手，未知值保守列出不略過）
         awaiting_confirm: 已回覆待確認（to∈our_roles，最新回覆 status: submitted）
         unknown_to:       to: 不符清單（to∉all_known_roles）
         errors:           異常清單（frontmatter 缺必要欄位或解析失敗）
     """
 
-    pending: list[HandoffInfo] = field(default_factory=list)
+    not_picked_up: list[HandoffInfo] = field(default_factory=list)
+    partial_done: list[HandoffInfo] = field(default_factory=list)
     awaiting_confirm: list[HandoffInfo] = field(default_factory=list)
     unknown_to: list[UnknownToItem] = field(default_factory=list)
     errors: list[ErrorItem] = field(default_factory=list)
@@ -156,8 +161,9 @@ def get_subrepo_status(
         kunsu_path:      此軍師的絕對路徑。
 
     Returns:
-        SubrepoStatusResult，含四個分類清單：
-        - pending:          待接手
+        SubrepoStatusResult，含五個分類清單：
+        - not_picked_up:    未接手
+        - partial_done:     部分完成
         - awaiting_confirm: 已回覆待確認
         - unknown_to:       to: 不符清單
         - errors:           frontmatter 缺欄位等異常（不中斷整體判斷）
@@ -165,7 +171,8 @@ def get_subrepo_status(
     handoffs_dir = Path(kunsu_path) / "docs" / "handoffs"
     replies_dir = handoffs_dir / "replies"
 
-    pending: list[HandoffInfo] = []
+    not_picked_up: list[HandoffInfo] = []
+    partial_done: list[HandoffInfo] = []
     awaiting_confirm: list[HandoffInfo] = []
     unknown_to: list[UnknownToItem] = []
     errors: list[ErrorItem] = []
@@ -173,15 +180,17 @@ def get_subrepo_status(
     # ── 若軍師無交接目錄，直接回傳空結果 ─────────────────────────────────────
     if not handoffs_dir.exists():
         return SubrepoStatusResult(
-            pending=pending,
+            not_picked_up=not_picked_up,
+            partial_done=partial_done,
             awaiting_confirm=awaiting_confirm,
             unknown_to=unknown_to,
             errors=errors,
         )
 
-    # ── 4a-3 前置：預先索引全部回覆（{handoff_filename: [(date, n, status)]}） ─
+    # ── 4a-3 前置：預先索引全部回覆 ─────────────────────────────────────────
+    # {handoff_filename: [(date, n, status, verify)]}
     # 一次性掃描，避免逐筆交接再搜尋回覆目錄造成 O(n²) 讀檔
-    replies_index: dict[str, list[tuple[str, int, str]]] = {}
+    replies_index: dict[str, list[tuple[str, int, str, Optional[str]]]] = {}
 
     if replies_dir.exists():
         for reply_file in replies_dir.glob("*.md"):
@@ -196,6 +205,11 @@ def get_subrepo_status(
             # 避免型別不符導致 replies_index 的 key 比對永遠失敗。
             in_reply_to = str(fm.get("in_reply_to") or "")
             status = str(fm.get("status") or "")
+            # verify 為選填欄位（驗收方式，ADR 011）：缺省／空值正規化為 None
+            verify_raw = fm.get("verify")
+            verify: Optional[str] = (
+                str(verify_raw) if verify_raw not in (None, "") else None
+            )
             if not in_reply_to:
                 continue
 
@@ -206,7 +220,7 @@ def get_subrepo_status(
             date_str, n = sort_key
             if in_reply_to not in replies_index:
                 replies_index[in_reply_to] = []
-            replies_index[in_reply_to].append((date_str, n, str(status)))
+            replies_index[in_reply_to].append((date_str, n, str(status), verify))
 
     # ── 4a-2. 掃描軍師交接文件頂層（不遞迴） ─────────────────────────────────
     # Path.glob("*.md") 僅比對頂層 .md 檔案，天然排除 replies/ 與 archive/ 子目錄
@@ -256,6 +270,7 @@ def get_subrepo_status(
         reply_entries = replies_index.get(filename, [])
         latest_reply_status: Optional[str] = None
         latest_reply_date: Optional[str] = None
+        latest_reply_verify: Optional[str] = None
 
         if reply_entries:
             # 依 (date, n) 數值降序排序取最新
@@ -263,9 +278,10 @@ def get_subrepo_status(
             sorted_entries = sorted(
                 reply_entries, key=lambda x: (x[0], x[1]), reverse=True
             )
-            best_date, _best_n, best_status = sorted_entries[0]
+            best_date, _best_n, best_status, best_verify = sorted_entries[0]
             latest_reply_status = best_status
             latest_reply_date = best_date
+            latest_reply_verify = best_verify
 
         info = HandoffInfo(
             filename=filename,
@@ -275,23 +291,27 @@ def get_subrepo_status(
             created=created,
             latest_reply_status=latest_reply_status,
             latest_reply_date=latest_reply_date,
+            latest_reply_verify=latest_reply_verify,
             raw_content=content,
             mtime=mtime,
         )
 
         # ── 依 SKILL.md 4a-3 表格分類 ─────────────────────────────────────────
-        if latest_reply_status is None or latest_reply_status in ("partial", "blocked"):
-            pending.append(info)
+        # 判準是「有無回覆」：有回覆就不是未接手（ADR 011）
+        if latest_reply_status is None:
+            not_picked_up.append(info)
         elif latest_reply_status == "submitted":
             awaiting_confirm.append(info)
         elif latest_reply_status == "done":
             pass  # 不列出（略過）
         else:
-            # 未知 status 值 → 保守視同待接手
-            pending.append(info)
+            # partial／blocked，以及未知 status 值（保守列出不略過，
+            # 顯示端原樣呈現該 status）→ 部分完成
+            partial_done.append(info)
 
     return SubrepoStatusResult(
-        pending=pending,
+        not_picked_up=not_picked_up,
+        partial_done=partial_done,
         awaiting_confirm=awaiting_confirm,
         unknown_to=unknown_to,
         errors=errors,

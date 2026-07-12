@@ -2,7 +2,7 @@
 
 **這不是一個 Claude Code skill（不透過 `/kunsu-dashboard` 或任何觸發語啟動）。** 這是一個獨立的本機 FastAPI 服務，只是借用 `skills/` 目錄的部署慣例（隨 `install.sh` 一併複製或 symlink），執行時完全不經過 Claude Code session。設計理由與例外條件見 [ADR 010](../../docs/adr/2026-07-11-adr-candidate-010-dashboard-service-exception.md)。
 
-**軍師沙盤（kunsu dashboard）**——如統帥推演戰局的沙盤，一頁彙整全域反向註冊表 `~/.claude/kunsu-registry.json` 裡所有軍師與子專案的 kunsu 訊息狀態（交接待接手／已回覆、新申請、新上報），取代逐一切換 CLI 視窗手動執行 `/kunsu-inbox` 的做法。刷新瀏覽器頁面即觸發全新掃描，不跑背景服務。
+**軍師沙盤（kunsu dashboard）**——如統帥推演戰局的沙盤，一頁彙整全域反向註冊表 `~/.claude/kunsu-registry.json` 裡所有軍師與子專案的 kunsu 訊息狀態（未接手／部分完成／已回覆待確認交接、新回覆、新申請、新上報，含回覆 `verify` 驗收標籤，見 ADR 011），取代逐一切換 CLI 視窗手動執行 `/kunsu-inbox` 的做法。刷新瀏覽器頁面即觸發全新掃描，不跑背景服務。
 
 ---
 

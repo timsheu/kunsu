@@ -3,7 +3,11 @@
 # 獨立回覆檔案（回覆信箱模式：交接文件本體永遠不被編輯，回覆一律是新檔案）
 #
 # 用法：
-#   echo "<回覆內文>" | new-handoff-reply.sh "<原交接檔案 slug 或路徑>" [from]
+#   echo "<回覆內文>" | new-handoff-reply.sh "<原交接檔案 slug 或路徑>" [from] [verify]
+#
+#   verify 選填：驗收方式（建議代碼 needs-deploy／testable-now／needs-device，
+#   開放值域可填自由字串）；非空時寫入 frontmatter verify: 欄位。
+#   只帶 verify 不覆寫 from 時，from 傳空字串 "" 佔位。
 #
 # 行為：
 #   1. 從當前目錄往上找最近的 CLAUDE.md/AGENTS.md 定位專案根；找不到才退回
@@ -18,17 +22,19 @@
 #      路徑，回覆保證落在原檔所在 repo 的 docs/handoffs/replies/
 #   5. 檔名 = {原交接檔名}-reply-YYYY-MM-DD.md；同日同名自動加 -2、-3...
 #      （append-only，不覆寫前次回覆）
-#   6. 寫入 Dataview 友善 frontmatter（from/to/in_reply_to/status）+ stdin 內文
+#   6. 寫入 Dataview 友善 frontmatter（from/to/in_reply_to/status［/verify］）
+#      + stdin 內文
 #   7. 印出最終檔案路徑（供呼叫端回報）
 
 set -euo pipefail
 
 ORIG_REF="${1:-}"
 FROM_OVERRIDE="${2:-}"
+VERIFY="${3:-}"
 
 if [[ -z "$ORIG_REF" ]]; then
   echo "錯誤：缺少原交接檔案 slug 或路徑（第一個參數）" >&2
-  echo "用法：new-handoff-reply.sh \"<原交接檔案 slug 或路徑>\" [from]" >&2
+  echo "用法：new-handoff-reply.sh \"<原交接檔案 slug 或路徑>\" [from] [verify]" >&2
   exit 1
 fi
 
@@ -127,6 +133,9 @@ BODY="$(cat || true)"
   printf 'in_reply_to: %s\n' "$ORIG_BASENAME"
   printf 'created: %s\n' "$DATE"
   printf 'status: submitted\n'
+  if [[ -n "$VERIFY" ]]; then
+    printf 'verify: %s\n' "$VERIFY"
+  fi
   printf -- '---\n\n'
   printf '# %s — 回覆\n\n' "$ORIG_TITLE"
   if [[ -n "$BODY" ]]; then

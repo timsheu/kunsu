@@ -79,14 +79,16 @@ def _scan(
 
 
 def _subrepo(
-    pending: list[HandoffInfo] | None = None,
+    not_picked_up: list[HandoffInfo] | None = None,
+    partial_done: list[HandoffInfo] | None = None,
     awaiting: list[HandoffInfo] | None = None,
     unknown: list[UnknownToItem] | None = None,
     errors: list[ErrorItem] | None = None,
 ) -> SubrepoStatusResult:
     """建立 SubrepoStatusResult 測試用實例。"""
     return SubrepoStatusResult(
-        pending=pending or [],
+        not_picked_up=not_picked_up or [],
+        partial_done=partial_done or [],
         awaiting_confirm=awaiting or [],
         unknown_to=unknown or [],
         errors=errors or [],
@@ -101,6 +103,7 @@ def _handoff(
     created: str = "2026-07-01",
     latest_reply_status: str | None = None,
     latest_reply_date: str | None = None,
+    latest_reply_verify: str | None = None,
 ) -> HandoffInfo:
     """建立 HandoffInfo 測試用實例。"""
     return HandoffInfo(
@@ -111,6 +114,7 @@ def _handoff(
         created=created,
         latest_reply_status=latest_reply_status,
         latest_reply_date=latest_reply_date,
+        latest_reply_verify=latest_reply_verify,
     )
 
 
@@ -174,7 +178,7 @@ def test_happy_path_kunsu_and_subrepo_both_rendered(monkeypatch, client):
         p, new_replies=[" docs/handoffs/reply.md"]
     ))
     monkeypatch.setattr("app.main.get_subrepo_status", lambda *a, **k: _subrepo(
-        pending=[_handoff(filename="work.md", title="Pending Task")]
+        not_picked_up=[_handoff(filename="work.md", title="Pending Task")]
     ))
 
     resp = client.get("/")
@@ -185,7 +189,7 @@ def test_happy_path_kunsu_and_subrepo_both_rendered(monkeypatch, client):
     assert "子專案" in html
     assert KUNSU in html
     assert SUBREPO in html
-    assert "待接手" in html
+    assert "未接手" in html
     assert "Pending Task" in html
     assert "新回覆" in html
 
@@ -366,8 +370,9 @@ def test_unknown_to_shown_as_separate_warning_list(monkeypatch, client):
     assert "不符清單" in html
     # 不符清單以警示樣式（lbl-warn）呈現
     assert "lbl-warn" in html
-    # 未被歸入待接手
-    assert "待接手" not in html
+    # 未被歸入未接手／部分完成
+    assert "未接手" not in html
+    assert "部分完成" not in html
 
 
 # ── Test 8: XSS 轉義 ─────────────────────────────────────────────────────────
@@ -384,7 +389,7 @@ def test_xss_in_handoff_title_is_escaped(monkeypatch, client):
     ))
     monkeypatch.setattr("app.main.scan_kunsu", lambda p: _scan(p))
     monkeypatch.setattr("app.main.get_subrepo_status", lambda *a, **k: _subrepo(
-        pending=[_handoff(filename="task.md", title=XSS_TITLE)]
+        not_picked_up=[_handoff(filename="task.md", title=XSS_TITLE)]
     ))
 
     resp = client.get("/")
@@ -428,7 +433,7 @@ def test_integration_all_status_types_rendered(monkeypatch, client):
     ) -> SubrepoStatusResult:
         if subrepo_path == SUBREPO_PENDING:
             return _subrepo(
-                pending=[_handoff("p.md", "Pending Job", "boss", "alpha")]
+                not_picked_up=[_handoff("p.md", "Pending Job", "boss", "alpha")]
             )
         if subrepo_path == SUBREPO_AWAITING:
             return _subrepo(
@@ -465,8 +470,8 @@ def test_integration_all_status_types_rendered(monkeypatch, client):
     assert STALE in html
     assert "card-stale" in html
 
-    # 待接手子專案
-    assert "待接手" in html
+    # 未接手子專案
+    assert "未接手" in html
     assert "Pending Job" in html
 
     # 已回覆待確認子專案
@@ -558,7 +563,7 @@ def test_pending_handoff_shows_expandable_raw_content(monkeypatch, client):
     # _handoff 輔助函式預設 raw_content=""／mtime=None，改用實際物件驗證需直接建構
     from app.subrepo_status import HandoffInfo
     monkeypatch.setattr("app.main.get_subrepo_status", lambda *a, **k: _subrepo(
-        pending=[HandoffInfo(
+        not_picked_up=[HandoffInfo(
             filename="task.md", title="Pending Task",
             from_role="boss", to_role="worker", created="2026-07-01",
             latest_reply_status=None, latest_reply_date=None,
@@ -832,3 +837,186 @@ def test_uncommitted_handoff_hint_rendered_in_tripwire_card(monkeypatch, client)
 
     assert "hint-uncommitted" in html
     assert "漏做 /handoff add 尾端確認 commit" in html
+
+
+# ── verify 標籤與三分類渲染（ADR 011） ────────────────────────────────────────
+
+
+def _client_with_subrepo(monkeypatch, subrepo_result):
+    """組出「一軍師＋一子專案」的最小 registry mock，回傳指定子專案分類結果。"""
+    KUNSU = "/fake/kunsu-verify"
+    SUBREPO = "/fake/subrepo-verify"
+    monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
+        healthy=[KUNSU, SUBREPO],
+        raw={SUBREPO: [{"kunsu": KUNSU, "roles": ["dev"]}]},
+    ))
+    monkeypatch.setattr("app.main.scan_kunsu", lambda p: _scan(p))
+    monkeypatch.setattr(
+        "app.main.get_subrepo_status", lambda *a, **k: subrepo_result
+    )
+
+
+def test_three_categories_rendered_with_verify_badges(monkeypatch, client):
+    """未接手／部分完成／已回覆待確認三分類標題同時出現，
+    三個建議代碼各自渲染為對應中文彩色標籤。"""
+    _client_with_subrepo(monkeypatch, _subrepo(
+        not_picked_up=[_handoff("n.md", "New Job")],
+        partial_done=[
+            _handoff(
+                "p.md", "Deploy Job",
+                latest_reply_status="partial",
+                latest_reply_date="2026-07-10",
+                latest_reply_verify="needs-deploy",
+            ),
+            _handoff(
+                "d.md", "Device Job",
+                latest_reply_status="partial",
+                latest_reply_date="2026-07-10",
+                latest_reply_verify="needs-device",
+            ),
+        ],
+        awaiting=[_handoff(
+            "a.md", "Now Job",
+            latest_reply_status="submitted",
+            latest_reply_date="2026-07-11",
+            latest_reply_verify="testable-now",
+        )],
+    ))
+
+    resp = client.get("/")
+    assert resp.status_code == 200
+    html = resp.text
+
+    assert "未接手（1）" in html
+    assert "部分完成（2）" in html
+    assert "已回覆待確認（1）" in html
+    assert "需上線測試 🚀" in html and "badge-deploy" in html
+    assert "需實機測試 📱" in html and "badge-device" in html
+    assert "馬上可測 ⚡" in html and "badge-now" in html
+
+
+def test_free_text_verify_rendered_as_plain_badge_and_escaped(monkeypatch, client):
+    """自由字串 verify 原樣顯示為一般標籤（badge-other），且經 escape()。"""
+    _client_with_subrepo(monkeypatch, _subrepo(
+        partial_done=[_handoff(
+            "p.md", "Custom Job",
+            latest_reply_status="partial",
+            latest_reply_verify="等 <b>DBA</b> 開權限",
+        )],
+    ))
+
+    resp = client.get("/")
+    html = resp.text
+
+    assert "badge-other" in html
+    assert "等 &lt;b&gt;DBA&lt;/b&gt; 開權限" in html
+    assert "<b>DBA</b>" not in html
+
+
+def test_blocked_reply_shows_blocked_badge(monkeypatch, client):
+    """blocked 回覆在部分完成分類中另標 ⛔ 卡關標籤。"""
+    _client_with_subrepo(monkeypatch, _subrepo(
+        partial_done=[_handoff(
+            "b.md", "Blocked Job",
+            latest_reply_status="blocked",
+            latest_reply_verify="needs-deploy",
+        )],
+    ))
+
+    resp = client.get("/")
+    html = resp.text
+
+    assert "部分完成（1）" in html
+    assert "badge-blocked" in html and "⛔ 卡關" in html
+    # verify 標籤與卡關標籤並存
+    assert "badge-deploy" in html
+
+
+def test_unknown_status_shows_raw_status_badge(monkeypatch, client):
+    """未知 status 值歸部分完成，摘要列原樣顯示該 status 標籤（經 escape）。"""
+    _client_with_subrepo(monkeypatch, _subrepo(
+        partial_done=[_handoff(
+            "w.md", "WIP Job",
+            latest_reply_status="wip<x>",
+        )],
+    ))
+
+    resp = client.get("/")
+    html = resp.text
+
+    assert "部分完成（1）" in html
+    assert "badge-status-unknown" in html
+    assert "status: wip&lt;x&gt;" in html
+    assert "wip<x>" not in html
+
+
+def test_missing_verify_shows_no_badge(monkeypatch, client):
+    """verify 缺省（既有回覆檔零遷移）→ 不出現任何 verify 標籤 class。"""
+    _client_with_subrepo(monkeypatch, _subrepo(
+        awaiting=[_handoff(
+            "a.md", "Plain Job",
+            latest_reply_status="submitted",
+        )],
+    ))
+
+    resp = client.get("/")
+    html = resp.text
+
+    assert "已回覆待確認（1）" in html
+    # CSS class 定義出現在每頁的 <style>，不能用 class 名稱反向斷言；
+    # 改斷言「實際渲染出的 badge span」不存在
+    assert '<span class="badge' not in html
+
+
+def test_verify_suggested_code_lookup_is_case_insensitive(monkeypatch, client):
+    """建議代碼大小寫變體（Needs-Deploy）仍命中彩色標籤，不靜默降格為一般標籤
+    （ADR 011 doc review 修正：查找前正規化為小寫）。"""
+    _client_with_subrepo(monkeypatch, _subrepo(
+        partial_done=[_handoff(
+            "p.md", "Case Job",
+            latest_reply_status="partial",
+            latest_reply_verify="Needs-Deploy",
+        )],
+    ))
+
+    resp = client.get("/")
+    html = resp.text
+
+    assert "需上線測試 🚀" in html and "badge-deploy" in html
+    assert '<span class="badge badge-other">' not in html
+
+
+def test_items_within_category_sorted_by_verify_grouping(monkeypatch, client):
+    """同分類內依 verify 聚合排序：已知代碼在前、自由字串次之、缺省最後，
+    同 verify 值相鄰（ADR 011 Decision 2 排序規則）。"""
+    _client_with_subrepo(monkeypatch, _subrepo(
+        partial_done=[
+            _handoff("z-none.md", "NoVerify Job",
+                     latest_reply_status="partial"),
+            _handoff("a-free.md", "FreeText Job",
+                     latest_reply_status="partial",
+                     latest_reply_verify="等 DBA 開權限"),
+            _handoff("m-dev2.md", "Device Job Two",
+                     latest_reply_status="partial",
+                     latest_reply_verify="needs-device"),
+            _handoff("b-deploy.md", "Deploy Job",
+                     latest_reply_status="partial",
+                     latest_reply_verify="needs-deploy"),
+            _handoff("k-dev1.md", "Device Job One",
+                     latest_reply_status="partial",
+                     latest_reply_verify="needs-device"),
+        ],
+    ))
+
+    resp = client.get("/")
+    html = resp.text
+
+    # 已知代碼（needs-deploy < needs-device，值相同者相鄰）→ 自由字串 → 缺省
+    pos_deploy = html.index("Deploy Job")
+    pos_dev1 = html.index("Device Job One")
+    pos_dev2 = html.index("Device Job Two")
+    pos_free = html.index("FreeText Job")
+    pos_none = html.index("NoVerify Job")
+
+    assert pos_deploy < min(pos_dev1, pos_dev2)
+    assert max(pos_dev1, pos_dev2) < pos_free < pos_none

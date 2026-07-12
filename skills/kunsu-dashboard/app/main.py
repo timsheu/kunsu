@@ -137,6 +137,14 @@ _CSS = (
     ".filename{color:#777;font-size:.85em}"
     ".unknown-to-item{color:#7b1fa2}"
     ".mtime{color:#999;font-size:.82em}"
+    ".badge{display:inline-block;padding:0 .45em;border-radius:9px;"
+    "font-size:.8em;font-weight:600;margin-left:.35em;white-space:nowrap}"
+    ".badge-deploy{background:#fff3e0;color:#e65100}"
+    ".badge-now{background:#e8f5e9;color:#2e7d32}"
+    ".badge-device{background:#ede7f6;color:#4527a0}"
+    ".badge-other{background:#f0f0f0;color:#555}"
+    ".badge-blocked{background:#ffebee;color:#b71c1c}"
+    ".badge-status-unknown{background:#f3e5f5;color:#7b1fa2}"
     ".detail-name{display:inline-block;padding-left:1.5em;margin-top:.15em}"
     "pre{white-space:pre-wrap;word-break:break-all;background:#f8f8f8;"
     "padding:.5em;border-radius:3px;font-size:.85em;margin:.3em 0}"
@@ -280,12 +288,70 @@ def _render_kunsu_category(
     return "".join(items_html), latest
 
 
+# ── verify 標籤對照（ADR 011）──────────────────────────────────────────────
+# 建議代碼 → (中文標籤, CSS class)；其他非空字串原樣顯示為一般標籤（badge-other）
+_VERIFY_LABELS: dict[str, tuple[str, str]] = {
+    "needs-deploy": ("需上線測試 🚀", "badge-deploy"),
+    "testable-now": ("馬上可測 ⚡", "badge-now"),
+    "needs-device": ("需實機測試 📱", "badge-device"),
+}
+
+
+def _html_status_badges(h: HandoffInfo) -> str:
+    """組出摘要列的狀態標籤區（blocked／未知 status＋verify 驗收方式）。
+
+    - `status: blocked` → ⛔ 卡關（partial／submitted 由所屬分類標題傳達，不重複）
+    - 未知 status 值 → 原樣顯示（分類端已保守歸入部分完成）
+    - verify 建議代碼 → 中文彩色標籤；其他非空字串 → 原樣一般標籤；缺省 → 不顯示
+    """
+    badges: list[str] = []
+    status = h.latest_reply_status
+    if status == "blocked":
+        badges.append('<span class="badge badge-blocked">⛔ 卡關</span>')
+    elif status is not None and status not in ("partial", "submitted"):
+        badges.append(
+            f'<span class="badge badge-status-unknown">'
+            f'status: {escape(status)}</span>'
+        )
+    verify = h.latest_reply_verify
+    if verify:
+        # 建議代碼為全小寫 kebab-case；查找前正規化為小寫（ADR 011），
+        # 大小寫變體（Needs-Deploy 等）仍命中彩色標籤，不靜默降格。
+        # 未命中的自由字串一律原樣顯示「原始值」，不顯示正規化後的字串。
+        known = _VERIFY_LABELS.get(verify.lower())
+        if known:
+            label, css = known
+            badges.append(f'<span class="badge {css}">{label}</span>')
+        else:
+            badges.append(
+                f'<span class="badge badge-other">{escape(verify)}</span>'
+            )
+    return "".join(badges)
+
+
+def _verify_sort_key(h: HandoffInfo) -> tuple:
+    """分類內 verify 聚合排序鍵（ADR 011 Decision 2）。
+
+    已知建議代碼在前、自由字串次之、缺省最後；同 verify 值相鄰，
+    組內依檔案修改時間降序——讓相同驗收方式的項目相鄰，支撐批次排程。
+    """
+    verify = h.latest_reply_verify
+    if verify and verify.lower() in _VERIFY_LABELS:
+        group, value = 0, verify.lower()
+    elif verify:
+        group, value = 1, verify
+    else:
+        group, value = 2, ""
+    return (group, value, -(h.mtime or 0.0))
+
+
 def _html_handoff_detail(h: HandoffInfo) -> str:
-    """單一交接文件的展開式預覽卡片，摘要列含標題、檔名與最後修改時間。"""
+    """單一交接文件的展開式預覽卡片，摘要列含標題、檔名、狀態標籤與最後修改時間。"""
     mtime_str = _format_mtime(h.mtime)
     name_html = (
         f'{escape(h.title)} '
         f'<span class="filename">({escape(h.filename)})</span>'
+        f'{_html_status_badges(h)}'
     )
     summary = _html_summary_line(mtime_str, name_html)
     return _html_detail(summary, h.raw_content)
@@ -430,7 +496,7 @@ def _html_kunsu(path: str, result: KunsuScanResult) -> str:
 
 
 def _html_subrepo(path: str, kunsu_path: str, result: SubrepoStatusResult) -> str:
-    """子專案卡片：待接手／已回覆待確認／to 不符清單／異常四類。
+    """子專案卡片：未接手／部分完成／已回覆待確認／to 不符清單／異常五類。
 
     所有 frontmatter 字串（title、filename 等）一律 escape() 後再拼接。
     """
@@ -442,18 +508,31 @@ def _html_subrepo(path: str, kunsu_path: str, result: SubrepoStatusResult) -> st
         f'<p>所屬軍師：<code>{esc_kunsu}</code></p>',
     ]
 
-    if result.pending:
-        items = "".join(_html_handoff_detail(h) for h in result.pending)
-        parts.append(f'<h4>待接手（{len(result.pending)}）</h4>{items}')
+    if result.not_picked_up:
+        items = "".join(
+            _html_handoff_detail(h)
+            for h in sorted(result.not_picked_up, key=_verify_sort_key)
+        )
+        parts.append(f'<h4>未接手（{len(result.not_picked_up)}）</h4>{items}')
+
+    if result.partial_done:
+        items = "".join(
+            _html_handoff_detail(h)
+            for h in sorted(result.partial_done, key=_verify_sort_key)
+        )
+        parts.append(f'<h4>部分完成（{len(result.partial_done)}）</h4>{items}')
 
     if result.awaiting_confirm:
-        items = "".join(_html_handoff_detail(h) for h in result.awaiting_confirm)
+        items = "".join(
+            _html_handoff_detail(h)
+            for h in sorted(result.awaiting_confirm, key=_verify_sort_key)
+        )
         parts.append(
             f'<h4>已回覆待確認（{len(result.awaiting_confirm)}）</h4>{items}'
         )
 
     if result.unknown_to:
-        # 以獨立警示列呈現，不歸入待接手或已回覆待確認
+        # 以獨立警示列呈現，不歸入未接手／部分完成／已回覆待確認
         items = "".join(
             f'<li class="unknown-to-item">{escape(u.filename)}'
             f' <span class="lbl-warn">to: {escape(u.to_value)}</span></li>'
@@ -474,7 +553,8 @@ def _html_subrepo(path: str, kunsu_path: str, result: SubrepoStatusResult) -> st
         )
 
     if not (
-        result.pending
+        result.not_picked_up
+        or result.partial_done
         or result.awaiting_confirm
         or result.unknown_to
         or result.errors

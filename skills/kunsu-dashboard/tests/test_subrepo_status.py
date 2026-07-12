@@ -1,14 +1,17 @@
 """
 test_subrepo_status.py — skills/kunsu-dashboard/app/subrepo_status.py 的單元測試
 
-覆蓋計畫 U3 的 7 個 test scenarios：
-  - Covers AE1. happy path：交接文件無任何回覆 → 待接手
+覆蓋計畫 U3 的 7 個 test scenarios（分類名依 ADR 011 拆分後更新）：
+  - Covers AE1. happy path：交接文件無任何回覆 → 未接手
   - Covers AE2. happy path：最新回覆 status: submitted → 已回覆待確認
   - Covers AE3. happy path：最新回覆 status: done → 不列出
-  - edge case：最新回覆 status: partial 或 status: blocked → 待接手
+  - edge case：最新回覆 status: partial 或 status: blocked → 部分完成
   - edge case：同日多份回覆（-2 後綴）→ 依數值排序取最大 n 者，非字串排序
   - edge case：to: 值不在任何已知角色代碼集合 → unknown_to 清單
   - error path：frontmatter 缺少必要欄位 → 不拋例外，歸入異常清單
+
+另覆蓋 verify 選填欄位（驗收方式，ADR 011）：建議代碼／自由字串／缺省／
+非字串型別防呆，以及未知 status 有回覆歸「部分完成」的保守列出行為。
 """
 
 from pathlib import Path
@@ -57,9 +60,15 @@ def make_reply(
     status: str = "submitted",
     from_role: str = "my-role",
     to_role: str = "ebook-store",
+    verify: str | None = None,
 ) -> Path:
-    """在 replies_dir 建立一份回覆檔案（含完整 frontmatter）。"""
+    """在 replies_dir 建立一份回覆檔案（含完整 frontmatter）。
+
+    verify 非 None 時附加選填欄位 verify:（原樣字串，不加引號，
+    模擬 new-handoff-reply.sh 的輸出格式）。
+    """
     replies_dir.mkdir(parents=True, exist_ok=True)
+    verify_line = f"verify: {verify}\n" if verify is not None else ""
     content = f"""---
 title: 回覆
 type: handoff-reply
@@ -68,7 +77,7 @@ to: {to_role}
 in_reply_to: {in_reply_to}
 created: 2026-07-06
 status: {status}
----
+{verify_line}---
 
 回覆內容。
 """
@@ -86,12 +95,12 @@ def setup_kunsu(tmp_path: Path, kunsu_name: str = "kunsu") -> tuple[Path, Path, 
     return kunsu, handoffs, replies
 
 
-# ── Test Scenario 1（Covers AE1）：無回覆 → 待接手 ──────────────────────────────
+# ── Test Scenario 1（Covers AE1）：無回覆 → 未接手 ──────────────────────────────
 
-class TestNoReplyIsPending:
-    """AE1: 交接文件無任何回覆，應分類為待接手。"""
+class TestNoReplyIsNotPickedUp:
+    """AE1: 交接文件無任何回覆，應分類為未接手。"""
 
-    def test_handoff_without_reply_is_pending(self, tmp_path):
+    def test_handoff_without_reply_is_not_picked_up(self, tmp_path):
         kunsu, handoffs, replies = setup_kunsu(tmp_path)
 
         make_handoff(handoffs, "2026-07-01-test-handoff.md", to_role="my-role")
@@ -103,16 +112,18 @@ class TestNoReplyIsPending:
             kunsu_path=str(kunsu),
         )
 
-        assert len(result.pending) == 1
+        assert len(result.not_picked_up) == 1
+        assert len(result.partial_done) == 0
         assert len(result.awaiting_confirm) == 0
         assert len(result.unknown_to) == 0
         assert len(result.errors) == 0
 
-        item = result.pending[0]
+        item = result.not_picked_up[0]
         assert item.filename == "2026-07-01-test-handoff.md"
         assert item.to_role == "my-role"
         assert item.latest_reply_status is None
         assert item.latest_reply_date is None
+        assert item.latest_reply_verify is None
 
     def test_pending_handoff_contains_correct_metadata(self, tmp_path):
         kunsu, handoffs, replies = setup_kunsu(tmp_path)
@@ -133,8 +144,8 @@ class TestNoReplyIsPending:
             kunsu_path=str(kunsu),
         )
 
-        assert len(result.pending) == 1
-        item = result.pending[0]
+        assert len(result.not_picked_up) == 1
+        item = result.not_picked_up[0]
         assert item.title == "重要交接"
         assert item.from_role == "ebook-store"
         assert item.created == "2026-07-01"
@@ -153,9 +164,9 @@ class TestNoReplyIsPending:
             kunsu_path=str(kunsu),
         )
 
-        assert len(result.pending) == 1
-        assert result.pending[0].raw_content == expected_content
-        assert "交接內容。" in result.pending[0].raw_content
+        assert len(result.not_picked_up) == 1
+        assert result.not_picked_up[0].raw_content == expected_content
+        assert "交接內容。" in result.not_picked_up[0].raw_content
 
     def test_pending_handoff_carries_mtime(self, tmp_path):
         """HandoffInfo.mtime 應等於檔案實際的最後修改時間（st_mtime）。"""
@@ -171,8 +182,8 @@ class TestNoReplyIsPending:
             kunsu_path=str(kunsu),
         )
 
-        assert len(result.pending) == 1
-        assert result.pending[0].mtime == expected_mtime
+        assert len(result.not_picked_up) == 1
+        assert result.not_picked_up[0].mtime == expected_mtime
 
 
 # ── Test Scenario 2（Covers AE2）：最新回覆 submitted → 已回覆待確認 ─────────────
@@ -198,7 +209,8 @@ class TestSubmittedReplyIsAwaitingConfirm:
             kunsu_path=str(kunsu),
         )
 
-        assert len(result.pending) == 0
+        assert len(result.not_picked_up) == 0
+        assert len(result.partial_done) == 0
         assert len(result.awaiting_confirm) == 1
         assert len(result.errors) == 0
 
@@ -231,21 +243,23 @@ class TestDoneReplyIsSkipped:
             kunsu_path=str(kunsu),
         )
 
-        assert len(result.pending) == 0
+        assert len(result.not_picked_up) == 0
+        assert len(result.partial_done) == 0
         assert len(result.awaiting_confirm) == 0
         assert len(result.unknown_to) == 0
         assert len(result.errors) == 0
 
 
-# ── Test Scenario 4：partial / blocked → 待接手 ───────────────────────────────
+# ── Test Scenario 4：partial / blocked → 部分完成 ─────────────────────────────
 
-class TestPartialAndBlockedIsPending:
-    """edge case: status: partial 或 status: blocked 的最新回覆應視同待接手。
+class TestPartialAndBlockedIsPartialDone:
+    """edge case: status: partial 或 status: blocked 的最新回覆應歸「部分完成」。
 
-    覆蓋 SKILL.md 4a-3 表格中「最新回覆 status: partial/blocked → 待接手」兩列。
+    覆蓋 SKILL.md 4a-3 表格中「最新回覆 status: partial/blocked → 部分完成」兩列
+    （ADR 011：有回覆就不是未接手）。
     """
 
-    def test_partial_reply_is_pending(self, tmp_path):
+    def test_partial_reply_is_partial_done(self, tmp_path):
         kunsu, handoffs, replies = setup_kunsu(tmp_path)
 
         make_handoff(handoffs, "2026-07-01-test-handoff.md", to_role="my-role")
@@ -263,11 +277,12 @@ class TestPartialAndBlockedIsPending:
             kunsu_path=str(kunsu),
         )
 
-        assert len(result.pending) == 1
+        assert len(result.partial_done) == 1
+        assert len(result.not_picked_up) == 0
         assert len(result.awaiting_confirm) == 0
-        assert result.pending[0].latest_reply_status == "partial"
+        assert result.partial_done[0].latest_reply_status == "partial"
 
-    def test_blocked_reply_is_pending(self, tmp_path):
+    def test_blocked_reply_is_partial_done(self, tmp_path):
         kunsu, handoffs, replies = setup_kunsu(tmp_path)
 
         make_handoff(handoffs, "2026-07-01-test-handoff.md", to_role="my-role")
@@ -285,9 +300,10 @@ class TestPartialAndBlockedIsPending:
             kunsu_path=str(kunsu),
         )
 
-        assert len(result.pending) == 1
+        assert len(result.partial_done) == 1
+        assert len(result.not_picked_up) == 0
         assert len(result.awaiting_confirm) == 0
-        assert result.pending[0].latest_reply_status == "blocked"
+        assert result.partial_done[0].latest_reply_status == "blocked"
 
 
 # ── Test Scenario 5：同日多份回覆數值排序 ──────────────────────────────────────
@@ -337,7 +353,8 @@ class TestSameDayMultipleRepliesSorting:
             "n=2 的回覆（submitted）應為最新，"
             "若結果為空表示誤用字串排序（n=1 的 done 被錯誤選中）"
         )
-        assert len(result.pending) == 0
+        assert len(result.not_picked_up) == 0
+        assert len(result.partial_done) == 0
         assert result.awaiting_confirm[0].latest_reply_status == "submitted"
 
     def test_three_same_day_replies_selects_highest_n(self, tmp_path):
@@ -399,7 +416,8 @@ class TestUnknownToIsListed:
         )
 
         assert len(result.unknown_to) == 1
-        assert len(result.pending) == 0
+        assert len(result.not_picked_up) == 0
+        assert len(result.partial_done) == 0
         assert len(result.awaiting_confirm) == 0
 
         item = result.unknown_to[0]
@@ -423,7 +441,8 @@ class TestUnknownToIsListed:
             kunsu_path=str(kunsu),
         )
 
-        assert len(result.pending) == 0
+        assert len(result.not_picked_up) == 0
+        assert len(result.partial_done) == 0
         assert len(result.awaiting_confirm) == 0
         assert len(result.unknown_to) == 0
         assert len(result.errors) == 0
@@ -457,7 +476,8 @@ status: open
         )
 
         assert len(result.errors) == 1
-        assert len(result.pending) == 0
+        assert len(result.not_picked_up) == 0
+        assert len(result.partial_done) == 0
         assert "to" in result.errors[0].error
 
     def test_missing_multiple_fields_reports_all(self, tmp_path):
@@ -510,9 +530,9 @@ created: 2026-07-01
             kunsu_path=str(kunsu),
         )
 
-        # 正常的那份應分類為待接手
-        assert len(result.pending) == 1
-        assert result.pending[0].filename == "2026-07-01-good-handoff.md"
+        # 正常的那份應分類為未接手
+        assert len(result.not_picked_up) == 1
+        assert result.not_picked_up[0].filename == "2026-07-01-good-handoff.md"
         # 有問題的那份應進異常清單
         assert len(result.errors) == 1
         assert result.errors[0].filename == "2026-07-01-bad-handoff.md"
@@ -536,7 +556,8 @@ class TestEdgeCases:
         )
 
         assert isinstance(result, SubrepoStatusResult)
-        assert len(result.pending) == 0
+        assert len(result.not_picked_up) == 0
+        assert len(result.partial_done) == 0
         assert len(result.awaiting_confirm) == 0
         assert len(result.unknown_to) == 0
         assert len(result.errors) == 0
@@ -569,8 +590,8 @@ status: done
         )
 
         # 只有頂層的一份應被判斷
-        assert len(result.pending) == 1
-        assert result.pending[0].filename == "2026-07-01-active.md"
+        assert len(result.not_picked_up) == 1
+        assert result.not_picked_up[0].filename == "2026-07-01-active.md"
 
     def test_replies_subdir_not_treated_as_handoffs(self, tmp_path):
         """replies/ 子目錄內的 .md 不應被掃描為交接文件（只掃頂層）。"""
@@ -600,7 +621,8 @@ status: submitted
         )
 
         # replies/ 內的回覆不應出現在任何分類
-        assert len(result.pending) == 0
+        assert len(result.not_picked_up) == 0
+        assert len(result.partial_done) == 0
         assert len(result.awaiting_confirm) == 0
         assert len(result.unknown_to) == 0
         assert len(result.errors) == 0
@@ -642,8 +664,163 @@ status: open
         )
 
         assert len(result.errors) == 0
-        assert len(result.pending) == 1
-        assert result.pending[0].title == "測試交接"
+        assert len(result.not_picked_up) == 1
+        assert result.not_picked_up[0].title == "測試交接"
+
+
+# ── verify 選填欄位（驗收方式，ADR 011） ─────────────────────────────────────
+
+
+class TestVerifyField:
+    """verify 欄位解析：建議代碼／自由字串／缺省／非字串型別防呆／取最新回覆的值。"""
+
+    def _run(self, tmp_path, kunsu):
+        return get_subrepo_status(
+            subrepo_path=str(tmp_path / "subrepo"),
+            our_roles={"my-role"},
+            all_known_roles={"my-role"},
+            kunsu_path=str(kunsu),
+        )
+
+    def test_partial_with_needs_deploy_carries_verify(self, tmp_path):
+        kunsu, handoffs, replies = setup_kunsu(tmp_path)
+        make_handoff(handoffs, "2026-07-01-test-handoff.md", to_role="my-role")
+        make_reply(
+            replies,
+            "2026-07-01-test-handoff-reply-2026-07-06.md",
+            in_reply_to="2026-07-01-test-handoff.md",
+            status="partial",
+            verify="needs-deploy",
+        )
+
+        result = self._run(tmp_path, kunsu)
+
+        assert len(result.partial_done) == 1
+        assert result.partial_done[0].latest_reply_verify == "needs-deploy"
+
+    def test_blocked_with_free_text_verify_carried_as_is(self, tmp_path):
+        """自由字串（開放值域）原樣帶出，不因非建議代碼而被丟棄。"""
+        kunsu, handoffs, replies = setup_kunsu(tmp_path)
+        make_handoff(handoffs, "2026-07-01-test-handoff.md", to_role="my-role")
+        make_reply(
+            replies,
+            "2026-07-01-test-handoff-reply-2026-07-06.md",
+            in_reply_to="2026-07-01-test-handoff.md",
+            status="blocked",
+            verify="等後端資料遷移完成",
+        )
+
+        result = self._run(tmp_path, kunsu)
+
+        assert len(result.partial_done) == 1
+        assert result.partial_done[0].latest_reply_verify == "等後端資料遷移完成"
+
+    def test_submitted_with_needs_device_carries_verify(self, tmp_path):
+        kunsu, handoffs, replies = setup_kunsu(tmp_path)
+        make_handoff(handoffs, "2026-07-01-test-handoff.md", to_role="my-role")
+        make_reply(
+            replies,
+            "2026-07-01-test-handoff-reply-2026-07-06.md",
+            in_reply_to="2026-07-01-test-handoff.md",
+            status="submitted",
+            verify="needs-device",
+        )
+
+        result = self._run(tmp_path, kunsu)
+
+        assert len(result.awaiting_confirm) == 1
+        assert result.awaiting_confirm[0].latest_reply_verify == "needs-device"
+
+    def test_missing_verify_is_none(self, tmp_path):
+        """缺省（既有回覆檔零遷移）→ latest_reply_verify 為 None，分類不變。"""
+        kunsu, handoffs, replies = setup_kunsu(tmp_path)
+        make_handoff(handoffs, "2026-07-01-test-handoff.md", to_role="my-role")
+        make_reply(
+            replies,
+            "2026-07-01-test-handoff-reply-2026-07-06.md",
+            in_reply_to="2026-07-01-test-handoff.md",
+            status="submitted",
+        )
+
+        result = self._run(tmp_path, kunsu)
+
+        assert len(result.awaiting_confirm) == 1
+        assert result.awaiting_confirm[0].latest_reply_verify is None
+
+    def test_non_string_verify_does_not_crash(self, tmp_path):
+        """verify 被 YAML 解析為非字串型別（如布林值）時不得拋例外，str() 正規化。"""
+        kunsu, handoffs, replies = setup_kunsu(tmp_path)
+        make_handoff(handoffs, "2026-07-01-test-handoff.md", to_role="my-role")
+        make_reply(
+            replies,
+            "2026-07-01-test-handoff-reply-2026-07-06.md",
+            in_reply_to="2026-07-01-test-handoff.md",
+            status="submitted",
+            verify="true",  # YAML 解析為布林 True
+        )
+
+        result = self._run(tmp_path, kunsu)
+
+        assert len(result.awaiting_confirm) == 1
+        # 不拋例外為主要目的；str() 正規化後仍為非空字串
+        assert result.awaiting_confirm[0].latest_reply_verify == "True"
+
+    def test_verify_taken_from_latest_reply_only(self, tmp_path):
+        """多份回覆時 verify 取最新一份的值（同 status 的取值規則）。"""
+        kunsu, handoffs, replies = setup_kunsu(tmp_path)
+        handoff_name = "2026-07-01-test-handoff.md"
+        make_handoff(handoffs, handoff_name, to_role="my-role")
+        make_reply(
+            replies,
+            f"{handoff_name[:-3]}-reply-2026-07-05.md",
+            in_reply_to=handoff_name,
+            status="partial",
+            verify="needs-deploy",  # 較舊
+        )
+        make_reply(
+            replies,
+            f"{handoff_name[:-3]}-reply-2026-07-06.md",
+            in_reply_to=handoff_name,
+            status="partial",
+            verify="needs-device",  # 最新，應獲選
+        )
+
+        result = self._run(tmp_path, kunsu)
+
+        assert len(result.partial_done) == 1
+        assert result.partial_done[0].latest_reply_verify == "needs-device"
+
+
+# ── 未知 status 有回覆 → 部分完成（保守列出，ADR 011） ────────────────────────
+
+
+class TestUnknownStatusIsPartialDone:
+    """未知 status 值但有回覆 → 歸「部分完成」（有回覆就不是未接手），不略過。"""
+
+    def test_unknown_status_goes_to_partial_done(self, tmp_path):
+        kunsu, handoffs, replies = setup_kunsu(tmp_path)
+        make_handoff(handoffs, "2026-07-01-test-handoff.md", to_role="my-role")
+        make_reply(
+            replies,
+            "2026-07-01-test-handoff-reply-2026-07-06.md",
+            in_reply_to="2026-07-01-test-handoff.md",
+            status="wip",  # 不在 submitted/partial/blocked/done 值域內
+        )
+
+        result = self._run(tmp_path, kunsu)
+
+        assert len(result.partial_done) == 1
+        assert len(result.not_picked_up) == 0
+        assert len(result.awaiting_confirm) == 0
+        assert result.partial_done[0].latest_reply_status == "wip"
+
+    def _run(self, tmp_path, kunsu):
+        return get_subrepo_status(
+            subrepo_path=str(tmp_path / "subrepo"),
+            our_roles={"my-role"},
+            all_known_roles={"my-role"},
+            kunsu_path=str(kunsu),
+        )
 
 
 # ── Regression（code review C9）：in_reply_to 型別強制轉為字串 ─────────────────
@@ -669,7 +846,8 @@ class TestInReplyToTypeCoercion:
         )
 
         assert len(result.awaiting_confirm) == 1
-        assert len(result.pending) == 0
+        assert len(result.not_picked_up) == 0
+        assert len(result.partial_done) == 0
 
     def test_non_string_in_reply_to_does_not_crash(self, tmp_path):
         """in_reply_to 被 YAML 解析為非字串型別（如布林值）時不得拋例外。
@@ -703,6 +881,6 @@ status: submitted
         )
 
         # 不拋例外即為此測試的主要目的；型別不符的回覆無法比對，
-        # 交接文件因找不到相符回覆而歸類為待接手。
-        assert len(result.pending) == 1
+        # 交接文件因找不到相符回覆而歸類為未接手。
+        assert len(result.not_picked_up) == 1
         assert len(result.awaiting_confirm) == 0

@@ -133,6 +133,7 @@ fi
   printf 'status: submitted\n'
   printf -- '---\n'
   printf -- '```\n'
+  printf '\n回覆檔 `status` 值：`submitted`（預設，已完成待發起方確認）／`partial`（部分完成，後續會再回報）／`blocked`（卡關）。另可加選填欄位 `verify:` 標注驗收方式——`needs-deploy`（需上線測試）／`testable-now`（馬上可測）／`needs-device`（需實機測試）或自由字串，無明確驗收需求則省略。\n'
 } > "$file"
 
 echo "$file"
