@@ -13,6 +13,7 @@ test_main.py — skills/kunsu-dashboard/app/main.py 的單元測試
 """
 
 import re
+from html import escape
 
 import pytest
 from fastapi.testclient import TestClient
@@ -765,3 +766,69 @@ def test_no_json_routes_in_app(client):
     assert resp.status_code == 404, (
         "/openapi.json should be disabled (openapi_url=None)"
     )
+
+
+# ── _annotate_tripwire_line：漏 commit 提示 ───────────────────────────────────
+
+def test_annotate_tripwire_line_hints_untracked_handoff():
+    """未 commit 的頂層交接檔（?? 狀態）→ 附加白話漏 commit 提示。"""
+    from app.main import _annotate_tripwire_line
+
+    line = "TRIPWIRE:?? docs/handoffs/2026-07-11-vmcapi-restart.md"
+    html = _annotate_tripwire_line(line)
+
+    assert escape(line) in html
+    assert "hint-uncommitted" in html
+    assert "尚未 commit" in html
+
+
+def test_annotate_tripwire_line_hints_staged_handoff():
+    """已 git add 但未 commit 的頂層交接檔（A  狀態）→ 同樣附加提示。"""
+    from app.main import _annotate_tripwire_line
+
+    line = "TRIPWIRE:A  docs/handoffs/2026-07-11-vmcapi-restart.md"
+    html = _annotate_tripwire_line(line)
+
+    assert "hint-uncommitted" in html
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "TRIPWIRE:RM docs/handoffs/old.md",  # 修改既有交接檔
+        "TRIPWIRE: D docs/handoffs/removed.md",  # 刪除
+        "TRIPWIRE:?? docs/handoffs/nested/oops.md",  # 非預期巢狀路徑
+        "TRIPWIRE:?? docs/handoffs/not-markdown.txt",  # 非 .md
+        "TRIPWIRE:R  docs/handoffs/a.md -> docs/handoffs/replies/a.md",  # 越界搬移
+    ],
+)
+def test_annotate_tripwire_line_no_hint_for_other_shapes(line):
+    """非「剛建立未 commit」的其餘 tripwire 形狀 → 不附加提示，原樣顯示。"""
+    from app.main import _annotate_tripwire_line
+
+    html = _annotate_tripwire_line(line)
+
+    assert html == escape(line)
+    assert "hint-uncommitted" not in html
+
+
+def test_uncommitted_handoff_hint_rendered_in_tripwire_card(monkeypatch, client):
+    """整頁渲染：未 commit 的頂層交接檔 tripwire → 卡片內附白話提示，方便使用者一眼判讀成因。"""
+    KUNSU_A = "/fake/kunsu-uncommitted-handoff"
+    SUBREPO = "/fake/subrepo-for-uncommitted-handoff"
+
+    monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
+        healthy=[KUNSU_A, SUBREPO],
+        raw={SUBREPO: [{"kunsu": KUNSU_A, "roles": ["worker"]}]},
+    ))
+    monkeypatch.setattr("app.main.get_subrepo_status", lambda *a, **k: _subrepo())
+    monkeypatch.setattr("app.main.scan_kunsu", lambda path: _scan(
+        path,
+        tripwire_lines=["TRIPWIRE:?? docs/handoffs/2026-07-11-vmcapi-restart.md"],
+    ))
+
+    resp = client.get("/")
+    html = resp.text
+
+    assert "hint-uncommitted" in html
+    assert "漏做 /handoff add 尾端確認 commit" in html

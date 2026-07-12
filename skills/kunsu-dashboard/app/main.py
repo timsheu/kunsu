@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import sys
 from datetime import datetime
 from html import escape
@@ -126,6 +127,8 @@ _CSS = (
     ".subrepo-nested{margin-left:1.75em;padding-left:1em;"
     "border-left:3px solid #e0e0e0}"
     ".lbl-tripwire{color:#b71c1c;font-weight:700}"
+    ".hint-uncommitted{color:#1565c0;font-size:.85em;display:inline-block;"
+    "margin-top:.15em}"
     ".lbl-script-error{color:#e65100;font-weight:700}"
     ".lbl-stale{color:#616161}"
     ".lbl-warn{color:#f57c00;font-weight:700}"
@@ -332,6 +335,33 @@ def _html_subrepo_stale(path: str, kunsu_path: str) -> str:
     )
 
 
+# scan-replies.sh 分類規則第 3 條：docs/handoffs/ 頂層 .md 檔案只要有任何未
+# commit 狀態變更即觸發 tripwire，不論成因是「未經授權的跨 repo 寫入」或
+# 「軍師 session 自己漏做 /handoff add 尾端確認 commit」。這兩種成因在
+# git status 上完全同形，腳本本身無法（也不該）代為判斷，只能由人工核實。
+# 這裡只針對其中最常見、最無歧義的一種形狀（檔案剛建立、尚未進 commit：
+# untracked「??」或已 git add 但未 commit「A 」）附加白話提示，縮短使用者
+# 從「看到異常」到「猜到可能是漏 commit」的判讀距離；其餘形狀（修改、刪除、
+# 非法搬移等）維持原樣顯示——那些無法用同一套啟發式安全歸類為「僅是忘記
+# commit」，仍需人工完整判讀。
+_UNCOMMITTED_HANDOFF_RE = re.compile(
+    r'^TRIPWIRE:(?:\?\?|A )\s(docs/handoffs/[^/\s]+\.md)$'
+)
+
+
+def _annotate_tripwire_line(line: str) -> str:
+    """為「交接檔已建立但尚未 commit」這種最常見的 tripwire 形狀附加白話提示。"""
+    esc = escape(line)
+    if not _UNCOMMITTED_HANDOFF_RE.match(line):
+        return esc
+    return (
+        f'{esc}<br><span class="hint-uncommitted">'
+        '💡 疑似交接文件已建立但尚未 commit（漏做 /handoff add 尾端確認 commit '
+        '步驟）。確認內容無誤後於軍師 repo 執行 git add + commit 即可清除此異常。'
+        '</span>'
+    )
+
+
 def _html_kunsu(path: str, result: KunsuScanResult) -> str:
     """軍師卡片：tripwire／腳本錯誤／正常三種樣式。
 
@@ -341,7 +371,8 @@ def _html_kunsu(path: str, result: KunsuScanResult) -> str:
 
     if result.tripwire_lines:
         lines_html = "".join(
-            f'<li>{escape(line)}</li>' for line in result.tripwire_lines
+            f'<li>{_annotate_tripwire_line(line)}</li>'
+            for line in result.tripwire_lines
         )
         return (
             '<div class="card card-tripwire">'
