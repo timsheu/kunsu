@@ -1,6 +1,6 @@
 ---
 name: kunsu-init
-version: 0.2.0
+version: 0.3.0
 description: |
   為多 repo AI 協作場景 scaffold 一個「軍師」（規劃協調中心）：以訪談收集子專案清單，
   自動查證路徑並讀取技術棧，填入固定不變量（5 條 Invariants、回覆信箱協議與
@@ -14,6 +14,8 @@ description: |
   Use add-project sub-command when asked to「add-project」「加入子專案」
   「新增子專案到軍師」「把子專案加入軍師」「新增子專案到規劃中心」
   「新增子專案」「add project to planner」「把子專案加入規劃中心」.
+  Use remove-project sub-command when asked to「remove-project」「移除子專案」
+  「刪除子專案登記」「移除子專案登記」「把子專案從軍師移除」「remove project from planner」.
 allowed-tools:
   - Bash
   - Read
@@ -603,3 +605,160 @@ bash "$CLAUDE_SKILL_DIR/scripts/registry-merge.sh" \
 2. **確認**：AskUserQuestion「是否 commit 本次審核產出？（訊息：`docs: 審核申請 <子專案顯示名>（核准）`，多筆審核時併列於同一訊息）」。
 3. **確認後執行**：`git add` 上述具體路徑（**不含** `~/.claude/kunsu-registry.json`——registry 為 repo 外全域檔案，不屬任何 repo 的版控範圍；亦不用 `git add -A`）→ `git commit`。**絕不 push**。
 4. **取消時**：登記與歸檔結果保留、不回退任何操作，回報可稍後手動執行的完整 `git add`＋`git commit` 指令。（歸檔搬移已被掃描規則豁免，未 commit 期間不會誤觸 tripwire。）
+
+---
+
+## remove-project 子指令
+
+在既有軍師（已由 `/kunsu-init` 建立）中移除一個子專案在本軍師的登記——對稱於 `add-project`。子專案可能因檔案結構合併或拆分使原本登記的路徑或角色代碼失效；本子指令**整筆移除**該子專案在本軍師的所有角色代碼登記（不支援只移除其中一個角色代碼），同步更新軍師 CLAUDE.md 關聯專案表與全域反向註冊表 `~/.claude/kunsu-registry.json`。移除前掃描未完成交接文件並警告、需經不可逆確認。
+
+**必須在軍師根目錄下的 session 執行此子指令。**
+
+**本子指令對子專案目錄完全唯讀（只使用 Read 與唯讀 git 查詢）；全部寫入僅發生在軍師自己的 CLAUDE.md 與軍師 repo 外的全域 registry，不寫入任何子專案目錄——不構成「軍師對子專案唯讀」（Invariant 2）的例外。**
+
+---
+
+### ①：身分驗證
+
+與 `add-project` 步驟①完全相同：
+
+```bash
+git rev-parse --show-toplevel
+```
+
+```bash
+python3 - "<CURRENT_REPO_ROOT>" <<'PYEOF'
+import json, os, sys
+reg = os.path.expanduser("~/.claude/kunsu-registry.json")
+if not os.path.exists(reg):
+    print("not_found"); sys.exit(0)
+try:
+    data = json.load(open(reg))
+except Exception:
+    print("json_error"); sys.exit(0)
+kunsu_paths = {e["kunsu"] for entries in data.values() for e in entries}
+print("ok" if sys.argv[1] in kunsu_paths else "not_kunsu")
+PYEOF
+```
+
+- **`not_found`**：報錯「`~/.claude/kunsu-registry.json` 不存在，請先以 `/kunsu-init` 建立軍師並完成登記。」終止。
+- **`json_error`**：報錯「kunsu-registry.json 格式損壞，請手動修復後再執行 remove-project。」終止。
+- **`not_kunsu`**：報錯「請於軍師根目錄執行 remove-project（當前路徑 `<CURRENT_REPO_ROOT>` 未登記為任何軍師）。」終止。
+- **`ok`**：繼續步驟②。
+
+---
+
+### ②：清單建立與呈現
+
+以 python3 行內執行，讀 registry 取本軍師（`entry.kunsu` 正規化後與 `<CURRENT_REPO_ROOT>` 相符）的所有子專案（路徑＋`roles`），並以 `Read` 讀取軍師 CLAUDE.md 關聯專案表逐列解析（顯示名稱、路徑、角色代碼；表格 header 為 `| 專案 | 路徑 | 角色代碼 | 角色說明 |`，逐列以 `|` 切分並去除空白，略過 header 列與 `---` 分隔列）。
+
+**兩來源聯集，不是只認 registry**：對兩側路徑均執行 `os.path.realpath()` 正規化後以路徑為鍵聯集去重——
+
+- 僅 registry 有的項目 → 顯示名稱 fallback 為「（無 CLAUDE.md 對應列，路徑：`<path>`）」。
+- 僅 CLAUDE.md 有的項目 → 正常列出（此類項目移除時，registry 側呼叫 `registry-remove.sh` 會走冪等略過，見步驟⑤）。
+
+之所以聯集兩來源而非只以 registry 為權威候選清單：registry 與 CLAUDE.md 可能因手動編輯而不同步，若清單只認 registry，僅存在於 CLAUDE.md 的殘留列將永遠無法被本子指令選中清除，形同留下一條沒有出口的孤兒資料。
+
+對聯集後的每筆執行 `os.path.isdir()` 路徑存在性查核，路徑不存在者標記 ⚠ 並排列在清單前段（stale 優先，其餘依原順序）。
+
+**清單為零筆** → 提示「本軍師目前沒有已登記子專案。」並終止，不進入後續步驟。
+
+**清單非空** → 以 `AskUserQuestion` 呈現含序號的清單（顯示名稱、路徑、角色代碼，stale 者加 ⚠），選項明確包含「取消」：
+
+- **選「取消」** → 回報「操作取消，未執行任何移除。」終止，不寫入任何檔案。
+- **選定一筆** → 繼續步驟③。
+
+---
+
+### ③：未完成交接警告
+
+取得選定子專案在本軍師登記的完整角色代碼集合——registry 該子專案本軍師 entry 的 `roles` 陣列與 CLAUDE.md 該列代碼欄兩者的**聯集**（不是擇一 fallback；擇一會讓另一側才有的角色代碼被漏掃，使該代碼底下的未完成交接悄悄跳過警告）。兩側代碼不一致時，額外回報「發現 registry 與 CLAUDE.md 角色代碼不一致（registry: `<...>`，CLAUDE.md: `<...>`），掃描已取聯集」。
+
+1. 以 `Glob` 掃描 `<CURRENT_REPO_ROOT>/docs/handoffs/*.md`（**只取頂層**，不含 `replies/`、`archive/`）。
+2. 逐一以 `Read` 讀取每份 frontmatter，篩選 `to:` 屬於上述角色代碼集合的文件。
+3. 對每筆符合者判斷「是否未完成」：
+   - 先以 `Glob` 列出 `<CURRENT_REPO_ROOT>/docs/handoffs/replies/*.md` 全部實體檔案（不依賴 git status，含 untracked），逐一以 `Read` 讀取 frontmatter，篩選 `in_reply_to` 字面等於該交接檔名（含 `.md` 後綴）者為其回覆。
+   - **無任何對應回覆** → 未完成。
+   - **有對應回覆** → 取最新一份（依檔名 `(date, n)` 降序，不可用字串排序——同日多份回覆時，無數值後綴視為 `n=1`，字串排序會把無後綴的基礎檔名誤判為排在有後綴版本之後而誤取（即誤取較舊的一份），同 `add-project` 步驟⑨的提醒）讀其 `status`：`done` = 完成；`partial`／`blocked`／`submitted`／其他未知值 = 未完成。
+
+**有未完成交接** → 以 `AskUserQuestion` 列出警告清單（每筆顯示：標題、建立日期、觸發的角色代碼、最新 status 或「無回覆」），並提示：「移除後，上述交接文件在軍師沙盤將被歸類為『to: 不符清單』，需手動歸檔。」選項「繼續」／「取消」：
+
+- **選「取消」** → 終止，不寫入任何檔案。
+- **選「繼續」** → 進入步驟④。
+
+**無未完成交接** → 不出警告，直接進入步驟④。
+
+---
+
+### ④：不可逆最終確認
+
+以 `AskUserQuestion` 呈現即將移除的摘要：
+
+> 即將移除「`<顯示名稱>`」（`<絕對路徑>`）在本軍師的登記，角色代碼：`<角色代碼清單>`。
+>
+> **此操作不可逆**：全域反向註冊表（`~/.claude/kunsu-registry.json`）不受任何 repo 版控，移除後無法用 git 復原。
+>
+> 若此子專案同時登記其他軍師，其他軍師的登記不受影響。
+>
+> 確認移除？
+
+選項「確認移除」／「取消」：
+
+- **選「取消」** → 終止，不寫入任何檔案。
+- **選「確認移除」** → 進入步驟⑤。
+
+---
+
+### ⑤：雙側移除
+
+**寫入順序固定為先 CLAUDE.md、後 registry**——CLAUDE.md 受 git 版控、未 commit 前可用 `git checkout` 復原；registry 不受版控、寫入即不可逆。把可復原的操作放前面、不可逆操作放最後，任何中斷後的殘留狀態都停在「CLAUDE.md 已編輯未 commit（可復原）＋registry 未動」，而非相反。
+
+**⑤-a：CLAUDE.md（若有對應列）**
+
+以 `Read` 確認軍師 CLAUDE.md 關聯專案表是否仍有該子專案的列（可能已被手動刪除）：
+
+- **有對應列**：
+  1. 若該子專案有環境限制小節（`### <顯示名稱> 環境限制`），先以 `Grep` 確認此標題在 CLAUDE.md 中只出現一次。**出現多次** → 停下回報「「`<顯示名稱>` 環境限制」標題在 CLAUDE.md 中出現多次，無法安全定位，需人工確認後手動刪除，不自動刪除。」**終止整個 remove-project 流程，不繼續執行本步驟其餘部分，不進入⑤-b，也不進入步驟⑥**（此時尚未對 CLAUDE.md 做任何 Edit，無殘留狀態需要收拾）。
+  2. 以 `Edit` 刪除關聯專案表對應列（以絕對路徑欄位為唯一定位鍵，精準匹配整行）；若環境限制小節唯一或不存在，一併刪除整個小節（標題行至下一個 `##`／`###` 標題前的全部內容，含前後空行）。
+  3. 以 `Grep` 核查：表列中已無該子專案路徑字串、環境限制小節標題（若原本存在）也已消失。**核查失敗** → 停下回報「CLAUDE.md 可能已手動修改導致定位失敗，請人工確認後重新執行 remove-project。」**終止整個 remove-project 流程，不繼續執行⑤-b，也不進入步驟⑥**——CLAUDE.md 此時處於未確認的中間狀態，不得詢問是否 commit；registry 維持原狀。使用者需先人工確認 CLAUDE.md 的實際內容（`git diff` 檢視這次 Edit 的結果），修正無誤後才重新執行 remove-project。
+  4. 核查通過 → 繼續⑤-b。
+- **無對應列**（可能已手動刪除）→ 回報「CLAUDE.md 已無此子專案登記（可能已手動刪除），略過此步驟。」直接繼續⑤-b。
+
+**⑤-b：registry**
+
+呼叫 `registry-remove.sh`（`$CLAUDE_SKILL_DIR` 若未定義，改用此 SKILL.md 所在目錄的絕對路徑）：
+
+```bash
+bash "$CLAUDE_SKILL_DIR/scripts/registry-remove.sh" \
+  "<sub-repo-abs-path>" \
+  "<CURRENT_REPO_ROOT>"
+```
+
+回報 stdout 與 exit code：
+
+- **exit 0**（成功移除）→ 回報「registry 登記已移除。」
+- **exit 3**（找不到對應登記）→ 明確回報「registry 中未找到此子專案在本軍師的登記，請確認路徑是否正確；若此子專案原本僅登記於 CLAUDE.md，這是預期行為。」**不得**與 exit 0 混為一談、不得回報成「已成功移除」。
+- **exit 1**（JSON 損壞或 python3 缺失）或其他非零 → 停下回報錯誤，不視為完成。
+
+---
+
+### ⑥：完成回報與確認 commit
+
+以正體中文摘要變更：
+
+| 位置 | 異動內容 |
+|------|---------|
+| 軍師 CLAUDE.md 關聯專案表 | 刪除列（或略過，若 CLAUDE.md 原本已無對應列）|
+| 環境限制小節 | 刪除段落（若有）/ 略過（無環境限制）|
+| kunsu-registry.json | `registry-remove.sh` 回報結果（已移除 / 找不到對應登記，略過）|
+
+**確認 commit（協議步驟，比照 ADR 009）**：
+
+1. **核對**：`git status --porcelain` 確認 `<CURRENT_REPO_ROOT>/CLAUDE.md` 確有待提交變更。**無變更**（如⑤-a 判定「無對應列」而略過編輯，CLAUDE.md 本就無異動）→ 回報「CLAUDE.md 無異動，無需 commit」，**不產生空 commit**。
+2. **確認**：`AskUserQuestion`「是否 commit 本次移除產出？（訊息：`docs: 移除子專案登記 <顯示名稱>`）」。
+3. **確認後執行**：`git add <CURRENT_REPO_ROOT>/CLAUDE.md`（**不含** `~/.claude/kunsu-registry.json`）→ `git commit`。**絕不 push**。
+4. **取消時**：保留產出（CLAUDE.md 變更留在 working tree 未 commit；registry 已完成移除，不可逆），回報可稍後手動執行的 `git add`＋`git commit` 指令。
+
+   **若使用者想完全放棄本次移除，明確提醒：不可先執行 `git checkout CLAUDE.md` 再重跑 `add-project`**——CLAUDE.md 還原後，`add-project` 的重複登記預檢會判定該子專案「已登記」，若使用者在該分支回答角色代碼不需異動，`add-project` 不會呼叫 `registry-merge.sh`，導致 registry 停留在已移除狀態、與還原後的 CLAUDE.md 重新產生漂移。正確作法二擇一：
+   - **(a)** 保持 CLAUDE.md 目前未 commit 的刪除狀態，直接執行 `add-project` 走「首次登記」分支，同步補回 CLAUDE.md 列與 registry 登記；或
+   - **(b)** 若已誤先 `git checkout CLAUDE.md`，改直接呼叫 `registry-merge.sh <sub-repo-abs-path> <kunsu-abs-path> <角色代碼>` 補回 registry，不透過 `add-project`。
