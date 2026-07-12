@@ -23,6 +23,7 @@ kunsu 專案的文件集合。專案定位與核心規範見上層 [CLAUDE.md](.
 - **上報信箱提案（2026-07-08）**：孤兒回覆事件暴露「子專案主動上報」無正式管道，起草 ADR 008 candidate——例外授權擴為三信箱（`docs/reports/`）、以「有無對應交接」結構判準分界 reply／report、中文定名「上報」（口語「回報」偏 reply 故歸 reply 觸發，「稟報軍師」列 report 觸發別名）、雙向重導兜底灰帶、`/kunsu-report` 投遞 skill，待審定後另立實作計畫。
 - **上報信箱落地（2026-07-09）**：ADR 008 全量實作——`/kunsu-report`、`scan-reports.sh`、`/kunsu-inbox` 第三段、scaffold 與 add-project 三信箱化、母體同步、ivm／ebook live 遷移與 ivm 孤兒上報歸位；八單元 maker（sonnet）／verifier 分離執行、dogfooding 全過（[實作計畫](plans/2026-07-08-002-feat-report-inbox-plan.md)）。
 - **協議 commit 逐次確認制（2026-07-10）**：ADR 009 落地——流程尾端 commit 升格為 AskUserQuestion 確認制（handoff v0.4.0、kunsu-init v0.2.0、kunsu-inbox v0.3.0），投遞端不對稱維持；`scan-replies.sh` 補 done 授權歸檔豁免（雙側核驗三形狀、RM 陷阱實測修正）；範本與 ivm／ebook 兩軍師 live 遷移；fixture 十四場景＋e2e dogfooding 九場景全過（[實作計畫](plans/2026-07-09-001-feat-protocol-commit-confirmation-plan.md)）。
+- **remove-project 子指令（2026-07-12）**：`kunsu-init` 新增 `remove-project` 子指令（v0.2.0 → v0.3.0），對稱 `add-project`，整筆移除子專案在本軍師的登記；新增 `registry-remove.sh`（獨立 exit code 區分冪等略過與成功移除）、清單失效感知選取、移除前未完成交接警告、雙階段不可逆確認、CLAUDE.md 先於 registry 的寫入順序設計。經 `/ce-brainstorm` → `/ce-plan`（4-persona doc-review）完整流程定案（ADR 012 accepted，[實作計畫](plans/2026-07-12-002-feat-remove-project-subcommand-plan.md)）。
 - **下一步**：於真實專案群首輪使用 `/kunsu-init` 建立軍師（如 ebook 中心加入 iOS 時的 add-project 案例），累積手感後評估 SessionStart hook（ADR 002 第二階段）。
 
 ## 文件清單
@@ -39,6 +40,7 @@ kunsu 專案的文件集合。專案定位與核心規範見上層 [CLAUDE.md](.
 | [adr/2026-07-08-adr-candidate-007-role-code-description-separation.md](adr/2026-07-08-adr-candidate-007-role-code-description-separation.md) | ADR 007（accepted）：角色識別正規化——角色代碼（比對鍵）與角色說明（描述）分離 |
 | [adr/2026-07-08-adr-candidate-008-report-inbox-triple-mailbox.md](adr/2026-07-08-adr-candidate-008-report-inbox-triple-mailbox.md) | ADR 008（accepted）：上報信箱——例外授權擴為三信箱，子專案主動上報入軍師記錄 |
 | [adr/2026-07-09-adr-candidate-009-protocol-commit-confirmation.md](adr/2026-07-09-adr-candidate-009-protocol-commit-confirmation.md) | ADR 009（accepted）：協議 commit 逐次確認制——確認 commit 升格協議步驟、投遞端不對稱維持、handoffs 授權歸檔豁免 |
+| [adr/2026-07-12-adr-candidate-012-remove-project-subcommand.md](adr/2026-07-12-adr-candidate-012-remove-project-subcommand.md) | ADR 012（accepted）：軍師端 remove-project 子指令——整筆移除、失效感知選取、雙階段不可逆確認、CLAUDE.md 先於 registry 的寫入順序 |
 | [brainstorms/2026-07-07-application-inbox-requirements.md](brainstorms/2026-07-07-application-inbox-requirements.md) | 需求：申請信箱與 add-project 對話式改造（R1–R15、驗收例） |
 | [plans/2026-07-06-001-feat-planner-toolkit-skills-plan.md](plans/2026-07-06-001-feat-planner-toolkit-skills-plan.md) | 實作計畫：kunsu-init 與 kunsu-inbox skill 工具組（已執行完畢） |
 | [plans/2026-07-06-002-feat-integrate-handoff-skill-plan.md](plans/2026-07-06-002-feat-integrate-handoff-skill-plan.md) | 實作計畫：/handoff 併入 toolkit（已執行完畢） |
@@ -46,3 +48,5 @@ kunsu 專案的文件集合。專案定位與核心規範見上層 [CLAUDE.md](.
 | [plans/2026-07-08-001-refactor-role-code-description-separation-plan.md](plans/2026-07-08-001-refactor-role-code-description-separation-plan.md) | 實作計畫：角色代碼／說明分離（R1–R22、九個實作單元，已執行完畢） |
 | [plans/2026-07-08-002-feat-report-inbox-plan.md](plans/2026-07-08-002-feat-report-inbox-plan.md) | 實作計畫：上報信箱（R1–R25、八個實作單元，已執行完畢） |
 | [plans/2026-07-09-001-feat-protocol-commit-confirmation-plan.md](plans/2026-07-09-001-feat-protocol-commit-confirmation-plan.md) | 實作計畫：協議 commit 逐次確認制與 handoffs 授權歸檔豁免（R1–R20、八個實作單元） |
+| [brainstorms/2026-07-12-remove-project-requirements.md](brainstorms/2026-07-12-remove-project-requirements.md) | 需求：軍師端 remove-project 子指令（整筆移除、失效感知選取、未完成交接警告、不可逆確認） |
+| [plans/2026-07-12-002-feat-remove-project-subcommand-plan.md](plans/2026-07-12-002-feat-remove-project-subcommand-plan.md) | 實作計畫：remove-project 子指令與 registry-remove.sh（R1–R16、六個實作單元） |
