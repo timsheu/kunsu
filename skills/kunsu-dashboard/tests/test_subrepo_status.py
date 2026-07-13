@@ -61,14 +61,24 @@ def make_reply(
     from_role: str = "my-role",
     to_role: str = "ebook-store",
     verify: str | None = None,
+    quote_verify: bool = True,
 ) -> Path:
     """在 replies_dir 建立一份回覆檔案（含完整 frontmatter）。
 
-    verify 非 None 時附加選填欄位 verify:（原樣字串，不加引號，
-    模擬 new-handoff-reply.sh 的輸出格式）。
+    verify 非 None 時附加選填欄位 verify:。預設以 YAML 雙引號包裹，
+    使含空白的測試值（如「   」）能以字串型別抵達解析端而非被 YAML
+    折疊為 null；quote_verify=False 時原樣不加引號。注意：正式的
+    new-handoff-reply.sh 輸出為不加引號格式——驗證與腳本輸出保真度
+    相關的行為（YAML 特殊值如 true／null／0 的型別解析）時，應使用
+    quote_verify=False。
     """
     replies_dir.mkdir(parents=True, exist_ok=True)
-    verify_line = f"verify: {verify}\n" if verify is not None else ""
+    if verify is None:
+        verify_line = ""
+    elif quote_verify:
+        verify_line = f'verify: "{verify}"\n'
+    else:
+        verify_line = f"verify: {verify}\n"
     content = f"""---
 title: 回覆
 type: handoff-reply
@@ -756,7 +766,8 @@ class TestVerifyField:
             "2026-07-01-test-handoff-reply-2026-07-06.md",
             in_reply_to="2026-07-01-test-handoff.md",
             status="submitted",
-            verify="true",  # YAML 解析為布林 True
+            verify="true",  # 不加引號 → YAML 解析為布林 True
+            quote_verify=False,
         )
 
         result = self._run(tmp_path, kunsu)
@@ -764,6 +775,23 @@ class TestVerifyField:
         assert len(result.awaiting_confirm) == 1
         # 不拋例外為主要目的；str() 正規化後仍為非空字串
         assert result.awaiting_confirm[0].latest_reply_verify == "True"
+
+    def test_whitespace_verify_normalized_to_none(self, tmp_path):
+        """verify 為純空白字串（YAML 引號包裹）→ 正規化為 None，不留空白標籤。"""
+        kunsu, handoffs, replies = setup_kunsu(tmp_path)
+        make_handoff(handoffs, "2026-07-01-test-handoff.md", to_role="my-role")
+        make_reply(
+            replies,
+            "2026-07-01-test-handoff-reply-2026-07-06.md",
+            in_reply_to="2026-07-01-test-handoff.md",
+            status="submitted",
+            verify="   ",
+        )
+
+        result = self._run(tmp_path, kunsu)
+
+        assert len(result.awaiting_confirm) == 1
+        assert result.awaiting_confirm[0].latest_reply_verify is None
 
     def test_verify_taken_from_latest_reply_only(self, tmp_path):
         """多份回覆時 verify 取最新一份的值（同 status 的取值規則）。"""

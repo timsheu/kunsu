@@ -205,11 +205,11 @@ def get_subrepo_status(
             # 避免型別不符導致 replies_index 的 key 比對永遠失敗。
             in_reply_to = str(fm.get("in_reply_to") or "")
             status = str(fm.get("status") or "")
-            # verify 為選填欄位（驗收方式，ADR 011）：缺省／空值正規化為 None
+            # verify 為選填欄位（驗收方式，ADR 011）：缺省／空值／純空白字串
+            # （如 verify: "   "）一律正規化為 None，避免顯示端出現空白標籤
             verify_raw = fm.get("verify")
-            verify: Optional[str] = (
-                str(verify_raw) if verify_raw not in (None, "") else None
-            )
+            verify_str = str(verify_raw).strip() if verify_raw is not None else ""
+            verify: Optional[str] = verify_str or None
             if not in_reply_to:
                 continue
 

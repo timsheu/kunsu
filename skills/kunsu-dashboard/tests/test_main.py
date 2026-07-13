@@ -1020,3 +1020,165 @@ def test_items_within_category_sorted_by_verify_grouping(monkeypatch, client):
 
     assert pos_deploy < min(pos_dev1, pos_dev2)
     assert max(pos_dev1, pos_dev2) < pos_free < pos_none
+
+
+# ── 已回覆待確認：下一步提示與停留天數（handoff done 收尾閉環）─────────────────
+
+def test_days_waiting_label_pure_function():
+    """_days_waiting_label 各降級路徑：有效日期／今天／未來／無效／None。"""
+    from datetime import date, timedelta
+
+    from app.main import _days_waiting_label
+
+    three_days_ago = (date.today() - timedelta(days=3)).isoformat()
+    tomorrow = (date.today() + timedelta(days=1)).isoformat()
+
+    assert _days_waiting_label(three_days_ago) == "已等 3 天"
+    assert _days_waiting_label(date.today().isoformat()) == "今天回覆"
+    # 未來日期（時鐘異常）clamp 為 0 → 「今天回覆」，不出現負天數
+    assert _days_waiting_label(tomorrow) == "今天回覆"
+    # 檔名 regex 只驗格式不驗語意：2026-13-01 可通過 regex 但非合法日期
+    assert _days_waiting_label("2026-13-01") == ""
+    assert _days_waiting_label(None) == ""
+    assert _days_waiting_label("") == ""
+
+
+def test_awaiting_confirm_shows_verify_hint_and_days(monkeypatch, client):
+    """Covers AE1: needs-device＋回覆日三天前 → 實機測試提示文案＋「已等 3 天」。"""
+    from datetime import date, timedelta
+
+    three_days_ago = (date.today() - timedelta(days=3)).isoformat()
+    _client_with_subrepo(monkeypatch, _subrepo(
+        awaiting=[_handoff(
+            "a.md", "Device Confirm Job",
+            latest_reply_status="submitted",
+            latest_reply_date=three_days_ago,
+            latest_reply_verify="needs-device",
+        )],
+    ))
+
+    resp = client.get("/")
+    assert resp.status_code == 200
+    html = resp.text
+
+    assert 'class="hint-next-step"' in html
+    assert "等實機測試後，確認即執行 /handoff done" in html
+    assert "已等 3 天" in html
+    assert 'class="days-waiting"' in html
+
+
+def test_awaiting_confirm_missing_verify_shows_generic_hint(monkeypatch, client):
+    """Covers AE2: verify 缺省 → 通用提示文案，無 verify badge。"""
+    _client_with_subrepo(monkeypatch, _subrepo(
+        awaiting=[_handoff(
+            "a.md", "Plain Job",
+            latest_reply_status="submitted",
+            latest_reply_date="2026-07-10",
+        )],
+    ))
+
+    html = client.get("/").text
+
+    assert "開軍師 session 查核回覆，確認無誤後以 /handoff done 收尾歸檔" in html
+    assert 'class="badge badge-deploy"' not in html
+    assert 'class="badge badge-device"' not in html
+    assert 'class="badge badge-now"' not in html
+
+
+def test_awaiting_confirm_free_text_verify_generic_hint_with_badge(monkeypatch, client):
+    """自由字串 verify → 通用提示與原樣 badge 並存（badge 行為不變）。"""
+    _client_with_subrepo(monkeypatch, _subrepo(
+        awaiting=[_handoff(
+            "a.md", "Custom Verify Job",
+            latest_reply_status="submitted",
+            latest_reply_date="2026-07-10",
+            latest_reply_verify="手動跑批次",
+        )],
+    ))
+
+    html = client.get("/").text
+
+    assert "開軍師 session 查核回覆，確認無誤後以 /handoff done 收尾歸檔" in html
+    assert 'class="badge badge-other"' in html
+    assert "手動跑批次" in html
+
+
+def test_awaiting_confirm_invalid_reply_date_degrades_silently(monkeypatch, client):
+    """語意無效日期（2026-13-01）→ 天數不顯示、提示照常、頁面不中斷。"""
+    _client_with_subrepo(monkeypatch, _subrepo(
+        awaiting=[_handoff(
+            "a.md", "Bad Date Job",
+            latest_reply_status="submitted",
+            latest_reply_date="2026-13-01",
+            latest_reply_verify="needs-deploy",
+        )],
+    ))
+
+    resp = client.get("/")
+    assert resp.status_code == 200
+    html = resp.text
+
+    assert "等上線部署後驗收，通過後請軍師執行 /handoff done" in html
+    assert 'class="days-waiting"' not in html
+
+
+def test_awaiting_confirm_none_reply_date_no_days(monkeypatch, client):
+    """latest_reply_date 為 None（防守路徑）→ 天數不顯示、不拋例外。"""
+    _client_with_subrepo(monkeypatch, _subrepo(
+        awaiting=[_handoff(
+            "a.md", "No Date Job",
+            latest_reply_status="submitted",
+            latest_reply_verify="testable-now",
+        )],
+    ))
+
+    resp = client.get("/")
+    assert resp.status_code == 200
+    html = resp.text
+
+    assert "可立即驗收，確認無誤即執行 /handoff done" in html
+    assert 'class="days-waiting"' not in html
+
+
+def test_other_categories_have_no_next_step_hint(monkeypatch, client):
+    """未接手／部分完成不帶下一步提示與天數（刻意取捨：下一步在接手方）。"""
+    _client_with_subrepo(monkeypatch, _subrepo(
+        not_picked_up=[_handoff("n.md", "New Job")],
+        partial_done=[_handoff(
+            "p.md", "Partial Job",
+            latest_reply_status="partial",
+            latest_reply_date="2026-07-10",
+            latest_reply_verify="needs-deploy",
+        )],
+    ))
+
+    html = client.get("/").text
+
+    assert 'class="hint-next-step"' not in html
+    assert 'class="days-waiting"' not in html
+
+
+def test_awaiting_confirm_hint_outside_details(monkeypatch, client):
+    """提示置於 <details> 之外——收合狀態下仍常態可見。"""
+    _client_with_subrepo(monkeypatch, _subrepo(
+        awaiting=[_handoff(
+            "a.md", "Visible Hint Job",
+            latest_reply_status="submitted",
+            latest_reply_date="2026-07-10",
+        )],
+    ))
+
+    html = client.get("/").text
+
+    # hint-next-step 出現在 </details> 之後，不被包在 details 內
+    detail_end = html.index("</details>", html.index("Visible Hint Job"))
+    hint_pos = html.index('class="hint-next-step"', html.index("Visible Hint Job"))
+    assert hint_pos > detail_end
+
+
+def test_next_step_hints_keys_match_verify_labels():
+    """_NEXT_STEP_HINTS 與 _VERIFY_LABELS 鍵集合必須一致——新增建議代碼時
+    兩個對照表須同步，否則新代碼會顯示彩色 badge 卻靜默降格為通用提示。"""
+    from app.main import _NEXT_STEP_HINTS, _VERIFY_LABELS
+
+    assert set(_NEXT_STEP_HINTS.keys()) == set(_VERIFY_LABELS.keys())

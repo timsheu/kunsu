@@ -16,7 +16,7 @@ import argparse
 import os
 import re
 import sys
-from datetime import datetime
+from datetime import date, datetime
 from html import escape
 from pathlib import Path
 from typing import Optional
@@ -145,6 +145,8 @@ _CSS = (
     ".badge-other{background:#f0f0f0;color:#555}"
     ".badge-blocked{background:#ffebee;color:#b71c1c}"
     ".badge-status-unknown{background:#f3e5f5;color:#7b1fa2}"
+    ".hint-next-step{color:#2e7d32;font-size:.85em;margin:0 0 .35em 1.5em}"
+    ".days-waiting{color:#e65100;font-weight:600;margin-left:.5em}"
     ".detail-name{display:inline-block;padding-left:1.5em;margin-top:.15em}"
     "pre{white-space:pre-wrap;word-break:break-all;background:#f8f8f8;"
     "padding:.5em;border-radius:3px;font-size:.85em;margin:.3em 0}"
@@ -357,6 +359,49 @@ def _html_handoff_detail(h: HandoffInfo) -> str:
     return _html_detail(summary, h.raw_content)
 
 
+# ── 下一步提示對照（「已回覆待確認」分類專用）──────────────────────────────────
+# verify 建議代碼 → 白話下一步文案；缺省與自由字串使用通用文案
+_NEXT_STEP_HINTS: dict[str, str] = {
+    "needs-deploy": "等上線部署後驗收，通過後請軍師執行 /handoff done",
+    "testable-now": "可立即驗收，確認無誤即執行 /handoff done",
+    "needs-device": "等實機測試後，確認即執行 /handoff done",
+}
+_NEXT_STEP_HINT_DEFAULT = "開軍師 session 查核回覆，確認無誤後以 /handoff done 收尾歸檔"
+
+
+def _days_waiting_label(reply_date: Optional[str]) -> str:
+    """最新回覆至今的停留天數標籤；日期缺失或無效時降級為空字串。
+
+    latest_reply_date 來自回覆檔名 regex，格式必為 YYYY-MM-DD 但無語意驗證
+    （如 2026-13-01 可通過 regex），fromisoformat 失敗時不顯示天數、不中斷渲染。
+    未來日期（時鐘異常）clamp 為 0，與當日回覆同以「今天回覆」呈現。
+    """
+    if not reply_date:
+        return ""
+    try:
+        d = date.fromisoformat(reply_date)
+    except ValueError:
+        return ""
+    days = max(0, (date.today() - d).days)
+    return "今天回覆" if days == 0 else f"已等 {days} 天"
+
+
+def _html_awaiting_confirm_item(h: HandoffInfo) -> str:
+    """「已回覆待確認」專屬卡片：展開式預覽下方常態顯示下一步提示與停留天數。
+
+    提示置於 <details> 之外，收合狀態下仍一眼可見；未接手／部分完成兩分類
+    沿用 _html_handoff_detail，不帶提示與天數（其下一步在接手方，非使用者）。
+    """
+    verify = (h.latest_reply_verify or "").lower()
+    hint = _NEXT_STEP_HINTS.get(verify, _NEXT_STEP_HINT_DEFAULT)
+    days = _days_waiting_label(h.latest_reply_date)
+    days_html = f'<span class="days-waiting">（{escape(days)}）</span>' if days else ""
+    return (
+        f"{_html_handoff_detail(h)}"
+        f'<div class="hint-next-step">→ {escape(hint)}{days_html}</div>'
+    )
+
+
 def _kunsu_group_open_and_label(
     path: str, is_stale: bool, scan: Optional[KunsuScanResult]
 ) -> tuple[bool, str]:
@@ -524,7 +569,7 @@ def _html_subrepo(path: str, kunsu_path: str, result: SubrepoStatusResult) -> st
 
     if result.awaiting_confirm:
         items = "".join(
-            _html_handoff_detail(h)
+            _html_awaiting_confirm_item(h)
             for h in sorted(result.awaiting_confirm, key=_verify_sort_key)
         )
         parts.append(
