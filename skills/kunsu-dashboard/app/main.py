@@ -16,8 +16,10 @@ import argparse
 import os
 import re
 import sys
+from dataclasses import dataclass
 from datetime import date, datetime
 from html import escape
+from itertools import groupby
 from pathlib import Path
 from typing import Optional
 
@@ -112,6 +114,7 @@ _CSS = (
     "h2{margin-top:2em;color:#444}"
     "h3{margin:.5em 0;font-size:1em}"
     "h4{margin:.4em 0 .2em;font-size:.95em}"
+    "h5{margin:.6em 0 .1em;font-size:.88em;color:#555}"
     "ul{margin:.2em 0;padding-left:1.5em}"
     "code{background:#f0f0f0;padding:.1em .3em;border-radius:3px;"
     "font-size:.88em;word-break:break-all}"
@@ -145,6 +148,14 @@ _CSS = (
     ".badge-other{background:#f0f0f0;color:#555}"
     ".badge-blocked{background:#ffebee;color:#b71c1c}"
     ".badge-status-unknown{background:#f3e5f5;color:#7b1fa2}"
+    ".overview{border-color:#90caf9;background:#f7fbff;display:flex;"
+    "flex-wrap:wrap;gap:.4em;align-items:center}"
+    ".chip{display:inline-block;padding:.15em .6em;border-radius:12px;"
+    "font-size:.9em;font-weight:600;white-space:nowrap}"
+    ".chip-alert{background:#ffebee;color:#b71c1c}"
+    ".chip-now{background:#e8f5e9;color:#2e7d32}"
+    ".chip-other{background:#f0f0f0;color:#555}"
+    ".chip-msg{background:#e3f2fd;color:#1565c0}"
     ".hint-next-step{color:#2e7d32;font-size:.85em;margin:0 0 .35em 1.5em}"
     ".days-waiting{color:#e65100;font-weight:600;margin-left:.5em}"
     ".detail-name{display:inline-block;padding-left:1.5em;margin-top:.15em}"
@@ -336,6 +347,8 @@ def _verify_sort_key(h: HandoffInfo) -> tuple:
 
     已知建議代碼在前、自由字串次之、缺省最後；同 verify 值相鄰，
     組內依檔案修改時間降序——讓相同驗收方式的項目相鄰，支撐批次排程。
+    僅用於未接手／部分完成兩分類；已回覆待確認改以 _awaiting_sort_key
+    做顯式子分組（見下方）。
     """
     verify = h.latest_reply_verify
     if verify and verify.lower() in _VERIFY_LABELS:
@@ -345,6 +358,42 @@ def _verify_sort_key(h: HandoffInfo) -> tuple:
     else:
         group, value = 2, ""
     return (group, value, -(h.mtime or 0.0))
+
+
+# ── 已回覆待確認 verify 子分組 ────────────────────────────────────────────────
+# 建議代碼 → (子分組權重, 子分組標題)；權重順序＝可動性優先，愈接近「能收尾
+# （/handoff done）」愈前。自由字串各 distinct 值自成一組（字典序）、缺省最後。
+_AWAITING_SUBGROUPS: dict[str, tuple[int, str]] = {
+    "testable-now": (0, "⚡ 馬上可測"),
+    "needs-device": (1, "📱 需實機測試"),
+    "needs-deploy": (2, "🚀 需上線測試"),
+}
+_SUBGROUP_FREE_WEIGHT = 3   # 自由字串 verify
+_SUBGROUP_NONE_WEIGHT = 4   # verify 缺省
+_SUBGROUP_NONE_LABEL = "未標示驗收方式"
+
+
+def _awaiting_subgroup(h: HandoffInfo) -> tuple[int, str]:
+    """回傳 (權重, 子分組標題)——同鍵項目屬同一子分組，權重決定子分組順序。
+
+    自由字串子分組的標題即 verify 原始值，渲染端負責 escape()。
+    """
+    verify = h.latest_reply_verify
+    if verify and verify.lower() in _AWAITING_SUBGROUPS:
+        return _AWAITING_SUBGROUPS[verify.lower()]
+    if verify:
+        return (_SUBGROUP_FREE_WEIGHT, verify)
+    return (_SUBGROUP_NONE_WEIGHT, _SUBGROUP_NONE_LABEL)
+
+
+def _awaiting_sort_key(h: HandoffInfo) -> tuple:
+    """已回覆待確認排序鍵：子分組順序＋組內最新回覆日期升冪（等最久排最前，
+
+    讓陳年件浮頂；此分類必有回覆，latest_reply_date 為 YYYY-MM-DD 可字典序比較），
+    同日再依檔案修改時間升冪。
+    """
+    weight, label = _awaiting_subgroup(h)
+    return (weight, label, h.latest_reply_date or "", h.mtime or 0.0)
 
 
 def _html_handoff_detail(h: HandoffInfo) -> str:
@@ -402,27 +451,140 @@ def _html_awaiting_confirm_item(h: HandoffInfo) -> str:
     )
 
 
+@dataclass(frozen=True)
+class PendingAggregate:
+    """子專案分類結果的聚合計數，供軍師分組摘要列與頁首全域總覽共用。
+
+    blocked／testable_now 分別是 partial_done／awaiting_confirm 的子集
+    （前者計 status: blocked，後者計 verify 正規化後為 testable-now 者），
+    僅供全域總覽列細分呈現。
+    """
+
+    not_picked_up: int = 0
+    partial_done: int = 0
+    awaiting_confirm: int = 0
+    blocked: int = 0
+    testable_now: int = 0
+    anomalies: int = 0  # frontmatter 異常 ＋ to: 不符清單
+
+
+def _aggregate_pending(results: list[SubrepoStatusResult]) -> PendingAggregate:
+    """聚合多個子專案的分類結果為計數。"""
+    npu = partial = awaiting = blocked = testable = anomalies = 0
+    for r in results:
+        npu += len(r.not_picked_up)
+        partial += len(r.partial_done)
+        awaiting += len(r.awaiting_confirm)
+        blocked += sum(
+            1 for h in r.partial_done if h.latest_reply_status == "blocked"
+        )
+        testable += sum(
+            1 for h in r.awaiting_confirm
+            if (h.latest_reply_verify or "").lower() == "testable-now"
+        )
+        anomalies += len(r.errors) + len(r.unknown_to)
+    return PendingAggregate(
+        not_picked_up=npu,
+        partial_done=partial,
+        awaiting_confirm=awaiting,
+        blocked=blocked,
+        testable_now=testable,
+        anomalies=anomalies,
+    )
+
+
+def _pending_suffix(pending: Optional[PendingAggregate]) -> str:
+    """分組摘要列的待處理計數尾註；僅列非零項，全零回傳空字串。"""
+    if pending is None:
+        return ""
+    parts: list[str] = []
+    if pending.not_picked_up:
+        parts.append(f"⚠ 未接手 {pending.not_picked_up}")
+    if pending.partial_done:
+        parts.append(f"部分完成 {pending.partial_done}")
+    if pending.awaiting_confirm:
+        parts.append(f"待確認 {pending.awaiting_confirm}")
+    if pending.anomalies:
+        parts.append(f"異常 {pending.anomalies}")
+    if not parts:
+        return ""
+    return "｜" + "・".join(parts)
+
+
 def _kunsu_group_open_and_label(
-    path: str, is_stale: bool, scan: Optional[KunsuScanResult]
+    path: str,
+    is_stale: bool,
+    scan: Optional[KunsuScanResult],
+    pending: Optional[PendingAggregate] = None,
 ) -> tuple[bool, str]:
     """判斷軍師分組預設是否展開，並組出摘要列文字。
 
     有進度（新訊息／tripwire／腳本錯誤）或 stale 者預設展開；
-    健康且「無新訊息」的軍師預設折疊，避免軍師一多列表就過長。
+    子專案有未接手或異常件時同樣強制展開——未接手／異常不得藏在收合分組裡。
+    摘要列尾註帶出子專案待處理計數，收合狀態下即可掌握全貌；
+    健康、無新訊息且無未接手／異常的軍師預設折疊，避免軍師一多列表就過長。
     """
     esc = escape(path)
     if is_stale:
         return True, f'⚠ 軍師：<code>{esc}</code>（stale）'
+    suffix = _pending_suffix(pending)
+    force_open = bool(pending and (pending.not_picked_up or pending.anomalies))
     if scan is None:
-        return True, f'軍師：<code>{esc}</code>'
+        return True, f'軍師：<code>{esc}</code>{suffix}'
     if scan.tripwire_lines:
-        return True, f'⛔ 軍師：<code>{esc}</code>（tripwire 異常）'
+        return True, f'⛔ 軍師：<code>{esc}</code>（tripwire 異常）{suffix}'
     if scan.script_error:
-        return True, f'⚠ 軍師：<code>{esc}</code>（腳本錯誤）'
+        return True, f'⚠ 軍師：<code>{esc}</code>（腳本錯誤）{suffix}'
     total = len(scan.new_replies) + len(scan.new_applications) + len(scan.new_reports)
     if total == 0:
-        return False, f'軍師：<code>{esc}</code>（無新訊息）'
-    return True, f'軍師：<code>{esc}</code>（{total} 則新訊息）'
+        return force_open, f'軍師：<code>{esc}</code>（無新訊息）{suffix}'
+    return True, f'軍師：<code>{esc}</code>（{total} 則新訊息）{suffix}'
+
+
+def _html_overview(
+    pending: PendingAggregate,
+    new_messages: int,
+    tripwire_kunsus: int,
+    script_error_kunsus: int,
+) -> str:
+    """頁首全域總覽列；全部計數為零時回傳空字串（不渲染）。
+
+    刻意使用 .chip 而非 .badge class——既有測試以「頁面不含
+    <span class="badge」斷言 verify 標籤缺席，總覽列不得共用同一 class。
+    """
+    chips: list[str] = []
+    if tripwire_kunsus:
+        chips.append(
+            f'<span class="chip chip-alert">⛔ tripwire 異常軍師 {tripwire_kunsus}</span>'
+        )
+    if script_error_kunsus:
+        chips.append(
+            f'<span class="chip chip-alert">⚠ 腳本錯誤軍師 {script_error_kunsus}</span>'
+        )
+    if pending.not_picked_up:
+        chips.append(
+            f'<span class="chip chip-alert">⚠ 未接手 {pending.not_picked_up}</span>'
+        )
+    if pending.blocked:
+        chips.append(f'<span class="chip chip-alert">⛔ 卡關 {pending.blocked}</span>')
+    if pending.testable_now:
+        chips.append(
+            f'<span class="chip chip-now">⚡ 馬上可測 {pending.testable_now}</span>'
+        )
+    other_awaiting = pending.awaiting_confirm - pending.testable_now
+    if other_awaiting:
+        chips.append(
+            f'<span class="chip chip-other">其餘待確認 {other_awaiting}</span>'
+        )
+    if pending.anomalies:
+        chips.append(
+            f'<span class="chip chip-alert">異常 {pending.anomalies}</span>'
+        )
+    if new_messages:
+        chips.append(f'<span class="chip chip-msg">📨 新訊息 {new_messages}</span>')
+    if not chips:
+        return ""
+    return f'<div class="card overview"><strong>全域總覽</strong>{"".join(chips)}</div>'
 
 
 def _html_kunsu_stale(path: str) -> str:
@@ -558,7 +720,9 @@ def _html_subrepo(path: str, kunsu_path: str, result: SubrepoStatusResult) -> st
             _html_handoff_detail(h)
             for h in sorted(result.not_picked_up, key=_verify_sort_key)
         )
-        parts.append(f'<h4>未接手（{len(result.not_picked_up)}）</h4>{items}')
+        parts.append(
+            f'<h4 class="lbl-warn">⚠ 未接手（{len(result.not_picked_up)}）</h4>{items}'
+        )
 
     if result.partial_done:
         items = "".join(
@@ -568,12 +732,23 @@ def _html_subrepo(path: str, kunsu_path: str, result: SubrepoStatusResult) -> st
         parts.append(f'<h4>部分完成（{len(result.partial_done)}）</h4>{items}')
 
     if result.awaiting_confirm:
-        items = "".join(
-            _html_awaiting_confirm_item(h)
-            for h in sorted(result.awaiting_confirm, key=_verify_sort_key)
-        )
+        # 依 verify 拆顯式子分組（h5 標題）：馬上可測 → 需實機 → 需上線 →
+        # 自由字串 → 未標示，讓「哪幾筆現在就能收尾」一眼可辨
+        sorted_awaiting = sorted(result.awaiting_confirm, key=_awaiting_sort_key)
+        sub_parts: list[str] = []
+        for (_weight, label), grouped in groupby(
+            sorted_awaiting, key=_awaiting_subgroup
+        ):
+            group_items = list(grouped)
+            items = "".join(
+                _html_awaiting_confirm_item(h) for h in group_items
+            )
+            sub_parts.append(
+                f'<h5>{escape(label)}（{len(group_items)}）</h5>{items}'
+            )
         parts.append(
-            f'<h4>已回覆待確認（{len(result.awaiting_confirm)}）</h4>{items}'
+            f'<h4>已回覆待確認（{len(result.awaiting_confirm)}）</h4>'
+            f'{"".join(sub_parts)}'
         )
 
     if result.unknown_to:
@@ -658,6 +833,12 @@ def index() -> HTMLResponse:
     group_parts: list[str] = []
     covered: set[str] = set()
 
+    # 全域總覽累計（頁首總覽列用）
+    all_sub_results: list[SubrepoStatusResult] = []
+    total_new_messages = 0
+    tripwire_kunsus = 0
+    script_error_kunsus = 0
+
     for kunsu_path in sorted(kunsu_paths):
         if kunsu_path not in healthy_set and kunsu_path not in stale_set:
             continue  # raw 與健康檢查結果不一致，理論上不應發生
@@ -667,6 +848,7 @@ def index() -> HTMLResponse:
         nested_parts: list[str] = []
         is_stale = kunsu_path in stale_set
         scan: Optional[KunsuScanResult] = None
+        pending: Optional[PendingAggregate] = None
 
         if is_stale:
             kunsu_card = _html_kunsu_stale(kunsu_path)
@@ -679,6 +861,16 @@ def index() -> HTMLResponse:
         else:
             scan = scan_kunsu(kunsu_path)
             kunsu_card = _html_kunsu(kunsu_path, scan)
+            if scan.tripwire_lines:
+                tripwire_kunsus += 1
+            if scan.script_error:
+                script_error_kunsus += 1
+            total_new_messages += (
+                len(scan.new_replies)
+                + len(scan.new_applications)
+                + len(scan.new_reports)
+            )
+            sub_results: list[SubrepoStatusResult] = []
             for sp in sub_paths:
                 covered.add(sp)
                 if sp in stale_set:
@@ -687,10 +879,13 @@ def index() -> HTMLResponse:
                 our_roles = _get_our_roles(data, sp, kunsu_path)
                 all_known = _get_all_known_roles(data, kunsu_path)
                 status = get_subrepo_status(sp, our_roles, all_known, kunsu_path)
+                sub_results.append(status)
                 nested_parts.append(_html_subrepo(sp, kunsu_path, status))
+            pending = _aggregate_pending(sub_results)
+            all_sub_results.extend(sub_results)
 
         is_open, summary_label = _kunsu_group_open_and_label(
-            kunsu_path, is_stale, scan
+            kunsu_path, is_stale, scan, pending
         )
         nested_html = (
             f'<div class="subrepo-nested">{"".join(nested_parts)}</div>'
@@ -712,6 +907,14 @@ def index() -> HTMLResponse:
 
     # ── 組裝頁面 ───────────────────────────────────────────────────────────
     body_sections: list[str] = []
+    overview = _html_overview(
+        _aggregate_pending(all_sub_results),
+        total_new_messages,
+        tripwire_kunsus,
+        script_error_kunsus,
+    )
+    if overview:
+        body_sections.append(overview)
     if group_parts:
         body_sections.append(
             f'<section><h2>軍師與子專案</h2>{"".join(group_parts)}</section>'

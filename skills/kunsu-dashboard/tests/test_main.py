@@ -1182,3 +1182,325 @@ def test_next_step_hints_keys_match_verify_labels():
     from app.main import _NEXT_STEP_HINTS, _VERIFY_LABELS
 
     assert set(_NEXT_STEP_HINTS.keys()) == set(_VERIFY_LABELS.keys())
+
+
+# ── 已回覆待確認 verify 子分組＋未接手顯眼化（沙盤優化批次）────────────────────
+
+def test_awaiting_confirm_rendered_in_verify_subgroups(monkeypatch, client):
+    """已回覆待確認依 verify 拆子分組（h5 標題含計數），順序＝可動性優先：
+    馬上可測 → 需實機測試 → 需上線測試 → 自由字串 → 未標示驗收方式。"""
+    _client_with_subrepo(monkeypatch, _subrepo(
+        awaiting=[
+            _handoff("e-none.md", "NoVerify Job",
+                     latest_reply_status="submitted",
+                     latest_reply_date="2026-07-10"),
+            _handoff("d-free.md", "FreeText Job",
+                     latest_reply_status="submitted",
+                     latest_reply_date="2026-07-10",
+                     latest_reply_verify="手動跑批次"),
+            _handoff("c-deploy.md", "Deploy Job",
+                     latest_reply_status="submitted",
+                     latest_reply_date="2026-07-10",
+                     latest_reply_verify="needs-deploy"),
+            _handoff("b-device.md", "Device Job",
+                     latest_reply_status="submitted",
+                     latest_reply_date="2026-07-10",
+                     latest_reply_verify="needs-device"),
+            _handoff("a-now.md", "Now Job",
+                     latest_reply_status="submitted",
+                     latest_reply_date="2026-07-10",
+                     latest_reply_verify="testable-now"),
+        ],
+    ))
+
+    html = client.get("/").text
+
+    assert "已回覆待確認（5）" in html
+    assert "<h5>⚡ 馬上可測（1）</h5>" in html
+    assert "<h5>📱 需實機測試（1）</h5>" in html
+    assert "<h5>🚀 需上線測試（1）</h5>" in html
+    assert "<h5>手動跑批次（1）</h5>" in html
+    assert "<h5>未標示驗收方式（1）</h5>" in html
+
+    positions = [
+        html.index("<h5>⚡ 馬上可測（1）"),
+        html.index("<h5>📱 需實機測試（1）"),
+        html.index("<h5>🚀 需上線測試（1）"),
+        html.index("<h5>手動跑批次（1）"),
+        html.index("<h5>未標示驗收方式（1）"),
+    ]
+    assert positions == sorted(positions)
+
+
+def test_awaiting_subgroup_free_label_escaped(monkeypatch, client):
+    """自由字串 verify 作為子分組標題時原樣顯示且經 escape()。"""
+    _client_with_subrepo(monkeypatch, _subrepo(
+        awaiting=[_handoff(
+            "a.md", "Custom Job",
+            latest_reply_status="submitted",
+            latest_reply_date="2026-07-10",
+            latest_reply_verify="等 <b>DBA</b> 開權限",
+        )],
+    ))
+
+    html = client.get("/").text
+
+    assert "<h5>等 &lt;b&gt;DBA&lt;/b&gt; 開權限（1）</h5>" in html
+    assert "<b>DBA</b>" not in html
+
+
+def test_awaiting_subgroup_items_oldest_reply_first(monkeypatch, client):
+    """同子分組內依最新回覆日期升冪——等最久的陳年件排最前。"""
+    _client_with_subrepo(monkeypatch, _subrepo(
+        awaiting=[
+            _handoff("new.md", "Newest Job",
+                     latest_reply_status="submitted",
+                     latest_reply_date="2026-07-14",
+                     latest_reply_verify="testable-now"),
+            _handoff("old.md", "Oldest Job",
+                     latest_reply_status="submitted",
+                     latest_reply_date="2026-07-03",
+                     latest_reply_verify="testable-now"),
+            _handoff("mid.md", "Middle Job",
+                     latest_reply_status="submitted",
+                     latest_reply_date="2026-07-10",
+                     latest_reply_verify="testable-now"),
+        ],
+    ))
+
+    html = client.get("/").text
+
+    assert (
+        html.index("Oldest Job")
+        < html.index("Middle Job")
+        < html.index("Newest Job")
+    )
+
+
+def test_awaiting_subgroup_pure_function():
+    """_awaiting_subgroup 各路徑：建議代碼（含大小寫變體）／自由字串／缺省。"""
+    from app.main import _awaiting_subgroup
+
+    def _h(verify=None):
+        return _handoff(
+            "a.md", "Job",
+            latest_reply_status="submitted",
+            latest_reply_date="2026-07-10",
+            latest_reply_verify=verify,
+        )
+
+    assert _awaiting_subgroup(_h("testable-now")) == (0, "⚡ 馬上可測")
+    assert _awaiting_subgroup(_h("Testable-Now")) == (0, "⚡ 馬上可測")
+    assert _awaiting_subgroup(_h("needs-device")) == (1, "📱 需實機測試")
+    assert _awaiting_subgroup(_h("needs-deploy")) == (2, "🚀 需上線測試")
+    assert _awaiting_subgroup(_h("自由值")) == (3, "自由值")
+    assert _awaiting_subgroup(_h(None)) == (4, "未標示驗收方式")
+
+
+def test_awaiting_subgroups_keys_match_verify_labels():
+    """_AWAITING_SUBGROUPS 與 _VERIFY_LABELS 鍵集合必須一致——新增建議代碼時
+    兩個對照表須同步，否則新代碼會顯示彩色 badge 卻靜默落入自由字串子分組。"""
+    from app.main import _AWAITING_SUBGROUPS, _VERIFY_LABELS
+
+    assert set(_AWAITING_SUBGROUPS.keys()) == set(_VERIFY_LABELS.keys())
+
+
+def test_not_picked_up_heading_highlighted(monkeypatch, client):
+    """未接手分類標題帶 ⚠ 與 lbl-warn 醒目樣式。"""
+    _client_with_subrepo(monkeypatch, _subrepo(
+        not_picked_up=[_handoff("n.md", "New Job")],
+    ))
+
+    html = client.get("/").text
+
+    assert '<h4 class="lbl-warn">⚠ 未接手（1）</h4>' in html
+
+
+def test_aggregate_pending_pure_function():
+    """_aggregate_pending 聚合多子專案：各分類計數與 blocked／testable-now
+    （大小寫變體亦計入）子集、異常（errors＋to 不符）計數。"""
+    from app.main import _aggregate_pending
+
+    agg = _aggregate_pending([
+        _subrepo(
+            not_picked_up=[_handoff("n.md")],
+            partial_done=[
+                _handoff("b.md", latest_reply_status="blocked"),
+                _handoff("p.md", latest_reply_status="partial"),
+            ],
+            awaiting=[_handoff(
+                "t.md",
+                latest_reply_status="submitted",
+                latest_reply_verify="Testable-Now",
+            )],
+            unknown=[UnknownToItem("u.md", "ghost")],
+            errors=[ErrorItem("e.md", "missing field")],
+        ),
+        _subrepo(
+            awaiting=[_handoff("a.md", latest_reply_status="submitted")],
+        ),
+    ])
+
+    assert agg.not_picked_up == 1
+    assert agg.partial_done == 2
+    assert agg.blocked == 1
+    assert agg.awaiting_confirm == 2
+    assert agg.testable_now == 1
+    assert agg.anomalies == 2
+
+
+def test_kunsu_group_summary_shows_pending_counts_and_opens(monkeypatch, client):
+    """零新訊息但子專案有未接手 → 摘要列帶待處理計數且分組強制展開
+    （修正：未接手不得藏在「無新訊息」的收合分組裡）。"""
+    KUNSU = "/fake/kunsu-pending-summary"
+    SUBREPO = "/fake/subrepo-pending-summary"
+
+    monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
+        healthy=[KUNSU, SUBREPO],
+        raw={SUBREPO: [{"kunsu": KUNSU, "roles": ["dev"]}]},
+    ))
+    monkeypatch.setattr("app.main.scan_kunsu", lambda p: _scan(p))  # 無新訊息
+    monkeypatch.setattr("app.main.get_subrepo_status", lambda *a, **k: _subrepo(
+        not_picked_up=[_handoff("n.md", "New Job")],
+        awaiting=[_handoff(
+            "a.md", "Wait Job",
+            latest_reply_status="submitted",
+            latest_reply_date="2026-07-10",
+        )],
+    ))
+
+    html = client.get("/").text
+
+    assert '<details class="kunsu-group" open>' in html
+    summary_start = html.index("<summary>")
+    summary = html[summary_start:html.index("</summary>", summary_start)]
+    assert "無新訊息" in summary
+    assert "⚠ 未接手 1" in summary
+    assert "待確認 1" in summary
+
+
+def test_kunsu_group_awaiting_only_counts_but_stays_collapsed(monkeypatch, client):
+    """僅待確認（無未接手／異常）→ 摘要列帶計數但維持折疊，不強制展開。"""
+    KUNSU = "/fake/kunsu-awaiting-only"
+    SUBREPO = "/fake/subrepo-awaiting-only"
+
+    monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
+        healthy=[KUNSU, SUBREPO],
+        raw={SUBREPO: [{"kunsu": KUNSU, "roles": ["dev"]}]},
+    ))
+    monkeypatch.setattr("app.main.scan_kunsu", lambda p: _scan(p))
+    monkeypatch.setattr("app.main.get_subrepo_status", lambda *a, **k: _subrepo(
+        awaiting=[_handoff(
+            "a.md", "Wait Job",
+            latest_reply_status="submitted",
+            latest_reply_date="2026-07-10",
+        )],
+    ))
+
+    html = client.get("/").text
+
+    assert '<details class="kunsu-group">' in html
+    assert '<details class="kunsu-group" open>' not in html
+    assert "待確認 1" in html
+
+
+def test_kunsu_group_anomaly_forces_open(monkeypatch, client):
+    """子專案有 to: 不符／frontmatter 異常 → 分組強制展開並帶「異常」計數。"""
+    KUNSU = "/fake/kunsu-anomaly"
+    SUBREPO = "/fake/subrepo-anomaly"
+
+    monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
+        healthy=[KUNSU, SUBREPO],
+        raw={SUBREPO: [{"kunsu": KUNSU, "roles": ["dev"]}]},
+    ))
+    monkeypatch.setattr("app.main.scan_kunsu", lambda p: _scan(p))
+    monkeypatch.setattr("app.main.get_subrepo_status", lambda *a, **k: _subrepo(
+        unknown=[UnknownToItem("mystery.md", "ghost-role")],
+    ))
+
+    html = client.get("/").text
+
+    assert '<details class="kunsu-group" open>' in html
+    assert "異常 1" in html
+
+
+def test_overview_bar_aggregates_across_kunsus(monkeypatch, client):
+    """頁首總覽列跨軍師加總：未接手／卡關／馬上可測／其餘待確認／新訊息。"""
+    KUNSU_A = "/fake/kunsu-ov-a"
+    KUNSU_B = "/fake/kunsu-ov-b"
+    SUB_A = "/fake/sub-ov-a"
+    SUB_B = "/fake/sub-ov-b"
+
+    monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
+        healthy=[KUNSU_A, KUNSU_B, SUB_A, SUB_B],
+        raw={
+            SUB_A: [{"kunsu": KUNSU_A, "roles": ["dev"]}],
+            SUB_B: [{"kunsu": KUNSU_B, "roles": ["dev"]}],
+        },
+    ))
+    monkeypatch.setattr("app.main.scan_kunsu", lambda p: (
+        _scan(p, new_replies=["docs/handoffs/replies/r.md"])
+        if p == KUNSU_A else _scan(p)
+    ))
+
+    def mock_subrepo(subrepo_path, *a, **k):
+        if subrepo_path == SUB_A:
+            return _subrepo(
+                not_picked_up=[_handoff("n.md", "N Job")],
+                awaiting=[
+                    _handoff("t.md", "T Job",
+                             latest_reply_status="submitted",
+                             latest_reply_date="2026-07-10",
+                             latest_reply_verify="testable-now"),
+                    _handoff("d.md", "D Job",
+                             latest_reply_status="submitted",
+                             latest_reply_date="2026-07-10",
+                             latest_reply_verify="needs-deploy"),
+                ],
+            )
+        return _subrepo(
+            partial_done=[_handoff(
+                "b.md", "B Job", latest_reply_status="blocked",
+            )],
+            # 大小寫變體也計入馬上可測
+            awaiting=[_handoff(
+                "t2.md", "T2 Job",
+                latest_reply_status="submitted",
+                latest_reply_date="2026-07-11",
+                latest_reply_verify="Testable-Now",
+            )],
+        )
+    monkeypatch.setattr("app.main.get_subrepo_status", mock_subrepo)
+
+    html = client.get("/").text
+
+    assert "全域總覽" in html
+    assert '<span class="chip chip-alert">⚠ 未接手 1</span>' in html
+    assert '<span class="chip chip-alert">⛔ 卡關 1</span>' in html
+    assert '<span class="chip chip-now">⚡ 馬上可測 2</span>' in html
+    assert '<span class="chip chip-other">其餘待確認 1</span>' in html
+    assert '<span class="chip chip-msg">📨 新訊息 1</span>' in html
+
+
+def test_overview_bar_absent_when_nothing_pending(monkeypatch, client):
+    """全部計數為零 → 總覽列整條不渲染。"""
+    _client_with_subrepo(monkeypatch, _subrepo())
+
+    html = client.get("/").text
+
+    assert "全域總覽" not in html
+    assert '<div class="card overview">' not in html
+
+
+def test_overview_bar_appears_before_kunsu_groups(monkeypatch, client):
+    """總覽列位於頁首——出現在第一個軍師分組之前。"""
+    _client_with_subrepo(monkeypatch, _subrepo(
+        not_picked_up=[_handoff("n.md", "New Job")],
+    ))
+
+    html = client.get("/").text
+
+    assert (
+        html.index('<div class="card overview">')
+        < html.index('<details class="kunsu-group"')
+    )
