@@ -96,6 +96,28 @@ class TestEdgeCases:
         assert len(result.orphaned_done) == 1
         assert result.orphaned_done[0].status == "已解決"
 
+    def test_archived_status_also_goes_to_orphaned(self, tmp_path):
+        """status: 已封存 是另一個明確關閉值，與 已解決 同路徑歸入 orphaned_done。"""
+        todos_dir = tmp_path / "docs" / "todos"
+        make_todo(todos_dir, "archived.md", status="已封存")
+
+        result = get_todo_status(str(tmp_path))
+
+        assert result.pending == []
+        assert len(result.orphaned_done) == 1
+        assert result.orphaned_done[0].status == "已封存"
+
+    def test_falsy_status_value_not_misclassified_as_missing(self, tmp_path):
+        """status: false／0 是 YAML falsy 值但欄位確實存在，不應誤判為缺欄位而消失。"""
+        todos_dir = tmp_path / "docs" / "todos"
+        make_todo(todos_dir, "falsy.md", status="false")
+
+        result = get_todo_status(str(tmp_path))
+
+        assert result.errors == []
+        assert len(result.pending) == 1
+        assert result.pending[0].status == "False"
+
     def test_covers_ae2_open_status_displayed_and_counted(self, tmp_path):
         """Covers AE2：status: open 原樣顯示、計入 pending（分類與顯示值皆正確）。"""
         todos_dir = tmp_path / "docs" / "todos"

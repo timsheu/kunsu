@@ -168,7 +168,10 @@ def get_todo_status(kunsu_path: str) -> TodoStatusResult:
         fm, body = _parse_frontmatter_and_body(content)
 
         status_raw = fm.get("status")
-        if not status_raw:
+        # 用 is None 而非真值判斷：YAML 可能把 status 解析為 False/0 等
+        # falsy 值，這仍是「欄位存在」（雖然是無意義的值），若誤判為缺欄位
+        # 會讓該筆待辦從清單裡靜默消失，比顯示一個奇怪的 status 字串更糟。
+        if status_raw is None:
             errors.append(
                 ErrorItem(filename=filename, error="missing required frontmatter field: status")
             )

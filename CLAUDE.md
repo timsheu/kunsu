@@ -61,7 +61,9 @@ install.sh             → 部署至 ~/.claude/skills/（預設 copy、--link �
 |------|------|
 | [docs/README.md](docs/README.md) | 文件中心主索引 |
 | [docs/brainstorms/2026-07-06-planner-toolkit-requirements.md](docs/brainstorms/2026-07-06-planner-toolkit-requirements.md) | 種子需求：問題定義、ce-team 教訓、母本解剖、方案設計 |
-| [docs/adr/](docs/adr/) | ADR（001–004 於 2026-07-06、005 於 2026-07-07 審定為 accepted；006 申請信箱與 008 上報信箱於 2026-07-09 accepted；007 角色代碼／說明分離於 2026-07-08 accepted；010 kunsu-dashboard 對 Invariant 1 的例外於 2026-07-11 accepted；011 回覆 verify 欄位與分類拆分、012 remove-project 子指令於 2026-07-12 accepted——全數 accepted） |
+| [docs/adr/](docs/adr/) | ADR（001–004 於 2026-07-06、005 於 2026-07-07 審定為 accepted；006 申請信箱與 008 上報信箱於 2026-07-09 accepted；007 角色代碼／說明分離於 2026-07-08 accepted；010 kunsu-dashboard 對 Invariant 1 的例外於 2026-07-11 accepted；011 回覆 verify 欄位與分類拆分、012 remove-project 子指令於 2026-07-12 accepted；013 `/todo` skill 併入 toolkit 於 2026-07-17 accepted——全數 accepted） |
+| [docs/brainstorms/2026-07-17-dashboard-todo-list-requirements.md](docs/brainstorms/2026-07-17-dashboard-todo-list-requirements.md) | 軍師沙盤 todo 列表顯示需求 |
+| [docs/plans/2026-07-17-001-feat-dashboard-todo-list-plan.md](docs/plans/2026-07-17-001-feat-dashboard-todo-list-plan.md) | 軍師沙盤 todo 列表顯示與 `/todo` skill 併入實作計畫（R1–R9、七個實作單元，已執行完畢） |
 | [docs/plans/2026-07-06-001-feat-planner-toolkit-skills-plan.md](docs/plans/2026-07-06-001-feat-planner-toolkit-skills-plan.md) | 實作計畫（12 條 requirements、7 個實作單元，已執行完畢） |
 | [docs/plans/2026-07-07-001-feat-application-inbox-plan.md](docs/plans/2026-07-07-001-feat-application-inbox-plan.md) | 申請信箱實作計畫（R1–R20、六個實作單元） |
 | [docs/plans/2026-07-08-001-refactor-role-code-description-separation-plan.md](docs/plans/2026-07-08-001-refactor-role-code-description-separation-plan.md) | 角色代碼／說明分離實作計畫（R1–R22、九個實作單元） |
@@ -99,6 +101,8 @@ install.sh             → 部署至 ~/.claude/skills/（預設 copy、--link �
 
 - handoff done 歸檔前逐項驗收查核（handoff v0.7.0，2026-07-17）：源自使用者某 session 執行 insights 後獲得的建議「建立獨立 `handoff-done` skill（依日誌逐一驗證每項驗收條件、封存交接文件、草擬給協調者的回覆、以分開的 commit 提交）」，經 kunsu 化評估**不另建 skill**——「handoff done」觸發詞已屬既有 done 收尾閉環（雙 skill 撞路由）、建議步驟混合發起方（封存）與接手方（草擬回覆）兩個 kunsu 刻意分離的角色、「分開 commit」牴觸 ADR 009 不對稱 commit 設計、`.claude/skills/` 直建違反 Invariant 3 開發部署分離。僅吸收真缺口「逐項驗證驗收條件」：done 步驟 2 新增「逐項驗收查核」子步驟（交接本體問題清單與期望交付逐項對照最新回覆並回報覆蓋狀態；`verify:` 欄位存在時確認該驗收方式已實際執行，以日誌／測試輸出等證據為準、不以回覆文字宣稱代替驗證；缺口顯式列出、由使用者決定收尾或暫緩），reply 步驟 2 對稱補「逐項回答附可查核證據」指引。掃描慣例、`status`／`verify` 值域、tripwire 與歸檔形狀零改動；kunsu-inbox 依賴聲明版號同步 v0.7.0。
 
+- **軍師沙盤新增 todo 列表顯示，`/todo` skill 併入 toolkit**（[ADR 013](docs/adr/2026-07-17-adr-candidate-013-integrate-todo-into-toolkit.md)，2026-07-17 accepted）：源自使用者想在跟 supervisor 討論時一次性攤開所有軍師累積的技術債（ebook 軍師 26 筆未歸檔、ivm 軍師 15 筆），不用逐一開軍師 session 跑 `/todo list`。同一批工作把全域 `/todo` skill（v0.1.1，原僅存在部署目錄）逐字併入 `skills/todo/`，比照 ADR 003 handoff 併入先例，`install.sh` 與 CLAUDE.md 專案結構同步。軍師沙盤新增 `app/todo_status.py` 唯讀掃描軍師自己 `docs/todos/` 頂層，兩桶計數（`orphaned_done`：status 為 已解決／已封存 但未歸檔；`pending`：其餘所有值，含未知自由字串）、三層顯示樣式（未處理已知值標籤／自由字串一般標籤／看似完成未歸檔獨立子區塊，比照 ADR 011 verify 欄位模式）、severity 排序＋archive 筆數計數；`main.py` 新增「待辦技術債」卡片區塊（新 CSS class 前綴 `tlabel`，避開既有 `badge`/`chip` 字面）；`PendingAggregate` 新增 `todo_pending` 欄位（經 `_aggregate_pending` 建構子參數帶入，因該 dataclass 為 frozen 不可建構後賦值），全域總覽與軍師分組摘要非零才顯示「待辦 N」。經 `/ce-brainstorm` → `/ce-plan` 完整流程定案（5 個 AskUserQuestion 釐清互動範圍、todo skill 耦合處理、status 計數/顯示分離、未歸檔孤兒判定），計畫期 3-persona `/ce-doc-review`（coherence／feasibility／scope-guardian）發現並修正 R5 顯示樣式弄丟三層區分、`PendingAggregate` frozen dataclass 直接賦值會拋 `FrozenInstanceError` 兩項正確性缺陷；`ce-simplify-code` 三面向審查合併重複 CSS 宣告、修正 `_html_todo_section` 對解析錯誤靜默略過（原本全數解析失敗會誤顯示「無待辦」）；8-agent Tier 2 code review（correctness／testing／maintainability／project-standards／performance／adversarial／agent-native／learnings）發現並修正 `status` 欄位 YAML falsy 值（`false`/`0`）誤判為缺欄位的邊界案例，另發現 `/todo` skill 原有的 `git mv` 前缺 `git add`（untracked 檔案歸檔會失敗，很可能正是 ivm 軍師真實資料裡「已解決但未歸檔」異常的成因）與 `new-todo.sh` slug 產生順序（連字號先轉又被標點清除）兩個**併入前既有**的 skill 本身缺陷，因本次明訂零行為變更未在此 PR 修正，列入下方後續評估。137 項 pytest 測試通過（自 111 項增至 137）。
+
 ### 尚未實作／後續評估
 - ADR 008 open questions 留待用量評估——歸檔 `status` 值域升級（現為單一 `archived`）、「軍師已讀」輕量標記、上報量成長後的整理慣例。
 - applications 的 HOME dataview 補齊、add-project reports 遷移不含 HOME dataview 附加（已知落差，見實作計畫 Scope Boundaries）。
@@ -107,6 +111,7 @@ install.sh             → 部署至 ~/.claude/skills/（預設 copy、--link �
 - 角色改名的追溯修復工具化（ADR 002 Deferred／[ADR 007](docs/adr/2026-07-08-adr-candidate-007-role-code-description-separation.md) Open Questions；代碼穩定＋Decision 7 唯一性可減少非必要改名，但自動批次修復仍缺，現行為 add-project 警告掃描）。
 - add-project 內建「整句 `roles` → 代碼」自動遷移偵測（ADR 007 Open Questions；本次已手動遷 ivm 三筆＋ebook-store-nginx，工具內建供其他既有軍師升級待評估）。
 - 角色說明欄留空時關聯專案表的呈現規格（ADR 007 Open Questions；顯示「無說明」佔位 vs 留空欄，待範本落地時定）。
+- `/todo` skill 的 `done`／`rm` 步驟對 untracked 檔案直接 `git mv` 會因缺少前置 `git add` 而失敗（2026-07-17 併入時由 code review 發現，併入前既有缺陷，非本次新增；很可能是 ivm 軍師真實資料裡「已解決但未歸檔」異常的成因）；`new-todo.sh` 的 slug 產生邏輯裡連字號會被自身的標點清除步驟一併移除，英文詞間分隔符喪失（同屬併入前既有）。兩者皆需改動 `/todo` skill 行為，牴觸本次「零行為變更」決策，留待後續版號（如 0.1.2）獨立修正評估。
 
 ### 相關資產（唯讀參考）
 

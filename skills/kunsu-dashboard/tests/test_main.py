@@ -1606,6 +1606,21 @@ def test_todo_section_renders_parse_errors(monkeypatch, client):
     assert "missing required frontmatter field: status" in html
 
 
+def test_todo_section_only_orphaned_no_pending(monkeypatch, client):
+    """pending 為空、僅有 orphaned_done——顯示「待辦技術債（0）」＋「無未處理待辦」＋孤兒子區塊。"""
+    KUNSU = _client_with_kunsu_only(monkeypatch)
+    monkeypatch.setattr(
+        "app.main.get_todo_status",
+        lambda p: TodoStatusResult(orphaned_done=[_todo("resolved.md", status="已解決")]),
+    )
+
+    html = client.get("/").text
+
+    assert "待辦技術債（0）" in html
+    assert "無未處理待辦" in html
+    assert "看似完成但未歸檔（1）" in html
+
+
 def test_todo_section_empty_shows_no_todo_message(monkeypatch, client):
     """未處理、看似完成未歸檔、archive 皆為零 → 顯示「無待辦」，不報錯。"""
     KUNSU = _client_with_kunsu_only(monkeypatch)
