@@ -1628,7 +1628,11 @@ def test_covers_ae4_missing_todos_dir_does_not_crash(monkeypatch, client):
 
 
 def test_todo_labels_do_not_use_badge_or_chip_class(monkeypatch, client):
-    """待辦標籤 class 不得與既有 verify badge／總覽 chip 字面衝突。"""
+    """待辦項目本身的標籤 class 不得與既有 verify badge／總覽 chip 字面衝突。
+
+    僅檢查待辦技術債區塊本身（從「待辦技術債」標題開始的內容）；
+    頁首全域總覽合法使用 chip class（見 U7），不在本測試檢查範圍內。
+    """
     KUNSU = _client_with_kunsu_only(monkeypatch)
     monkeypatch.setattr(
         "app.main.get_todo_status",
@@ -1639,9 +1643,61 @@ def test_todo_labels_do_not_use_badge_or_chip_class(monkeypatch, client):
     )
 
     html = client.get("/").text
+    todo_section = html[html.index("待辦技術債") :]
 
-    assert '<span class="badge' not in html
-    assert '<span class="chip' not in html
+    assert '<span class="badge' not in todo_section
+    assert '<span class="chip' not in todo_section
+
+
+def test_kunsu_group_summary_shows_todo_pending_count(monkeypatch, client):
+    """軍師分組摘要列含「待辦 N」，N 為該軍師未處理 todo 筆數，非零才出現。"""
+    KUNSU = _client_with_kunsu_only(monkeypatch)
+    monkeypatch.setattr(
+        "app.main.get_todo_status",
+        lambda p: TodoStatusResult(pending=[_todo("a.md"), _todo("b.md")]),
+    )
+
+    html = client.get("/").text
+
+    assert "待辦 2" in html
+
+
+def test_overview_bar_aggregates_todo_pending_across_kunsus(monkeypatch, client):
+    """全域總覽 chips 新增「待辦 N」，N 為所有軍師加總；全零時不出現此 chip。"""
+    KUNSU_A = "/fake/kunsu-todo-a"
+    KUNSU_B = "/fake/kunsu-todo-b"
+    monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
+        healthy=[KUNSU_A, KUNSU_B],
+        raw={
+            "/fake/subrepo-a": [{"kunsu": KUNSU_A, "roles": ["dev"]}],
+            "/fake/subrepo-b": [{"kunsu": KUNSU_B, "roles": ["dev"]}],
+        },
+    ))
+    monkeypatch.setattr("app.main.scan_kunsu", lambda p: _scan(p))
+    monkeypatch.setattr("app.main.get_subrepo_status", lambda *a, **k: _subrepo())
+
+    def _mock_todo(path):
+        if path == KUNSU_A:
+            return TodoStatusResult(pending=[_todo("a1.md"), _todo("a2.md"), _todo("a3.md")])
+        return TodoStatusResult(pending=[_todo(f"b{i}.md") for i in range(5)])
+
+    monkeypatch.setattr("app.main.get_todo_status", _mock_todo)
+
+    html = client.get("/").text
+
+    assert '<span class="chip chip-other">待辦 8</span>' in html
+
+
+def test_overview_bar_no_todo_chip_when_zero(monkeypatch, client):
+    """零 todo：待辦 chip 不出現，不影響既有其他 chips 渲染。"""
+    _client_with_subrepo(monkeypatch, _subrepo(
+        not_picked_up=[_handoff("n.md", "New Job")],
+    ))
+
+    html = client.get("/").text
+
+    assert "全域總覽" in html
+    assert "待辦" not in html.split("全域總覽")[1].split("</div>")[0]
 
 
 def test_stale_kunsu_does_not_call_get_todo_status(monkeypatch, client):

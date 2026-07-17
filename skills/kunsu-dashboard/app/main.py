@@ -473,10 +473,17 @@ class PendingAggregate:
     blocked: int = 0
     testable_now: int = 0
     anomalies: int = 0  # frontmatter 異常 ＋ to: 不符清單
+    todo_pending: int = 0  # 軍師自身 docs/todos/ 未處理筆數（粒度為軍師，非子專案聚合）
 
 
-def _aggregate_pending(results: list[SubrepoStatusResult]) -> PendingAggregate:
-    """聚合多個子專案的分類結果為計數。"""
+def _aggregate_pending(
+    results: list[SubrepoStatusResult], todo_pending: int = 0
+) -> PendingAggregate:
+    """聚合多個子專案的分類結果為計數。
+
+    todo_pending 粒度是「軍師自身」而非子專案聚合，經建構子參數一併帶入
+    （PendingAggregate 為 frozen dataclass，不可建構後賦值）。
+    """
     npu = partial = awaiting = blocked = testable = anomalies = 0
     for r in results:
         npu += len(r.not_picked_up)
@@ -497,6 +504,7 @@ def _aggregate_pending(results: list[SubrepoStatusResult]) -> PendingAggregate:
         blocked=blocked,
         testable_now=testable,
         anomalies=anomalies,
+        todo_pending=todo_pending,
     )
 
 
@@ -513,6 +521,8 @@ def _pending_suffix(pending: Optional[PendingAggregate]) -> str:
         parts.append(f"待確認 {pending.awaiting_confirm}")
     if pending.anomalies:
         parts.append(f"異常 {pending.anomalies}")
+    if pending.todo_pending:
+        parts.append(f"待辦 {pending.todo_pending}")
     if not parts:
         return ""
     return "｜" + "・".join(parts)
@@ -586,6 +596,10 @@ def _html_overview(
     if pending.anomalies:
         chips.append(
             f'<span class="chip chip-alert">異常 {pending.anomalies}</span>'
+        )
+    if pending.todo_pending:
+        chips.append(
+            f'<span class="chip chip-other">待辦 {pending.todo_pending}</span>'
         )
     if new_messages:
         chips.append(f'<span class="chip chip-msg">📨 新訊息 {new_messages}</span>')
@@ -893,6 +907,7 @@ def index() -> HTMLResponse:
     total_new_messages = 0
     tripwire_kunsus = 0
     script_error_kunsus = 0
+    total_todo_pending = 0
 
     for kunsu_path in sorted(kunsu_paths):
         if kunsu_path not in healthy_set and kunsu_path not in stale_set:
@@ -937,8 +952,9 @@ def index() -> HTMLResponse:
                 status = get_subrepo_status(sp, our_roles, all_known, kunsu_path)
                 sub_results.append(status)
                 nested_parts.append(_html_subrepo(sp, kunsu_path, status))
-            pending = _aggregate_pending(sub_results)
+            pending = _aggregate_pending(sub_results, todo_pending=len(todo_result.pending))
             all_sub_results.extend(sub_results)
+            total_todo_pending += len(todo_result.pending)
 
         is_open, summary_label = _kunsu_group_open_and_label(
             kunsu_path, is_stale, scan, pending
@@ -964,7 +980,7 @@ def index() -> HTMLResponse:
     # ── 組裝頁面 ───────────────────────────────────────────────────────────
     body_sections: list[str] = []
     overview = _html_overview(
-        _aggregate_pending(all_sub_results),
+        _aggregate_pending(all_sub_results, todo_pending=total_todo_pending),
         total_new_messages,
         tripwire_kunsus,
         script_error_kunsus,
