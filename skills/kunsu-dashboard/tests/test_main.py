@@ -27,6 +27,7 @@ from app.subrepo_status import (
     UnknownToItem,
     ErrorItem,
 )
+from app.todo_status import ErrorItem as TodoErrorItem
 from app.todo_status import TodoInfo, TodoStatusResult
 
 
@@ -1585,6 +1586,24 @@ def test_covers_r5_three_way_display_distinction(monkeypatch, client):
     assert '<span class="tlabel tlabel-open">未處理</span>' in html
     assert '<span class="tlabel tlabel-other">open</span>' in html
     assert '<span class="tlabel tlabel-orphaned">看似完成但未歸檔</span>' in html
+
+
+def test_todo_section_renders_parse_errors(monkeypatch, client):
+    """frontmatter 解析錯誤（如缺 status 欄位）要顯示異常清單，不得誤報「無待辦」。"""
+    KUNSU = _client_with_kunsu_only(monkeypatch)
+    monkeypatch.setattr(
+        "app.main.get_todo_status",
+        lambda p: TodoStatusResult(
+            errors=[TodoErrorItem(filename="bad.md", error="missing required frontmatter field: status")],
+        ),
+    )
+
+    html = client.get("/").text
+
+    assert "無待辦" not in html
+    assert "異常（1）" in html
+    assert "bad.md" in html
+    assert "missing required frontmatter field: status" in html
 
 
 def test_todo_section_empty_shows_no_todo_message(monkeypatch, client):

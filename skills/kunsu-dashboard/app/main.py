@@ -44,7 +44,12 @@ from app.subrepo_status import (
     UnknownToItem,
     get_subrepo_status,
 )
-from app.todo_status import TodoInfo, TodoStatusResult, get_todo_status
+from app.todo_status import (
+    KNOWN_PENDING_STATUS,
+    TodoInfo,
+    TodoStatusResult,
+    get_todo_status,
+)
 
 # ── FastAPI app ───────────────────────────────────────────────────────────────
 # 禁用 OpenAPI、Docs、ReDoc 端點，確保 app 內無任何 JSON 端點存在
@@ -141,14 +146,14 @@ _CSS = (
     ".filename{color:#777;font-size:.85em}"
     ".unknown-to-item{color:#7b1fa2}"
     ".mtime{color:#999;font-size:.82em}"
-    ".badge{display:inline-block;padding:0 .45em;border-radius:9px;"
+    ".badge,.tlabel{display:inline-block;padding:0 .45em;border-radius:9px;"
     "font-size:.8em;font-weight:600;margin-left:.35em;white-space:nowrap}"
     ".badge-deploy{background:#fff3e0;color:#e65100}"
     ".badge-now{background:#e8f5e9;color:#2e7d32}"
     ".badge-device{background:#ede7f6;color:#4527a0}"
-    ".badge-other{background:#f0f0f0;color:#555}"
-    ".badge-blocked{background:#ffebee;color:#b71c1c}"
-    ".badge-status-unknown{background:#f3e5f5;color:#7b1fa2}"
+    ".badge-other,.tlabel-other{background:#f0f0f0;color:#555}"
+    ".badge-blocked,.tlabel-high{background:#ffebee;color:#b71c1c}"
+    ".badge-status-unknown,.tlabel-orphaned{background:#f3e5f5;color:#7b1fa2}"
     ".overview{border-color:#90caf9;background:#f7fbff;display:flex;"
     "flex-wrap:wrap;gap:.4em;align-items:center}"
     ".chip{display:inline-block;padding:.15em .6em;border-radius:12px;"
@@ -156,7 +161,7 @@ _CSS = (
     ".chip-alert{background:#ffebee;color:#b71c1c}"
     ".chip-now{background:#e8f5e9;color:#2e7d32}"
     ".chip-other{background:#f0f0f0;color:#555}"
-    ".chip-msg{background:#e3f2fd;color:#1565c0}"
+    ".chip-msg,.tlabel-open{background:#e3f2fd;color:#1565c0}"
     ".hint-next-step{color:#2e7d32;font-size:.85em;margin:0 0 .35em 1.5em}"
     ".days-waiting{color:#e65100;font-weight:600;margin-left:.5em}"
     ".detail-name{display:inline-block;padding-left:1.5em;margin-top:.15em}"
@@ -165,12 +170,6 @@ _CSS = (
     "details{margin:.3em 0}"
     "summary{cursor:pointer;color:#1565c0}"
     "summary:hover{text-decoration:underline}"
-    ".tlabel{display:inline-block;padding:0 .45em;border-radius:9px;"
-    "font-size:.8em;font-weight:600;margin-left:.35em;white-space:nowrap}"
-    ".tlabel-open{background:#e3f2fd;color:#1565c0}"
-    ".tlabel-other{background:#f0f0f0;color:#555}"
-    ".tlabel-orphaned{background:#f3e5f5;color:#7b1fa2}"
-    ".tlabel-high{background:#ffebee;color:#b71c1c}"
 )
 
 
@@ -729,7 +728,7 @@ def _html_todo_item(t: TodoInfo, *, orphaned: bool = False) -> str:
     labels: list[str] = []
     if orphaned:
         labels.append('<span class="tlabel tlabel-orphaned">看似完成但未歸檔</span>')
-    elif t.status == "未處理":
+    elif t.status == KNOWN_PENDING_STATUS:
         labels.append('<span class="tlabel tlabel-open">未處理</span>')
     else:
         labels.append(f'<span class="tlabel tlabel-other">{escape(t.status)}</span>')
@@ -750,7 +749,12 @@ def _html_todo_section(result: TodoStatusResult) -> str:
     pending 依 todo_status.py 已排序（severity 升冪，high 排最前）；
     orphaned_done（看似完成但未歸檔）獨立子區塊呈現，不計入未處理筆數。
     """
-    if not result.pending and not result.orphaned_done and not result.archive_count:
+    if (
+        not result.pending
+        and not result.orphaned_done
+        and not result.archive_count
+        and not result.errors
+    ):
         return '<div class="card card-normal"><p class="empty">無待辦</p></div>'
 
     archive_note = (
@@ -767,6 +771,15 @@ def _html_todo_section(result: TodoStatusResult) -> str:
     if result.orphaned_done:
         items = "".join(_html_todo_item(t, orphaned=True) for t in result.orphaned_done)
         parts.append(f'<h5>看似完成但未歸檔（{len(result.orphaned_done)}）</h5>{items}')
+
+    if result.errors:
+        items = "".join(
+            f'<li class="lbl-error">{escape(e.filename)}：{escape(e.error)}</li>'
+            for e in result.errors
+        )
+        parts.append(
+            f'<h4 class="lbl-error">異常（{len(result.errors)}）</h4><ul>{items}</ul>'
+        )
 
     return f'<div class="card card-normal">{"".join(parts)}</div>'
 
@@ -952,9 +965,10 @@ def index() -> HTMLResponse:
                 status = get_subrepo_status(sp, our_roles, all_known, kunsu_path)
                 sub_results.append(status)
                 nested_parts.append(_html_subrepo(sp, kunsu_path, status))
-            pending = _aggregate_pending(sub_results, todo_pending=len(todo_result.pending))
+            n_todo_pending = len(todo_result.pending)
+            pending = _aggregate_pending(sub_results, todo_pending=n_todo_pending)
             all_sub_results.extend(sub_results)
-            total_todo_pending += len(todo_result.pending)
+            total_todo_pending += n_todo_pending
 
         is_open, summary_label = _kunsu_group_open_and_label(
             kunsu_path, is_stale, scan, pending

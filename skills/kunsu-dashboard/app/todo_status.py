@@ -66,6 +66,9 @@ class TodoStatusResult:
 
 # ── 內部輔助函式 ────────────────────────────────────────────────────────────────
 
+# 顯示層可能需要區分「已知值」與自由字串（見 main.py _html_todo_item），
+# 這裡匯出常數避免跨模組的裸字串同步問題。
+KNOWN_PENDING_STATUS = "未處理"
 _CLOSED_STATUSES = frozenset({"已解決", "已封存"})
 _SEVERITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 _SEVERITY_UNKNOWN_WEIGHT = 3
@@ -196,7 +199,7 @@ def get_todo_status(kunsu_path: str) -> TodoStatusResult:
 
     # archive_count：只計數，不讀取內容
     archive_dir = todos_dir / "archive"
-    archive_count = len(list(archive_dir.glob("*.md"))) if archive_dir.exists() else 0
+    archive_count = sum(1 for _ in archive_dir.glob("*.md")) if archive_dir.exists() else 0
 
     return TodoStatusResult(
         pending=pending,
