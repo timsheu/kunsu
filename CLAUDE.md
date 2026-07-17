@@ -24,6 +24,9 @@ skills/                → skill 原始碼
   handoff/             → 通用交接原語（v0.7.0，2026-07-06 自部署目錄併入，見 ADR 003）
     SKILL.md           → add／reply／list／done 子指令（reply 含 kunsu 語境分支、verify 驗收方式選填欄位與逐項回答附證據指引；done 含收尾口語觸發、發起方守門與歸檔前逐項驗收查核；add／done／本地 reply 尾端確認 commit）
     scripts/           → new-handoff.sh、new-handoff-reply.sh
+  todo/                → CE 副作用 TODO 清單管理原語（v0.1.1，2026-07-17 自部署目錄併入，見 ADR 013）
+    SKILL.md           → add／list／done／rm 子指令，管理 docs/todos/ 一檔一項技術債
+    scripts/           → new-todo.sh
   kunsu-init/          → 軍師 scaffolding
     SKILL.md           → 訪談→查證→產檔→vault→git→註冊表主流程＋add-project（申請審核制）＋remove-project（整筆移除）子指令
     scripts/registry-merge.sh → 註冊表 read-merge-write（python3）
