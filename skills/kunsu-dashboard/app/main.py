@@ -44,6 +44,7 @@ from app.subrepo_status import (
     UnknownToItem,
     get_subrepo_status,
 )
+from app.todo_status import TodoInfo, TodoStatusResult, get_todo_status
 
 # ── FastAPI app ───────────────────────────────────────────────────────────────
 # 禁用 OpenAPI、Docs、ReDoc 端點，確保 app 內無任何 JSON 端點存在
@@ -164,6 +165,12 @@ _CSS = (
     "details{margin:.3em 0}"
     "summary{cursor:pointer;color:#1565c0}"
     "summary:hover{text-decoration:underline}"
+    ".tlabel{display:inline-block;padding:0 .45em;border-radius:9px;"
+    "font-size:.8em;font-weight:600;margin-left:.35em;white-space:nowrap}"
+    ".tlabel-open{background:#e3f2fd;color:#1565c0}"
+    ".tlabel-other{background:#f0f0f0;color:#555}"
+    ".tlabel-orphaned{background:#f3e5f5;color:#7b1fa2}"
+    ".tlabel-high{background:#ffebee;color:#b71c1c}"
 )
 
 
@@ -702,6 +709,54 @@ def _html_kunsu(path: str, result: KunsuScanResult) -> str:
     )
 
 
+def _html_todo_item(t: TodoInfo, *, orphaned: bool = False) -> str:
+    """單一待辦技術債的展開式預覽卡片，摘要列含標題、檔名、狀態與 severity 標籤。"""
+    mtime_str = _format_mtime(t.mtime)
+    labels: list[str] = []
+    if orphaned:
+        labels.append('<span class="tlabel tlabel-orphaned">看似完成但未歸檔</span>')
+    elif t.status == "未處理":
+        labels.append('<span class="tlabel tlabel-open">未處理</span>')
+    else:
+        labels.append(f'<span class="tlabel tlabel-other">{escape(t.status)}</span>')
+    if (t.severity or "").lower() == "high":
+        labels.append('<span class="tlabel tlabel-high">high</span>')
+    name_html = (
+        f'{escape(t.title)} '
+        f'<span class="filename">({escape(t.filename)})</span>'
+        f'{"".join(labels)}'
+    )
+    summary = _html_summary_line(mtime_str, name_html)
+    return _html_detail(summary, t.raw_content)
+
+
+def _html_todo_section(result: TodoStatusResult) -> str:
+    """軍師自身 docs/todos/ 待辦技術債卡片，獨立於三個信箱資料來源之外。
+
+    pending 依 todo_status.py 已排序（severity 升冪，high 排最前）；
+    orphaned_done（看似完成但未歸檔）獨立子區塊呈現，不計入未處理筆數。
+    """
+    if not result.pending and not result.orphaned_done and not result.archive_count:
+        return '<div class="card card-normal"><p class="empty">無待辦</p></div>'
+
+    archive_note = (
+        f' <span class="mtime">已歸檔 {result.archive_count} 筆</span>'
+        if result.archive_count
+        else ""
+    )
+    parts: list[str] = [f'<h4>待辦技術債（{len(result.pending)}）{archive_note}</h4>']
+    if result.pending:
+        parts.append("".join(_html_todo_item(t) for t in result.pending))
+    else:
+        parts.append('<p class="empty">無未處理待辦</p>')
+
+    if result.orphaned_done:
+        items = "".join(_html_todo_item(t, orphaned=True) for t in result.orphaned_done)
+        parts.append(f'<h5>看似完成但未歸檔（{len(result.orphaned_done)}）</h5>{items}')
+
+    return f'<div class="card card-normal">{"".join(parts)}</div>'
+
+
 def _html_subrepo(path: str, kunsu_path: str, result: SubrepoStatusResult) -> str:
     """子專案卡片：未接手／部分完成／已回覆待確認／to 不符清單／異常五類。
 
@@ -860,7 +915,8 @@ def index() -> HTMLResponse:
                 nested_parts.append(_html_subrepo_kunsu_unreachable(sp, kunsu_path))
         else:
             scan = scan_kunsu(kunsu_path)
-            kunsu_card = _html_kunsu(kunsu_path, scan)
+            todo_result = get_todo_status(kunsu_path)
+            kunsu_card = _html_kunsu(kunsu_path, scan) + _html_todo_section(todo_result)
             if scan.tripwire_lines:
                 tripwire_kunsus += 1
             if scan.script_error:

@@ -27,6 +27,7 @@ from app.subrepo_status import (
     UnknownToItem,
     ErrorItem,
 )
+from app.todo_status import TodoInfo, TodoStatusResult
 
 
 # ── Fixture ───────────────────────────────────────────────────────────────────
@@ -1504,3 +1505,165 @@ def test_overview_bar_appears_before_kunsu_groups(monkeypatch, client):
         html.index('<div class="card overview">')
         < html.index('<details class="kunsu-group"')
     )
+
+
+# ── 待辦技術債區塊（軍師 docs/todos/，U6） ────────────────────────────────────
+
+def _todo(
+    filename: str = "task.md",
+    title: str = "測試待辦",
+    status: str = "未處理",
+    severity: str | None = None,
+    raw_content: str = "測試內文",
+) -> TodoInfo:
+    """建立 TodoInfo 測試用實例。"""
+    return TodoInfo(
+        filename=filename,
+        title=title,
+        status=status,
+        severity=severity,
+        raw_content=raw_content,
+    )
+
+
+def _client_with_kunsu_only(monkeypatch):
+    """組出「單一軍師＋一個空子專案」的最小 registry mock，供待辦技術債測試使用。
+
+    需要一個子專案讓 KUNSU 被 `_build_kunsu_paths` 判定為「軍師」身分
+    （raw 的 kunsu 欄位機制，比照既有 `_client_with_subrepo` 慣例）；
+    子專案本身以空結果渲染，不影響待辦技術債區塊的斷言。
+    不 monkeypatch get_todo_status，交由呼叫端視需要覆寫。
+    """
+    KUNSU = "/fake/kunsu-todo"
+    SUBREPO = "/fake/subrepo-todo"
+    monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
+        healthy=[KUNSU, SUBREPO],
+        raw={SUBREPO: [{"kunsu": KUNSU, "roles": ["dev"]}]},
+    ))
+    monkeypatch.setattr("app.main.scan_kunsu", lambda p: _scan(p))
+    monkeypatch.setattr("app.main.get_subrepo_status", lambda *a, **k: _subrepo())
+    return KUNSU
+
+
+def test_todo_section_happy_path_shows_pending_and_orphaned(monkeypatch, client):
+    """待辦技術債區塊顯示未處理與看似完成未歸檔兩個分類，筆數正確。"""
+    KUNSU = _client_with_kunsu_only(monkeypatch)
+    monkeypatch.setattr(
+        "app.main.get_todo_status",
+        lambda p: TodoStatusResult(
+            pending=[_todo("a.md", "待辦A")],
+            orphaned_done=[_todo("b.md", "待辦B", status="已解決")],
+            archive_count=3,
+        ),
+    )
+
+    html = client.get("/").text
+
+    assert "待辦技術債（1）" in html
+    assert "已歸檔 3 筆" in html
+    assert "看似完成但未歸檔（1）" in html
+    assert "待辦A" in html
+    assert "待辦B" in html
+
+
+def test_covers_r5_three_way_display_distinction(monkeypatch, client):
+    """Covers R5：未處理（已知值）／自由字串／看似完成未歸檔 三者 class 互不相同。"""
+    KUNSU = _client_with_kunsu_only(monkeypatch)
+    monkeypatch.setattr(
+        "app.main.get_todo_status",
+        lambda p: TodoStatusResult(
+            pending=[
+                _todo("known.md", "已知值待辦", status="未處理"),
+                _todo("free.md", "自由字串待辦", status="open"),
+            ],
+            orphaned_done=[_todo("orphan.md", "孤兒待辦", status="已解決")],
+        ),
+    )
+
+    html = client.get("/").text
+
+    assert '<span class="tlabel tlabel-open">未處理</span>' in html
+    assert '<span class="tlabel tlabel-other">open</span>' in html
+    assert '<span class="tlabel tlabel-orphaned">看似完成但未歸檔</span>' in html
+
+
+def test_todo_section_empty_shows_no_todo_message(monkeypatch, client):
+    """未處理、看似完成未歸檔、archive 皆為零 → 顯示「無待辦」，不報錯。"""
+    KUNSU = _client_with_kunsu_only(monkeypatch)
+    monkeypatch.setattr("app.main.get_todo_status", lambda p: TodoStatusResult())
+
+    resp = client.get("/")
+
+    assert resp.status_code == 200
+    assert "無待辦" in resp.text
+
+
+def test_covers_ae3_high_severity_item_has_highlight_class(monkeypatch, client):
+    """Covers AE3：high severity 項目帶醒目樣式 class（排序由 todo_status.py 負責，本測試只驗證樣式）。"""
+    KUNSU = _client_with_kunsu_only(monkeypatch)
+    monkeypatch.setattr(
+        "app.main.get_todo_status",
+        lambda p: TodoStatusResult(
+            pending=[
+                _todo("high.md", "高風險待辦", severity="high"),
+                _todo("low.md", "低風險待辦", severity="low"),
+            ],
+        ),
+    )
+
+    html = client.get("/").text
+
+    assert html.index("高風險待辦") < html.index("低風險待辦")
+    assert '<span class="tlabel tlabel-high">high</span>' in html
+
+
+def test_covers_ae4_missing_todos_dir_does_not_crash(monkeypatch, client):
+    """Covers AE4：軍師 repo 沒有 docs/todos/ 目錄（真實呼叫，不 mock）——顯示空狀態，不中斷整頁渲染。"""
+    _client_with_kunsu_only(monkeypatch)  # 不 monkeypatch get_todo_status，走真實函式
+
+    resp = client.get("/")
+
+    assert resp.status_code == 200
+    assert "無待辦" in resp.text
+
+
+def test_todo_labels_do_not_use_badge_or_chip_class(monkeypatch, client):
+    """待辦標籤 class 不得與既有 verify badge／總覽 chip 字面衝突。"""
+    KUNSU = _client_with_kunsu_only(monkeypatch)
+    monkeypatch.setattr(
+        "app.main.get_todo_status",
+        lambda p: TodoStatusResult(
+            pending=[_todo("a.md", "A", status="open", severity="high")],
+            orphaned_done=[_todo("b.md", "B", status="已封存")],
+        ),
+    )
+
+    html = client.get("/").text
+
+    assert '<span class="badge' not in html
+    assert '<span class="chip' not in html
+
+
+def test_stale_kunsu_does_not_call_get_todo_status(monkeypatch, client):
+    """所屬軍師 stale 時不呼叫 get_todo_status（比照既有 get_subrepo_status 防呆測試）。
+
+    STALE_KUNSU 須透過 raw 的 kunsu 欄位登記才會進入主迴圈的 is_stale 分支
+    （否則只會落入 leftover_stale 的 fallback 呈現，不會經過本測試要驗證的路徑）。
+    """
+    STALE_KUNSU = "/fake/stale-kunsu-todo"
+    SUBREPO = "/fake/subrepo-of-stale-kunsu-todo"
+    monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
+        healthy=[SUBREPO],
+        stale=[STALE_KUNSU],
+        raw={SUBREPO: [{"kunsu": STALE_KUNSU, "roles": ["dev"]}]},
+    ))
+
+    def _fail_if_called(*a, **k):
+        raise AssertionError("get_todo_status 不應在軍師 stale 時被呼叫")
+
+    monkeypatch.setattr("app.main.get_todo_status", _fail_if_called)
+
+    resp = client.get("/")
+
+    assert resp.status_code == 200
+    assert "軍師不可達" in resp.text
