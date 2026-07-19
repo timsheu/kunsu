@@ -85,12 +85,13 @@ docs/todos/  →（解決後）status 改 已解決，git mv 到 docs/todos/arch
 2. 用 Edit 只改 frontmatter 的 `status: 未處理` → `status: 已解決`（不動內文其他部分）。
 3. 詢問或從對話取得解決依據（commit hash、solution 文件連結），用 Edit 補一行
    在標題下方，例如：`**解決依據**：commit \`abc1234\`，見 docs/solutions/xxx.md`。
-4. **untracked 前置檢查**：`git status --porcelain docs/todos/<slug>.md` 狀態為
+4. **歸檔前置檢查**：先 `mkdir -p docs/todos/archive/`（目錄不存在時 `git mv`
+   會失敗）；`git status --porcelain docs/todos/<slug>.md` 狀態為
    `??`（untracked）者先 `git add`（untracked 檔直接 `git mv` 會以
    `not under version control` 失敗），再
    `git mv docs/todos/<slug>.md docs/todos/archive/<slug>.md`。
-5. 檢查是否有其他文件連結指向舊路徑（`grep -rl "docs/todos/<slug>.md" docs/`），
-   逐一修正為 `docs/todos/archive/<slug>.md`。
+5. 檢查是否有其他文件連結指向舊路徑（`grep -Frl "docs/todos/<slug>.md" docs/`，
+   `-F` 固定字串比對避免 `.` 誤中），逐一修正為 `docs/todos/archive/<slug>.md`。
 6. 回報歸檔結果，**不要**主動 commit。
 
 ### rm
@@ -99,8 +100,8 @@ docs/todos/  →（解決後）status 改 已解決，git mv 到 docs/todos/arch
 
 1. Read 指定檔案，用 Edit 把 frontmatter `status` 改成 `已封存`，並在內文補一行
    結案原因（例如「三項假設皆不成立，logcat 實測排除」）。
-2. 同 done 步驟 4 先做 untracked 前置檢查，再 `git mv` 到 `docs/todos/archive/`，
-   並同 done 步驟 5 修正跨檔連結。
+2. 同 done 步驟 4 先做歸檔前置檢查（`mkdir -p`＋untracked），再 `git mv` 到
+   `docs/todos/archive/`，並同 done 步驟 5 修正跨檔連結。
 3. 回報結果。若使用者明確要求刪除誤建立的檔案（不是要封存），才用一般 Bash
    `rm` 處理，並在動手前跟使用者確認一次。
 
@@ -139,6 +140,7 @@ severity: medium
 - 多筆待辦請逐一建檔，不要塞進同一個檔。
 - 若某筆 todo 已升級為交接文件處理，`/handoff done`（v0.8.0 起）收尾時會以雙向
   檔名比對找出它，經使用者確認後代執行本 skill 的 done 收尾（status、解決依據、
-  歸檔），不需事後再跑 `/todo done`。
+  歸檔），不需事後再跑 `/todo done`；於該查核中略過或取消的 todo 不在此列，
+  仍由本 skill 自行收尾。
 - `done`／`rm` 都是「搬到 archive + 改 status」，不是刪檔案；只有使用者明確要求
   刪除誤建檔案時才用一般 `rm`。

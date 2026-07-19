@@ -262,16 +262,19 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
    > `/kunsu-inbox`——todo 檔與交接本體在 Edit 後、`git mv` 前的中間態不在
    > 掃描豁免範圍內，靠流程原子性避免 tripwire 與沙盤誤報。
 
-4. **todo 收尾執行**（僅步驟 3 有經確認的 todo 時執行）：對每筆依序——
+4. **todo 收尾執行**（僅步驟 3 有經確認的 todo 時執行；語意比照 `/todo done`，
+   該 skill 步驟更新時同步核查本段）：先 `mkdir -p docs/todos/archive/`（目錄
+   不存在時 `git mv` 會失敗），再對每筆依序——
    - status 非終態者：Edit frontmatter `status` 改「已解決」，標題下方補一行
      `**解決依據**：交接 docs/handoffs/archive/<交接slug>.md 收尾歸檔`（填預期
      歸檔路徑，此時交接本體尚未搬移）；status 已是「已解決」／「已封存」者
-     跳過本項，不改 status、不補依據。
+     僅跳過本項 Edit（不改 status、不補依據），後續兩項照常執行。
    - `git status --porcelain` 核對該 todo 檔，`??`（untracked）者先 `git add`
      （untracked 檔直接 `git mv` 會以 `not under version control` 失敗）。
    - `git mv docs/todos/<todo-slug>.md docs/todos/archive/<todo-slug>.md`。
    - 任一筆失敗 → 中止剩餘 todo 操作（已完成筆不回滾），記下失敗筆於步驟 9
-     回報，續行交接收尾（交接本體仍未動，整段可重跑）。
+     回報，續行交接收尾（交接本體仍未動，整段可重跑；已 Edit 未搬移的失敗筆
+     會在重跑的步驟 3 以孤兒身分再次列為候選，補歸檔即收斂）。
 
 5. 用 Edit 把交接文件本體 frontmatter `status` 改為 `done`（這是發起方對自己文件
    的生命週期狀態更新，不是接手方回填內容，不違反「本體不編輯」的規則）。
@@ -286,15 +289,17 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
    `docs/handoffs/archive/replies/`，讓交接文件與其回覆的歸檔位置保持成對；沒有
    回覆檔案則略過。
 
-8. 檢查是否有其他文件連結指向舊路徑（`grep -rl "docs/handoffs/<slug>.md" docs/`），
-   逐一修正為 `docs/handoffs/archive/<slug>.md`；步驟 4 有歸檔 todo 時，對每筆
-   同樣檢查（`grep -rl "docs/todos/<todo-slug>.md" docs/`）並逐一修正為
-   `docs/todos/archive/<todo-slug>.md`。
+8. 檢查是否有其他文件連結指向舊路徑（`grep -Frl "docs/handoffs/<slug>.md" docs/`，
+   `-F` 固定字串比對避免 `.` 誤中），逐一修正為 `docs/handoffs/archive/<slug>.md`；
+   步驟 4 有**成功歸檔**的 todo 時，對每筆同樣檢查
+   （`grep -Frl "docs/todos/<todo-slug>.md" docs/`）並逐一修正為
+   `docs/todos/archive/<todo-slug>.md`（失敗筆不改連結——其檔案仍在頂層）。
 
 9. 回報歸檔結果（含步驟 4 的 todo 收尾與失敗筆），並執行「確認 commit（協議
    步驟）」——`git add` 對象為**歸檔目的地路徑**（`docs/handoffs/archive/<slug>.md`
-   與各回覆的 `archive/replies/` 路徑，加上各歸檔 todo 的
-   `docs/todos/archive/<todo-slug>.md`；`git mv` 不會暫存 working tree 的內容
+   與各回覆的 `archive/replies/` 路徑，加上各**成功歸檔** todo 的
+   `docs/todos/archive/<todo-slug>.md`——失敗筆的 archive 路徑不存在，列入
+   `git add` 會以 pathspec 錯誤中斷；`git mv` 不會暫存 working tree 的內容
    修改，porcelain 呈現 `RM`，步驟 5 的 `status: done` 與步驟 4 的 todo Edit
    修改靠這一步 add 帶入 commit）**加上步驟 8 修改的所有檔案路徑**；訊息
    `docs: 歸檔交接 <檔名>`，含 todo 一併收尾時改用
