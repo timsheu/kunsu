@@ -1,7 +1,7 @@
 ---
 title: "feat: handoff done 來源 todo 查核與 /todo 0.1.2 缺陷修正"
 type: feat
-status: active
+status: completed
 date: 2026-07-19
 origin: docs/brainstorms/2026-07-19-handoff-done-todo-closure-requirements.md
 ---
