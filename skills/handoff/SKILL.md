@@ -1,6 +1,6 @@
 ---
 name: handoff
-version: 0.7.0
+version: 0.8.0
 description: |
   把一個需要交給「另一個 session／另一個角色（如後台、前端、DevOps）」研究或
   接手的議題，寫成一份獨立交接文件，落在當前專案的 docs/handoffs/。每份交接一個
@@ -96,7 +96,7 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
 | 子指令 | 訊息 |
 |--------|------|
 | add | `docs: 建立交接 <檔名>` |
-| done | `docs: 歸檔交接 <檔名>` |
+| done | `docs: 歸檔交接 <檔名>`（含 todo 一併收尾時：`docs: 歸檔交接 <檔名>；一併收尾 todo <slug>[、<slug>…]`） |
 | reply（本地語境） | `docs: 回覆交接 <檔名>` |
 
 **例外**：kunsu 語境的 reply（回覆檔落在另一 repo 的軍師回覆信箱）**不執行**本
@@ -243,31 +243,62 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
      部署紀錄）為準，不以回覆的文字宣稱代替驗證。存在未回答項或未執行的
      驗收時明確列出，由使用者決定仍要收尾或暫緩——本步驟的責任是讓缺口
      可見，不是替使用者做決定。
-3. 用 Edit 把交接文件本體 frontmatter `status` 改為 `done`（這是發起方對自己文件
+3. **來源 todo 查核**：掃描本 repo `docs/todos/` 頂層 `*.md`（排除 `archive/`；
+   目錄不存在或無檔案時本步驟靜默跳過），以具體檔名做雙向比對——(a) 各 todo 檔
+   內文是否提及本交接檔名 `<slug>.md`；(b) 交接本體內文是否提及某 todo 檔名。
+   任一方向命中即列為候選。
+   - 有候選 → AskUserQuestion 讓使用者確認哪些 todo 一併收尾：候選 ≤4 筆用
+     multiSelect 一次呈現（label 為 todo 標題，description 註明現況 status 與
+     命中方向），>4 筆改在對話中列數字清單請使用者以文字指定。候選 status 已是
+     「已解決」或「已封存」（漏歸檔孤兒）者，文案標明「已標記為<status>但尚未
+     歸檔，確認一併補歸檔？」，與未處理件的收尾文案區分。
+   - 使用者取消、零選、或非互動環境 AskUserQuestion 不可用 → 一律不執行任何
+     todo 操作，逕行後續交接收尾（比照「確認 commit」不可用視同取消的規則，
+     本查核不阻擋 done 完成）。
+   - 無候選但頂層仍有未歸檔 todo → 僅顯示一行提示「`docs/todos/` 尚有 N 筆
+     未歸檔 todo，若此交接源自其中一筆可一併收尾」，不阻擋流程。
+
+   > **連續執行約束**：步驟 4 至步驟 7 必須連續執行，中間不得執行
+   > `/kunsu-inbox`——todo 檔與交接本體在 Edit 後、`git mv` 前的中間態不在
+   > 掃描豁免範圍內，靠流程原子性避免 tripwire 與沙盤誤報。
+
+4. **todo 收尾執行**（僅步驟 3 有經確認的 todo 時執行）：對每筆依序——
+   - status 非終態者：Edit frontmatter `status` 改「已解決」，標題下方補一行
+     `**解決依據**：交接 docs/handoffs/archive/<交接slug>.md 收尾歸檔`（填預期
+     歸檔路徑，此時交接本體尚未搬移）；status 已是「已解決」／「已封存」者
+     跳過本項，不改 status、不補依據。
+   - `git status --porcelain` 核對該 todo 檔，`??`（untracked）者先 `git add`
+     （untracked 檔直接 `git mv` 會以 `not under version control` 失敗）。
+   - `git mv docs/todos/<todo-slug>.md docs/todos/archive/<todo-slug>.md`。
+   - 任一筆失敗 → 中止剩餘 todo 操作（已完成筆不回滾），記下失敗筆於步驟 9
+     回報，續行交接收尾（交接本體仍未動，整段可重跑）。
+
+5. 用 Edit 把交接文件本體 frontmatter `status` 改為 `done`（這是發起方對自己文件
    的生命週期狀態更新，不是接手方回填內容，不違反「本體不編輯」的規則）。
 
-   > **連續執行約束**：步驟 3 至步驟 5 必須連續執行，中間不得執行
-   > `/kunsu-inbox`——Edit 後、`git mv` 前的 ` M` 中間態不在掃描豁免範圍內，
-   > 靠流程原子性避免 tripwire 誤報。
-
-4. **untracked 前置檢查**：`git status --porcelain` 核對交接本體與步驟 2 找到的
+6. **untracked 前置檢查**：`git status --porcelain` 核對交接本體與步驟 2 找到的
    各回覆檔，狀態為 `??`（untracked）者一律先 `git add`（untracked 檔直接
    `git mv` 會以 `not under version control` 失敗；比照 add-project 審核歸檔的
    既有做法）。
 
-5. `git mv docs/handoffs/<slug>.md docs/handoffs/archive/<slug>.md`；若該交接文件
+7. `git mv docs/handoffs/<slug>.md docs/handoffs/archive/<slug>.md`；若該交接文件
    在 `docs/handoffs/replies/` 有對應回覆檔案，一併 `git mv` 到
    `docs/handoffs/archive/replies/`，讓交接文件與其回覆的歸檔位置保持成對；沒有
    回覆檔案則略過。
 
-6. 檢查是否有其他文件連結指向舊路徑（`grep -rl "docs/handoffs/<slug>.md" docs/`），
-   逐一修正為 `docs/handoffs/archive/<slug>.md`。
+8. 檢查是否有其他文件連結指向舊路徑（`grep -rl "docs/handoffs/<slug>.md" docs/`），
+   逐一修正為 `docs/handoffs/archive/<slug>.md`；步驟 4 有歸檔 todo 時，對每筆
+   同樣檢查（`grep -rl "docs/todos/<todo-slug>.md" docs/`）並逐一修正為
+   `docs/todos/archive/<todo-slug>.md`。
 
-7. 回報歸檔結果，並執行「確認 commit（協議步驟）」——`git add` 對象為**歸檔目的地
-   路徑**（`docs/handoffs/archive/<slug>.md` 與各回覆的 `archive/replies/` 路徑；
-   `git mv` 不會暫存 working tree 的內容修改，porcelain 呈現 `RM`，步驟 3 的
-   `status: done` 修改靠這一步 add 帶入 commit）**加上步驟 6 修改的所有檔案路徑**；
-   訊息 `docs: 歸檔交接 <檔名>`。
+9. 回報歸檔結果（含步驟 4 的 todo 收尾與失敗筆），並執行「確認 commit（協議
+   步驟）」——`git add` 對象為**歸檔目的地路徑**（`docs/handoffs/archive/<slug>.md`
+   與各回覆的 `archive/replies/` 路徑，加上各歸檔 todo 的
+   `docs/todos/archive/<todo-slug>.md`；`git mv` 不會暫存 working tree 的內容
+   修改，porcelain 呈現 `RM`，步驟 5 的 `status: done` 與步驟 4 的 todo Edit
+   修改靠這一步 add 帶入 commit）**加上步驟 8 修改的所有檔案路徑**；訊息
+   `docs: 歸檔交接 <檔名>`，含 todo 一併收尾時改用
+   `docs: 歸檔交接 <檔名>；一併收尾 todo <slug>[、<slug>…]`。
 
 ## 檔案格式範例
 
