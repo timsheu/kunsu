@@ -21,11 +21,11 @@ docs/
   adr/                 → ADR（001–009 全數 accepted）
   solutions/           → 可重用學習與解法（/ce-compound 產出，YAML frontmatter 依 module/tags/problem_type 可搜尋）
 skills/                → skill 原始碼
-  handoff/             → 通用交接原語（v0.7.0，2026-07-06 自部署目錄併入，見 ADR 003）
-    SKILL.md           → add／reply／list／done 子指令（reply 含 kunsu 語境分支、verify 驗收方式選填欄位與逐項回答附證據指引；done 含收尾口語觸發、發起方守門與歸檔前逐項驗收查核；add／done／本地 reply 尾端確認 commit）
+  handoff/             → 通用交接原語（v0.8.0，2026-07-06 自部署目錄併入，見 ADR 003）
+    SKILL.md           → add／reply／list／done 子指令（reply 含 kunsu 語境分支、verify 驗收方式選填欄位與逐項回答附證據指引；done 含收尾口語觸發、發起方守門、歸檔前逐項驗收查核與來源 todo 查核一併收尾；add／done／本地 reply 尾端確認 commit）
     scripts/           → new-handoff.sh、new-handoff-reply.sh
-  todo/                → CE 副作用 TODO 清單管理原語（v0.1.1，2026-07-17 自部署目錄併入，見 ADR 013）
-    SKILL.md           → add／list／done／rm 子指令，管理 docs/todos/ 一檔一項技術債
+  todo/                → CE 副作用 TODO 清單管理原語（v0.1.2，2026-07-17 自部署目錄併入，見 ADR 013）
+    SKILL.md           → add／list／done／rm 子指令，管理 docs/todos/ 一檔一項技術債（done／rm 含 untracked 前置檢查）
     scripts/           → new-todo.sh
   kunsu-init/          → 軍師 scaffolding
     SKILL.md           → 訪談→查證→產檔→vault→git→註冊表主流程＋add-project（申請審核制）＋remove-project（整筆移除）子指令
@@ -50,8 +50,8 @@ skills/                → skill 原始碼
   kunsu-dashboard/     → kunsu 訊息聚合本機網頁（非 Claude Code skill，見 ADR 010）
     SKILL.md           → 純安裝／啟動說明，不涉及觸發語
     requirements.txt   → fastapi／uvicorn[standard]／PyYAML（本專案首次 pip 依賴）
-    app/               → registry.py／kunsu_scan.py／subrepo_status.py／main.py
-    tests/             → pytest，98 項測試
+    app/               → registry.py／kunsu_scan.py／subrepo_status.py／todo_status.py／main.py
+    tests/             → pytest，137 項測試
 install.sh             → 部署至 ~/.claude/skills/（預設 copy、--link 開發模式）
 ```
 
@@ -103,6 +103,8 @@ install.sh             → 部署至 ~/.claude/skills/（預設 copy、--link �
 
 - **軍師沙盤新增 todo 列表顯示，`/todo` skill 併入 toolkit**（[ADR 013](docs/adr/2026-07-17-adr-candidate-013-integrate-todo-into-toolkit.md)，2026-07-17 accepted）：源自使用者想在跟 supervisor 討論時一次性攤開所有軍師累積的技術債（ebook 軍師 26 筆未歸檔、ivm 軍師 15 筆），不用逐一開軍師 session 跑 `/todo list`。同一批工作把全域 `/todo` skill（v0.1.1，原僅存在部署目錄）逐字併入 `skills/todo/`，比照 ADR 003 handoff 併入先例，`install.sh` 與 CLAUDE.md 專案結構同步。軍師沙盤新增 `app/todo_status.py` 唯讀掃描軍師自己 `docs/todos/` 頂層，兩桶計數（`orphaned_done`：status 為 已解決／已封存 但未歸檔；`pending`：其餘所有值，含未知自由字串）、三層顯示樣式（未處理已知值標籤／自由字串一般標籤／看似完成未歸檔獨立子區塊，比照 ADR 011 verify 欄位模式）、severity 排序＋archive 筆數計數；`main.py` 新增「待辦技術債」卡片區塊（新 CSS class 前綴 `tlabel`，避開既有 `badge`/`chip` 字面）；`PendingAggregate` 新增 `todo_pending` 欄位（經 `_aggregate_pending` 建構子參數帶入，因該 dataclass 為 frozen 不可建構後賦值），全域總覽與軍師分組摘要非零才顯示「待辦 N」。經 `/ce-brainstorm` → `/ce-plan` 完整流程定案（5 個 AskUserQuestion 釐清互動範圍、todo skill 耦合處理、status 計數/顯示分離、未歸檔孤兒判定），計畫期 3-persona `/ce-doc-review`（coherence／feasibility／scope-guardian）發現並修正 R5 顯示樣式弄丟三層區分、`PendingAggregate` frozen dataclass 直接賦值會拋 `FrozenInstanceError` 兩項正確性缺陷；`ce-simplify-code` 三面向審查合併重複 CSS 宣告、修正 `_html_todo_section` 對解析錯誤靜默略過（原本全數解析失敗會誤顯示「無待辦」）；8-agent Tier 2 code review（correctness／testing／maintainability／project-standards／performance／adversarial／agent-native／learnings）發現並修正 `status` 欄位 YAML falsy 值（`false`/`0`）誤判為缺欄位的邊界案例，另發現 `/todo` skill 原有的 `git mv` 前缺 `git add`（untracked 檔案歸檔會失敗，很可能正是 ivm 軍師真實資料裡「已解決但未歸檔」異常的成因）與 `new-todo.sh` slug 產生順序（連字號先轉又被標點清除）兩個**併入前既有**的 skill 本身缺陷，因本次明訂零行為變更未在此 PR 修正，列入下方後續評估。137 項 pytest 測試通過（自 111 項增至 137）。
 
+- **handoff done 來源 todo 查核與一併收尾，`/todo` 0.1.2 既有缺陷修正**（2026-07-19）：源自實際使用回饋——todo 升級成交接、交接完成且驗收後，常忘記把 todo 一併收尾，todo 停留「未處理」使沙盤待辦計數失真；根因是 todo 與 handoff 間無結構性連結、done 步驟無一回頭檢查來源 todo。經 `/ce-brainstorm`（中途自「frontmatter 加 handoff 欄位」的結構性方案自我修正為「done 時雙向發現」，todo 檔案格式零改動、零遷移）→ `/ce-plan` 定案：handoff（v0.8.0）done 於逐項驗收查核後新增步驟 3「來源 todo 查核」——掃描本 repo `docs/todos/` 頂層、以具體檔名雙向比對（todo 內文含交接檔名或交接本體含 todo 檔名）、AskUserQuestion 複選確認（>4 筆退化為對話數字清單；取消／零選／非互動一律不動 todo 續行收尾；無命中僅一行提示含筆數、無檔案靜默）——與步驟 4「todo 收尾執行」——非終態者 Edit status 改「已解決」＋解決依據自動填交接預期歸檔路徑，已解決／已封存孤兒僅補歸檔保留終態語意，untracked 先 `git add`，單筆失敗中止剩餘不回滾；原步驟 3–7 順移為 5–9，連續執行約束改涵蓋步驟 4–7，步驟 8 連結修正與步驟 9 協議 commit 的 `git add` 範圍擴及 todo 歸檔路徑（`git mv` 不暫存 Edit 內容的陷阱四防護），commit 訊息含 todo 時附「；一併收尾 todo <slug>」註記（ADR 009 `docs:` 前綴與主體不變）。`/todo`（0.1.2）同批修正兩個併入前既有缺陷：done／rm 補 untracked 前置檢查（很可能是 ivm「已解決但未歸檔」異常成因）、`new-todo.sh` slug 以 `\001` 佔位保護連字號與底線再清標點（原順序 `[:punct:]` 會把分隔符一併清除；順帶修正底線分隔喪失）。kunsu-inbox 依賴聲明同步 v0.8.0（todo 歸檔不在其掃描範圍、無豁免需求）；CONCEPTS「done 收尾」詞條同步。計畫經 3-persona headless doc review（coherence 抓出 R6 與終態保護矛盾、feasibility 抓出「僅調換順序仍會清掉既有連字號」的 U3 正確性缺陷）。暫存目錄 dogfooding 20 項斷言全過（含 porcelain `RM`／`A` 兩種前置狀態形狀、孤兒零 diff、中文檔名 quotepath 陷阱）＋ slug 六案例；137 項 pytest 通過（沙盤零改動）。
+
 ### 尚未實作／後續評估
 - ADR 008 open questions 留待用量評估——歸檔 `status` 值域升級（現為單一 `archived`）、「軍師已讀」輕量標記、上報量成長後的整理慣例。
 - applications 的 HOME dataview 補齊、add-project reports 遷移不含 HOME dataview 附加（已知落差，見實作計畫 Scope Boundaries）。
@@ -111,7 +113,6 @@ install.sh             → 部署至 ~/.claude/skills/（預設 copy、--link �
 - 角色改名的追溯修復工具化（ADR 002 Deferred／[ADR 007](docs/adr/2026-07-08-adr-candidate-007-role-code-description-separation.md) Open Questions；代碼穩定＋Decision 7 唯一性可減少非必要改名，但自動批次修復仍缺，現行為 add-project 警告掃描）。
 - add-project 內建「整句 `roles` → 代碼」自動遷移偵測（ADR 007 Open Questions；本次已手動遷 ivm 三筆＋ebook-store-nginx，工具內建供其他既有軍師升級待評估）。
 - 角色說明欄留空時關聯專案表的呈現規格（ADR 007 Open Questions；顯示「無說明」佔位 vs 留空欄，待範本落地時定）。
-- `/todo` skill 的 `done`／`rm` 步驟對 untracked 檔案直接 `git mv` 會因缺少前置 `git add` 而失敗（2026-07-17 併入時由 code review 發現，併入前既有缺陷，非本次新增；很可能是 ivm 軍師真實資料裡「已解決但未歸檔」異常的成因）；`new-todo.sh` 的 slug 產生邏輯裡連字號會被自身的標點清除步驟一併移除，英文詞間分隔符喪失（同屬併入前既有）。兩者皆需改動 `/todo` skill 行為，牴觸本次「零行為變更」決策，留待後續版號（如 0.1.2）獨立修正評估。
 
 ### 相關資產（唯讀參考）
 

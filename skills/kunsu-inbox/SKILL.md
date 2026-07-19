@@ -310,7 +310,7 @@ Edit 與 git mv 之間，頂層 ` M` 中間態亦會觸發，續行完成歸檔�
 
 ## 依賴聲明
 
-本 skill 依賴同 toolkit 內建的 `/handoff` skill（v0.7.0，原始碼位於本 repo `skills/handoff/`）所定義的下列慣例。兩者共同發版、慣例定義以本 repo 為準；更新 handoff 的以下行為時需同步核查本 skill：
+本 skill 依賴同 toolkit 內建的 `/handoff` skill（v0.8.0，原始碼位於本 repo `skills/handoff/`）所定義的下列慣例。兩者共同發版、慣例定義以本 repo 為準；更新 handoff 的以下行為時需同步核查本 skill：
 
 | 項目 | 慣例 |
 |------|------|
@@ -320,7 +320,7 @@ Edit 與 git mv 之間，頂層 ` M` 中間態亦會觸發，續行完成歸檔�
 | `verify` 欄位 | 選填，驗收方式（ADR 011）。建議代碼 `needs-deploy`／`testable-now`／`needs-device`（全小寫 kebab-case，顯示端查找前正規化為小寫），開放值域（其他字串原樣顯示）、缺省不顯示（純空白字串視同缺省）；不跨回覆繼承（只讀最新回覆）；display-only，不參與任何比對邏輯與 tripwire |
 | 信箱目錄 | `docs/handoffs/replies/`（一律在軍師 repo 內）|
 | `in_reply_to` 比對方式 | 精確字串比對，含後綴 |
-| done 歸檔搬移 | 頂層交接→`archive/`、其回覆→`archive/replies/` 成對搬移，即 `scan-replies.sh` 授權豁免的兩個 rename 形狀（可攜帶 `status: done` 修改，porcelain 呈現 `RM`）|
+| done 歸檔搬移 | 頂層交接→`archive/`、其回覆→`archive/replies/` 成對搬移，即 `scan-replies.sh` 授權豁免的兩個 rename 形狀（可攜帶 `status: done` 修改，porcelain 呈現 `RM`）；v0.8.0 起 done 亦可能一併搬移來源 todo（`docs/todos/`→`docs/todos/archive/`，不在本 skill 掃描範圍，無豁免需求）|
 | 流程尾端確認 commit | add／done／reply（本地語境）經 AskUserQuestion 確認後 commit（ADR 009）；kunsu 語境 reply 不 commit——未 commit 即本 skill 的新回覆偵測訊號 |
 
 另依賴同 toolkit 內建的 `/kunsu-apply` skill 所定義的申請信箱目錄慣例
