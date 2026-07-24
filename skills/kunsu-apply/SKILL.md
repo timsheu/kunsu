@@ -1,6 +1,6 @@
 ---
 name: kunsu-apply
-version: 0.1.0
+version: 0.1.1
 description: |
   在子專案 session 向軍師（規劃協調中心）投遞「申請加入」：自動偵測子專案路徑、
   顯示名稱與技術棧，從全域反向註冊表 ~/.claude/kunsu-registry.json 撈出軍師清單
@@ -86,6 +86,8 @@ test -d "<KUNSU_ROOT>/docs/applications" && echo "ok" || echo "missing"
 5. **能否自我驗證**：`y` = 可在該 repo 執行測試驗收；`n` = 需人工或跨 repo。
 
 **提議代碼撞名早期檢查（最佳努力、非權威）**：讀 registry 中目標軍師（`entry.kunsu == <KUNSU_ROOT>`）已登記的代碼集合，若提議代碼命中則提示並列出既有代碼、建議改碼。此檢查看不到在途待審申請，僅為早期訊號——最終唯一性由軍師端 `add-project` 核准時強制。
+
+**投遞前 redact**：申請檔會寫入軍師 repo（可能公開），角色說明、環境限制、技術棧摘要等欄位勿夾帶敏感資訊——API key、密碼、token／憑證、個資（PII）或內部機密路徑。
 
 ### 步驟 6：產生申請檔
 

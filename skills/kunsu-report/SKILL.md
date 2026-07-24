@@ -1,6 +1,6 @@
 ---
 name: kunsu-report
-version: 0.1.1
+version: 0.1.2
 description: |
   在子專案 session 向已登記的軍師（規劃協調中心）投遞「主動上報」：自動偵測子專案
   路徑，從全域反向註冊表 ~/.claude/kunsu-registry.json 取得本 repo 自身條目（限
@@ -125,6 +125,8 @@ test -d "<KUNSU_ROOT>/docs/reports" && echo "ok" || echo "missing"
 ### 步驟 9：收集並整理上報內文
 
 請使用者提供上報正文（可直接貼上已整理的內容，或口述後由 model 協助整理為結構化段落），將最終內文記為 `BODY`。
+
+**投遞前 redact**：上報檔會寫入軍師 repo（可能公開），內文與貼入的日誌／設定片段務必移除敏感資訊——API key、密碼、token／憑證、個資（PII）；需要時以佔位符代替，不要貼原值。
 
 ### 步驟 10：產生上報檔
 
