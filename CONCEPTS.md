@@ -24,6 +24,9 @@
 ### 角色說明
 子專案在某軍師中的整句職責描述，display-only：只落於軍師關聯專案表的說明欄，不進註冊表、不參與任何比對。與角色代碼刻意分離，避免單一欄位同時擔任「機器比對鍵」與「人看的描述」兩個相互衝突的職責（見 [ADR 007](docs/adr/2026-07-08-adr-candidate-007-role-code-description-separation.md)）。
 
+### 規劃前既有盤點
+軍師產出方案前的具名前置步驟：檢索自家歷史與子專案文件，確認「既有能力、做過沒、結果如何」後才開始規劃；檢索優先序為 handoffs（含回覆與 archive）→ plans → 子專案文件 → 跨 repo solutions，命中的既有能力須作為方案基礎或述明不採用的理由。檢索工具（kb／zoekt）為軟依賴，不可用時降級為手動查閱、不阻斷派發（見 [需求文件](docs/brainstorms/2026-07-24-kunsu-pre-planning-inventory-requirements.md)）。
+
 ## 信箱協作
 
 ### 例外授權信箱
