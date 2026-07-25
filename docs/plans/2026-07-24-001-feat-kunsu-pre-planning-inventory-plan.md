@@ -1,7 +1,7 @@
 ---
 title: "feat: 軍師規劃前既有盤點與 kb 檢索接線（核心＋kb playbook）"
 type: feat
-status: active
+status: completed
 date: 2026-07-24
 origin: docs/brainstorms/2026-07-24-kunsu-pre-planning-inventory-requirements.md
 ---
@@ -117,7 +117,7 @@ flowchart TB
 
 - **Goal**：任何 session 可從 kb SKILL.md 直接取得檢索軍師歷史與跨 repo 教訓的 query 模板。
 - **Requirements**：R5、R6。
-- **Dependencies**：U2（措辭對齊範本定稿）。
+- **Dependencies**：U1（三軍師入索引，handoffs 查詢方能命中）、U2（措辭對齊範本定稿）。
 - **Files**（tshehtu repo）：`skill/kb/SKILL.md`（symlink 部署，改 repo 即生效）。
 - **Approach**：查詢 playbook 新增「搜歷史／搜教訓」小節——query 模板（`f:docs/handoffs/`、`f:docs/plans/`、`f:docs/solutions/` 各搭關鍵字；frontmatter 過濾如 `problem_type:`、`tags:`、`status:`）、兩層檢索慣例（預設查頂層熱區、需要時以 archive 路徑翻冷區）、引用格式（repo 名＋路徑、標明他 repo 情境）；回報沿用既有「附索引新鮮度＋已索引範圍邊界」慣例（該段已存在，交叉引用即可）。附帶：於 tshehtu 以 `/todo` 記兩筆既有缺陷（`project-dir` 缺失、discovery 未入排程）。
 - **Patterns to follow**：kb SKILL.md 既有 playbook 三段的結構與口吻（指令＋解碼範例＋注意事項）。

@@ -71,6 +71,8 @@ install.sh             → 部署至 ~/.claude/skills/（預設 copy、--link �
 | [docs/plans/2026-07-11-001-feat-kunsu-dashboard-plan.md](docs/plans/2026-07-11-001-feat-kunsu-dashboard-plan.md) | 軍師沙盤（kunsu dashboard）實作計畫（R1–R10、六個實作單元，已執行完畢） |
 | [docs/plans/2026-07-12-001-feat-reply-verify-field-plan.md](docs/plans/2026-07-12-001-feat-reply-verify-field-plan.md) | 回覆驗收方式欄位（verify）與沙盤「部分完成」子分類實作計畫（U0–U7，已執行完畢） |
 | [docs/plans/2026-07-12-002-feat-remove-project-subcommand-plan.md](docs/plans/2026-07-12-002-feat-remove-project-subcommand-plan.md) | remove-project 子指令實作計畫（R1–R16、六個實作單元） |
+| [docs/brainstorms/2026-07-24-kunsu-pre-planning-inventory-requirements.md](docs/brainstorms/2026-07-24-kunsu-pre-planning-inventory-requirements.md) | 軍師規劃前既有盤點與 kb 檢索接線需求 |
+| [docs/plans/2026-07-24-001-feat-kunsu-pre-planning-inventory-plan.md](docs/plans/2026-07-24-001-feat-kunsu-pre-planning-inventory-plan.md) | 規劃前既有盤點實作計畫（核心＋kb playbook、六個實作單元，已執行完畢） |
 
 ## 開發狀態
 
@@ -105,6 +107,8 @@ install.sh             → 部署至 ~/.claude/skills/（預設 copy、--link �
 
 - **handoff done 來源 todo 查核與一併收尾，`/todo` 0.1.2 既有缺陷修正**（2026-07-19）：源自實際使用回饋——todo 升級成交接、交接完成且驗收後，常忘記把 todo 一併收尾，todo 停留「未處理」使沙盤待辦計數失真；根因是 todo 與 handoff 間無結構性連結、done 步驟無一回頭檢查來源 todo。經 `/ce-brainstorm`（中途自「frontmatter 加 handoff 欄位」的結構性方案自我修正為「done 時雙向發現」，todo 檔案格式零改動、零遷移）→ `/ce-plan` 定案：handoff（v0.8.0）done 於逐項驗收查核後新增步驟 3「來源 todo 查核」——掃描本 repo `docs/todos/` 頂層、以具體檔名雙向比對（todo 內文含交接檔名或交接本體含 todo 檔名）、AskUserQuestion 複選確認（>4 筆退化為對話數字清單；取消／零選／非互動一律不動 todo 續行收尾；無命中僅一行提示含筆數、無檔案靜默）——與步驟 4「todo 收尾執行」——非終態者 Edit status 改「已解決」＋解決依據自動填交接預期歸檔路徑，已解決／已封存孤兒僅補歸檔保留終態語意，untracked 先 `git add`，單筆失敗中止剩餘不回滾；原步驟 3–7 順移為 5–9，連續執行約束改涵蓋步驟 4–7，步驟 8 連結修正與步驟 9 協議 commit 的 `git add` 範圍擴及 todo 歸檔路徑（`git mv` 不暫存 Edit 內容的陷阱四防護），commit 訊息含 todo 時附「；一併收尾 todo <slug>」註記（ADR 009 `docs:` 前綴與主體不變）。`/todo`（0.1.2）同批修正兩個併入前既有缺陷：done／rm 補 untracked 前置檢查（很可能是 ivm「已解決但未歸檔」異常成因）、`new-todo.sh` slug 以 `\001` 佔位保護連字號與底線再清標點（原順序 `[:punct:]` 會把分隔符一併清除；順帶修正底線分隔喪失）。kunsu-inbox 依賴聲明同步 v0.8.0（todo 歸檔不在其掃描範圍、無豁免需求）；CONCEPTS「done 收尾」詞條同步。計畫經 3-persona headless doc review（coherence 抓出 R6 與終態保護矛盾、feasibility 抓出「僅調換順序仍會清掉既有連字號」的 U3 正確性缺陷）。暫存目錄 dogfooding 20 項斷言全過（含 porcelain `RM`／`A` 兩種前置狀態形狀、孤兒零 diff、中文檔名 quotepath 陷阱）＋ slug 六案例；137 項 pytest 通過（沙盤零改動）。
 
+- **軍師規劃前既有盤點與 kb 檢索接線**（2026-07-25）：源自實證案例——ebook 軍師處理「已購書籍排序」時漏查自家歷史（既有快取能力記錄於過往 plan／handoff），過度規劃至使用者人工介入才收斂；經 `/idea` 三點子 → `/ce-brainstorm`（框架反轉：主軸自「跨 repo solutions 檢索」重定位為「軍師漏查自家歷史」，handoff 回覆為最可靠的「做了沒＋結果」一手紀錄）→ `/ce-plan` 定案首發範圍為核心＋kb playbook。軍師範本工作流程步驟 2 新增「規劃前既有盤點」子步驟——以 `/kb`（zoekt）依「自家 handoffs（含 replies／archive）→ plans → 子專案文件」優先序檢索既有能力與結論，plans 命中以對應 handoff 回覆核對有效性、索引僅含已 commit 內容提醒、kb 軟依賴（服務未回應降級手動查閱不阻斷）、命中須為方案基礎或述明不採用理由；步驟 5 須包含清單加「相關既有教訓（選附，repo 名＋路徑）」。ebook／ivm／px 三 live 軍師同步遷移（ebook 客製子分類逐句保留，grep 恰中一次正反核查，各一筆確認 commit）；tshehtu kb skill 新增「搜教訓／搜歷史」playbook 段（query 模板逐條實跑命中、archive 冷區兩層檢索、引用格式，symlink 部署即時生效），並於該 repo 記兩筆既有缺陷 todo（`~/.tshehtu/project-dir` 缺失、discovery 未入排程——後者正是三軍師搬家至 `kunsu-project-root/` 後索引殘留舊路徑的成因，本輪手動重跑 discovery＋rebuild 收斂，三軍師 handoffs／plans 全數入索引）。headless doc review（coherence＋feasibility）3 筆修正全數套用；dogfooding AE1（「已購 快取」一查命中過度規劃→收斂全鏈歷史紀錄）＋AE2（bootout 服務後降級手動查閱不中斷、bootstrap 復原）通過。跨 repo solutions 檢索外環依計畫延後（[實作計畫](docs/plans/2026-07-24-001-feat-kunsu-pre-planning-inventory-plan.md)）。
+
 ### 尚未實作／後續評估
 - ADR 008 open questions 留待用量評估——歸檔 `status` 值域升級（現為單一 `archived`）、「軍師已讀」輕量標記、上報量成長後的整理慣例。
 - applications 的 HOME dataview 補齊、add-project reports 遷移不含 HOME dataview 附加（已知落差，見實作計畫 Scope Boundaries）。
@@ -113,6 +117,8 @@ install.sh             → 部署至 ~/.claude/skills/（預設 copy、--link �
 - 角色改名的追溯修復工具化（ADR 002 Deferred／[ADR 007](docs/adr/2026-07-08-adr-candidate-007-role-code-description-separation.md) Open Questions；代碼穩定＋Decision 7 唯一性可減少非必要改名，但自動批次修復仍缺，現行為 add-project 警告掃描）。
 - add-project 內建「整句 `roles` → 代碼」自動遷移偵測（ADR 007 Open Questions；本次已手動遷 ivm 三筆＋ebook-store-nginx，工具內建供其他既有軍師升級待評估）。
 - 角色說明欄留空時關聯專案表的呈現規格（ADR 007 Open Questions；顯示「無說明」佔位 vs 留空欄，待範本落地時定）。
+- 跨 repo solutions 檢索外環（全域 CLAUDE.md 慣例薄段＋ce-learnings-researcher 間接觸及）——等跨 repo 檢索實痛出現再做，落點建議全域 CLAUDE.md 直加（2026-07-24 計畫 Scope Boundaries）。
+- 範本超前漂移待另案同步：範本步驟 5「下筆交接前先確認議題已想透」grilling 文字三 live 軍師皆缺；kunsu-init SKILL.md 三處「工作流程六步驟」實為七步（2026-07-25 doc review residual）。
 
 ### 相關資產（唯讀參考）
 

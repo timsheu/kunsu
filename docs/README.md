@@ -25,6 +25,7 @@ kunsu 專案的文件集合。專案定位與核心規範見上層 [CLAUDE.md](.
 - **協議 commit 逐次確認制（2026-07-10）**：ADR 009 落地——流程尾端 commit 升格為 AskUserQuestion 確認制（handoff v0.4.0、kunsu-init v0.2.0、kunsu-inbox v0.3.0），投遞端不對稱維持；`scan-replies.sh` 補 done 授權歸檔豁免（雙側核驗三形狀、RM 陷阱實測修正）；範本與 ivm／ebook 兩軍師 live 遷移；fixture 十四場景＋e2e dogfooding 九場景全過（[實作計畫](plans/2026-07-09-001-feat-protocol-commit-confirmation-plan.md)）。
 - **remove-project 子指令（2026-07-12）**：`kunsu-init` 新增 `remove-project` 子指令（v0.2.0 → v0.3.0），對稱 `add-project`，整筆移除子專案在本軍師的登記；新增 `registry-remove.sh`（獨立 exit code 區分冪等略過與成功移除）、清單失效感知選取、移除前未完成交接警告、雙階段不可逆確認、CLAUDE.md 先於 registry 的寫入順序設計。經 `/ce-brainstorm` → `/ce-plan`（4-persona doc-review）完整流程定案（ADR 012 accepted，[實作計畫](plans/2026-07-12-002-feat-remove-project-subcommand-plan.md)）。
 - **軍師沙盤新增 todo 列表顯示，`/todo` skill 併入 toolkit（2026-07-17）**：全域 `/todo` skill（v0.1.1）逐字併入 `skills/todo/`（比照 ADR 003 handoff 先例），`install.sh` 與 CLAUDE.md 同步；軍師沙盤新增 `app/todo_status.py` 唯讀彙整軍師自己 `docs/todos/` 未歸檔技術債（兩桶計數＋三層顯示樣式，比照 ADR 011 verify 欄位模式，severity 排序＋archive 計數），`main.py` 新增「待辦技術債」卡片與全域總覽整合。經 `/ce-brainstorm` → `/ce-plan` 完整流程定案（ADR 013 accepted），計畫期 doc-review 與 `ce-simplify-code` 各修正正確性缺陷，8-agent Tier 2 code review 修正 status 欄位 falsy 值誤判，並發現 `/todo` skill 併入前既有的 `git mv` 缺 `git add`、slug 產生順序兩個缺陷（零行為變更決策下留待後續版號修正）。137 項 pytest 通過（自 111 項增至 137）。
+- **軍師規劃前既有盤點與 kb 檢索接線（2026-07-25）**：軍師範本工作流程步驟 2 新增「規劃前既有盤點」子步驟（以 `/kb`／zoekt 依 handoffs→plans→子專案文件優先序檢索既有能力與結論，kb 軟依賴降級不阻斷）、步驟 5 加「相關既有教訓（選附）」；ebook／ivm／px 三 live 軍師同步遷移，tshehtu kb skill 補「搜教訓／搜歷史」playbook 並記兩筆既有缺陷 todo；dogfooding AE1／AE2 通過（[實作計畫](plans/2026-07-24-001-feat-kunsu-pre-planning-inventory-plan.md)）。
 - **下一步**：於真實專案群首輪使用 `/kunsu-init` 建立軍師（如 ebook 中心加入 iOS 時的 add-project 案例），累積手感後評估 SessionStart hook（ADR 002 第二階段）。
 
 ## 文件清單
@@ -54,3 +55,5 @@ kunsu 專案的文件集合。專案定位與核心規範見上層 [CLAUDE.md](.
 | [plans/2026-07-12-002-feat-remove-project-subcommand-plan.md](plans/2026-07-12-002-feat-remove-project-subcommand-plan.md) | 實作計畫：remove-project 子指令與 registry-remove.sh（R1–R16、六個實作單元） |
 | [brainstorms/2026-07-17-dashboard-todo-list-requirements.md](brainstorms/2026-07-17-dashboard-todo-list-requirements.md) | 需求：軍師沙盤 todo 列表顯示與 `/todo` skill 併入 |
 | [plans/2026-07-17-001-feat-dashboard-todo-list-plan.md](plans/2026-07-17-001-feat-dashboard-todo-list-plan.md) | 實作計畫：軍師沙盤 todo 列表顯示與 `/todo` skill 併入（R1–R9、七個實作單元，已執行完畢） |
+| [brainstorms/2026-07-24-kunsu-pre-planning-inventory-requirements.md](brainstorms/2026-07-24-kunsu-pre-planning-inventory-requirements.md) | 需求：軍師規劃前既有盤點與 kb 檢索接線（主從反轉、檢索優先序、軟依賴降級） |
+| [plans/2026-07-24-001-feat-kunsu-pre-planning-inventory-plan.md](plans/2026-07-24-001-feat-kunsu-pre-planning-inventory-plan.md) | 實作計畫：規劃前既有盤點（核心＋kb playbook、六個實作單元，已執行完畢） |
