@@ -310,7 +310,7 @@ Edit 與 git mv 之間，頂層 ` M` 中間態亦會觸發，續行完成歸檔�
 
 ## 依賴聲明
 
-本 skill 依賴同 toolkit 內建的 `/handoff` skill（v0.8.0，原始碼位於本 repo `skills/handoff/`）所定義的下列慣例。兩者共同發版、慣例定義以本 repo 為準；更新 handoff 的以下行為時需同步核查本 skill：
+本 skill 依賴同 toolkit 內建的 `/handoff` skill（v0.9.0，原始碼位於本 repo `skills/handoff/`）所定義的下列慣例。兩者共同發版、慣例定義以本 repo 為準；更新 handoff 的以下行為時需同步核查本 skill：
 
 | 項目 | 慣例 |
 |------|------|
