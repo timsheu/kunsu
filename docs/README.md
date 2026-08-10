@@ -9,6 +9,8 @@ kunsu 專案的文件集合。專案定位與核心規範見上層 [CLAUDE.md](.
 | `brainstorms/` | 需求與構想 | `/ce-brainstorm`（種子文件為手工彙整） |
 | `plans/` | 實作計畫 | `/ce-plan` |
 | `adr/` | 架構決策紀錄與候選 | 先產出 Candidate，審定後正式化 |
+| `solutions/` | 可重用學習與解法 | `/ce-compound` |
+| `playbooks/` | 操作教學（端到端工作流程、軍師沙盤導覽） | 手工維護 |
 
 ## 目前狀態
 
@@ -57,3 +59,5 @@ kunsu 專案的文件集合。專案定位與核心規範見上層 [CLAUDE.md](.
 | [plans/2026-07-17-001-feat-dashboard-todo-list-plan.md](plans/2026-07-17-001-feat-dashboard-todo-list-plan.md) | 實作計畫：軍師沙盤 todo 列表顯示與 `/todo` skill 併入（R1–R9、七個實作單元，已執行完畢） |
 | [brainstorms/2026-07-24-kunsu-pre-planning-inventory-requirements.md](brainstorms/2026-07-24-kunsu-pre-planning-inventory-requirements.md) | 需求：軍師規劃前既有盤點與 kb 檢索接線（主從反轉、檢索優先序、軟依賴降級） |
 | [plans/2026-07-24-001-feat-kunsu-pre-planning-inventory-plan.md](plans/2026-07-24-001-feat-kunsu-pre-planning-inventory-plan.md) | 實作計畫：規劃前既有盤點（核心＋kb playbook、六個實作單元，已執行完畢） |
+| [playbooks/end-to-end-workflow.md](playbooks/end-to-end-workflow.md) | 操作教學：從建立軍師到一輪交接完成收尾的完整工作流程（自 README 拆出，操作教學唯一落點） |
+| [playbooks/dashboard.md](playbooks/dashboard.md) | 操作教學：軍師沙盤安裝、啟動與頁面導覽（自 README 拆出） |

@@ -2,7 +2,7 @@
 
 **這不是一個 Claude Code skill（不透過 `/kunsu-dashboard` 或任何觸發語啟動）。** 這是一個獨立的本機 FastAPI 服務，只是借用 `skills/` 目錄的部署慣例（隨 `install.sh` 一併複製或 symlink），執行時完全不經過 Claude Code session。設計理由與例外條件見 [ADR 010](../../docs/adr/2026-07-11-adr-candidate-010-dashboard-service-exception.md)。
 
-**軍師沙盤（kunsu dashboard）**——如統帥推演戰局的沙盤，一頁彙整全域反向註冊表 `~/.claude/kunsu-registry.json` 裡所有軍師與子專案的 kunsu 訊息狀態（未接手／部分完成／已回覆待確認交接、新回覆、新申請、新上報，含回覆 `verify` 驗收標籤，見 ADR 011），取代逐一切換 CLI 視窗手動執行 `/kunsu-inbox` 的做法。刷新瀏覽器頁面即觸發全新掃描，不跑背景服務。
+**軍師沙盤（kunsu dashboard）**——如統帥推演戰局的沙盤，一頁彙整全域反向註冊表 `~/.claude/kunsu-registry.json` 裡所有軍師與子專案的 kunsu 訊息狀態（未接手／部分完成／已回覆待確認交接、新回覆、新申請、新上報，含回覆 `verify` 驗收標籤，見 ADR 011），取代逐一切換 CLI 視窗手動執行 `/kunsu-inbox` 的做法。重新整理瀏覽器頁面即觸發全新掃描，不跑背景服務。
 
 ---
 
@@ -34,7 +34,7 @@ python3 app/main.py --port 8000
 
 兩種方式都是使用者自己觸發，沒有背景常駐或開機自動啟動機制（見 [ADR 010](../../docs/adr/2026-07-11-adr-candidate-010-dashboard-service-exception.md) Decision 第 1 項第 3 條）。伺服器綁定 `127.0.0.1:8000`（port 可自訂），只服務本機、單一使用者。開啟瀏覽器造訪 `http://127.0.0.1:8000/`。
 
-**刷新瀏覽器頁面即重新掃描全部已登記的軍師與子專案**——不需要重啟伺服器。伺服器本身不會自動刷新、不跑背景排程；關閉終端機視窗即停止服務，下次要用再手動啟動一次。
+**重新整理瀏覽器頁面即重新掃描全部已登記的軍師與子專案**——不需要重啟伺服器。伺服器本身不會自動重新掃描、不跑背景排程；關閉終端機視窗即停止服務，下次要用再手動啟動一次。
 
 ## 停止
 

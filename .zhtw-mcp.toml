@@ -1,0 +1,21 @@
+# zhtw-mcp 專案設定：本 repo 的已知誤殺詞清單（2026-08-09 實測建立）
+# 注意：ignore_terms 目前僅 MCP 呼叫路徑支援（作為 tool 參數，將命中降為 Info），
+# CLI 的 lint 尚未實作此欄位——CLI 端請改用 baseline 機制：
+#   zhtw-mcp lint <檔案> --baseline .zhtw-baseline.json          # 只報新增問題
+#   zhtw-mcp lint <檔案> --baseline .zhtw-baseline.json --update-baseline  # 重新凍結
+# 本清單同時是給 AI session 的參考：檢查本 repo 文件時，以下詞的命中一律視為誤殺。
+# 語彙規則是脈絡盲的，以下詞在本 repo 屬正當用法；新增時附一行原因。
+
+ignore_terms = [
+  "變量",   # 子字串誤殺：「不變量」（invariant）為正確術語
+  "文檔",   # 子字串誤殺：「中文檔名」＝中文＋檔名
+  "全局",   # 「掌握全局」為大局慣用語，非 CS 的 global
+  "一次性", # 「一次性攤開」＝一口氣，非拋棄式
+  "通過",   # 「pytest 通過」「review 通過」＝ pass，非「藉由」
+  "協議",   # 「回覆信箱協議」為本 repo 領域詞（雙方約定，非網路協定）
+  "查看",   # 台灣日常用語，repo 慣用（「查看信箱」）
+  "當前",   # repo 既有慣用（「當前 repo」「當前位置標記」）
+  "依賴",   # 「軟依賴」為 repo 既有領域詞
+  "異常",   # 沙盤「異常」計數指 anomaly 狀態，非 exception
+  "客戶端", # 軟體語境正當用法（speak-human-tw 在地化表亦允許）
+]

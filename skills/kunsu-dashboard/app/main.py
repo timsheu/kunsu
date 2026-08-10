@@ -187,7 +187,7 @@ def _page(body: str) -> str:
         '<h1>軍師沙盤（kunsu dashboard）</h1>'
         f'{body}'
         '<p style="color:#aaa;font-size:.8em;margin-top:3em">'
-        '刷新瀏覽器頁面觸發全新掃描。</p>'
+        '重新整理瀏覽器頁面觸發全新掃描。</p>'
         '</body></html>'
     )
 
