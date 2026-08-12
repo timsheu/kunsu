@@ -22,8 +22,8 @@ docs/
   solutions/           → 可重用學習與解法（/ce-compound 產出，YAML frontmatter 依 module/tags/problem_type 可搜尋）
   playbooks/           → 操作教學（端到端工作流程、軍師沙盤導覽；手工維護，自 README 拆出的教學唯一落點）
 skills/                → skill 原始碼
-  handoff/             → 通用交接原語（v0.9.0，2026-07-06 自部署目錄併入，見 ADR 003）
-    SKILL.md           → add／reply／list／done 子指令（reply 含 kunsu 語境分支、verify 驗收方式選填欄位、逐項回答附證據指引與暫離回報最小 partial 回覆；done 含收尾口語觸發、發起方守門、歸檔前逐項驗收查核與來源 todo 查核一併收尾；add／done／本地 reply 尾端確認 commit）
+  handoff/             → 通用交接原語（v0.10.0，2026-07-06 自部署目錄併入，見 ADR 003）
+    SKILL.md           → add／reply／list／done 子指令（reply 含 kunsu 語境分支、verify 驗收方式選填欄位、逐項回答附證據指引與暫離回報最小 partial 回覆；done 含收尾口語觸發、發起方守門、歸檔前逐項驗收查核、沉澱訊號查核與來源 todo 查核一併收尾；add／done／本地 reply 尾端確認 commit）
     scripts/           → new-handoff.sh、new-handoff-reply.sh
   todo/                → CE 副作用 TODO 清單管理原語（v0.1.2，2026-07-17 自部署目錄併入，見 ADR 013）
     SKILL.md           → add／list／done／rm 子指令，管理 docs/todos/ 一檔一項技術債（done／rm 含 untracked 前置檢查）
@@ -76,6 +76,8 @@ install.sh             → 部署至 ~/.claude/skills/（預設 copy、--link �
 | [docs/plans/2026-07-12-002-feat-remove-project-subcommand-plan.md](docs/plans/2026-07-12-002-feat-remove-project-subcommand-plan.md) | remove-project 子指令實作計畫（R1–R16、六個實作單元） |
 | [docs/brainstorms/2026-07-24-kunsu-pre-planning-inventory-requirements.md](docs/brainstorms/2026-07-24-kunsu-pre-planning-inventory-requirements.md) | 軍師規劃前既有盤點與 kb 檢索接線需求 |
 | [docs/plans/2026-07-24-001-feat-kunsu-pre-planning-inventory-plan.md](docs/plans/2026-07-24-001-feat-kunsu-pre-planning-inventory-plan.md) | 規劃前既有盤點實作計畫（核心＋kb playbook、六個實作單元，已執行完畢） |
+| [docs/brainstorms/2026-08-12-handoff-done-compound-prompt-requirements.md](docs/brainstorms/2026-08-12-handoff-done-compound-prompt-requirements.md) | handoff done 收尾沉澱訊號查核需求（R1–R7、AE 三例） |
+| [docs/plans/2026-08-12-001-feat-handoff-done-compound-prompt-plan.md](docs/plans/2026-08-12-001-feat-handoff-done-compound-prompt-plan.md) | 沉澱訊號查核實作計畫（三個實作單元，已執行完畢） |
 
 ## 開發狀態
 
@@ -113,6 +115,8 @@ install.sh             → 部署至 ~/.claude/skills/（預設 copy、--link �
 - **軍師規劃前既有盤點與 kb 檢索接線**（2026-07-25）：源自實證案例——ebook 軍師處理「已購書籍排序」時漏查自家歷史（既有快取能力記錄於過往 plan／handoff），過度規劃至使用者人工介入才收斂；經 `/idea` 三點子 → `/ce-brainstorm`（框架反轉：主軸自「跨 repo solutions 檢索」重定位為「軍師漏查自家歷史」，handoff 回覆為最可靠的「做了沒＋結果」一手紀錄）→ `/ce-plan` 定案首發範圍為核心＋kb playbook。軍師範本工作流程步驟 2 新增「規劃前既有盤點」子步驟——以 `/kb`（zoekt）依「自家 handoffs（含 replies／archive）→ plans → 子專案文件」優先序檢索既有能力與結論，plans 命中以對應 handoff 回覆核對有效性、索引僅含已 commit 內容提醒、kb 軟依賴（服務未回應降級手動查閱不阻斷）、命中須為方案基礎或述明不採用理由；步驟 5 須包含清單加「相關既有教訓（選附，repo 名＋路徑）」。ebook／ivm／px 三 live 軍師同步遷移（ebook 客製子分類逐句保留，grep 恰中一次正反核查，各一筆確認 commit）；tshehtu kb skill 新增「搜教訓／搜歷史」playbook 段（query 範本逐條實跑命中、archive 冷區兩層檢索、引用格式，symlink 部署即時生效），並於該 repo 記兩筆既有缺陷 todo（`~/.tshehtu/project-dir` 缺失、discovery 未入排程——後者正是三軍師搬家至 `kunsu-project-root/` 後索引殘留舊路徑的成因，本輪手動重跑 discovery＋rebuild 收斂，三軍師 handoffs／plans 全數入索引）。headless doc review（coherence＋feasibility）3 筆修正全數套用；dogfooding AE1（「已購 快取」一查命中過度規劃→收斂全鏈歷史紀錄）＋AE2（bootout 服務後降級手動查閱不中斷、bootstrap 復原）通過。跨 repo solutions 檢索外環依計畫延後（[實作計畫](docs/plans/2026-07-24-001-feat-kunsu-pre-planning-inventory-plan.md)）。
 
 - **handoff 暫離回報慣例**（handoff v0.9.0，2026-07-26）：源自實際使用回饋——交接工作已做完、成果先 commit 進 git branch（未合併），接手方臨時插入緊急需求切走且尚未回覆軍師，軍師沙盤將該交接誤判為「未接手」；機制正確、訊號缺席（協議唯一狀態源是回覆檔），且事發語句「把做好的部份先移到新的 branch」無任何交接語彙，單靠觸發詞攔不住。經 `/ce-brainstorm`（status 定調固定 `partial`——合併上線等剩餘步驟仍在接手方手上，避免發起方誤啟收尾；branch 名以點開回覆內文可見為準，不加 frontmatter 欄位）→ `/ce-plan` 三單元執行：reply 段新增「暫離回報」子節（最小內文三要素——branch 名、一句現況、回來意向；verify 照常選填且 branch 不入 verify；回歸後照常投遞 `submitted` 完成回覆並顯式複寫 verify）、description 補四個帶交接語境觸發詞（「交接工作先暫停」「暫停這份交接」等，套用 solutions 補詞三步驟教訓——帶語境拒裸詞、負向場景核查）、「回覆方式」定型文字兩副本各加一行暫離提示（產生器 printf 與 SKILL.md 範例段字面一致，順手拉齊兩處既有斷行差異）。`status`／`verify` 值域、四份值域語意副本、沙盤分類邏輯、軍師範本一律零改動，免 live 軍師遷移；kunsu-inbox 依賴聲明同步 v0.9.0（一併收斂 0.8.1 patch 未同步的既有漂移）。需求經 4-persona doc review（4 筆修正全數套用，含「可靠攔截」過度承諾降為條件式陳述、AE1 補「session 已讀交接檔」前置條件），計畫經 3-persona headless review；暫存目錄實跑產檔驗證兩副本逐字一致。CONCEPTS「暫離回報」詞條同步。
+
+- **handoff done 收尾沉澱訊號查核**（handoff v0.10.0，2026-08-12）：源自 Agent Memory 文章（AILogora）五條發想之一（記憶 write 側補強）——教訓沉澱全靠使用者事後想起 `/ce-compound`，實際發生過「規劃時得由使用者親自指示以前已發生過」；live 軍師沉澱率實測極不均（ebook 84 筆歸檔交接對 11 篇非種子 solutions、ivm 41/2、px 16/0）。done 步驟 2 新增「沉澱訊號查核」子項——多份回覆時通讀全部回覆判斷往返軌跡（**新增讀檔範圍**，結論確認仍以最新一份為準；此前提為 doc review feasibility persona 抓出的 P1 修正：原計畫誤稱步驟 2 本來就通讀，實則僅讀最新一份，照字面實作訊號場景必然失敗）、判斷五類訊號（往返翻案、blocked 軌跡、與原規劃落差、多輪往返、經接受的驗收缺口）、字面存在即記下不確定傾向記下；步驟 9 回報附一句候選教訓摘要與 `/ce-compound` 建議（含手動沉澱至 `docs/solutions/` 的 fallback），僅提示不自動執行、無訊號靜默、暫緩收尾不提示——「CE 指令由使用者發起」原則零改動。落點僅 handoff SKILL.md 單一語意副本（依 done 收尾閉環的多副本教訓），軍師範本零改動免三軍師遷移、不新增觸發詞（掛載點依攔截點教訓選在 session 必經路徑，不吃觸發詞覆蓋上限）；kunsu-inbox 依賴聲明同步 v0.10.0（不涉掃描慣例、無豁免需求）、CONCEPTS「done 收尾」詞條同步。經 `/ce-brainstorm`（live 軍師沉澱統計實測查證）→ `/ce-plan` → 2-persona 兩輪 doc review（headless＋互動 walkthrough，共 2 筆修正）；暫存目錄 dogfooding 22 項斷言全過（訊號場景證明先前回覆確實被讀取——摘要含僅存在於第一、二份回覆的內容；乾淨場景零沉澱文字；暫緩場景不提示；無回覆邊界；歸檔全鏈 porcelain `RM` 形狀無回歸）。同批發想的 idea 2（solutions 失效欄位）查證判定不適用（`/ce-compound`／`/ce-compound-refresh` 原生已覆蓋且哲學相反，見 `docs/ideas/`），idea 3（tshehtu memory index）縮減為 kb playbook「彙整模式」補充並已於 tshehtu repo 落地。
 
 ### 尚未實作／後續評估
 - ADR 008 open questions 留待用量評估——歸檔 `status` 值域升級（現為單一 `archived`）、「軍師已讀」輕量標記、上報量成長後的整理慣例。
