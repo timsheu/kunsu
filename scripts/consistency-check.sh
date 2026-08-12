@@ -107,9 +107,9 @@ fi
 # --- G. 已修正漂移防回歸 ---
 g1="$(grep -c '六步驟' skills/kunsu-init/SKILL.md || true)"
 if [[ "${g1}" -eq 0 ]]; then
-  ok "G  kunsu-init 無「六步驟」殘留（工作流程實為七步驟）"
+  ok "G  kunsu-init 無「六步驟」殘留（步驟數以範本為準，引用處已去計數化）"
 else
-  ng "G  kunsu-init 出現「六步驟」${g1} 處（2026-08-12 稽核已修正為七步驟，疑似回歸）"
+  ng "G  kunsu-init 出現「六步驟」${g1} 處（2026-08-12 稽核已去計數化，疑似回歸）"
 fi
 
 # --- H. live 軍師同步抽查（WARN 級）---

@@ -57,7 +57,7 @@
 *Avoid:* handoff（口語可用）
 
 ### done 收尾
-發起方確認接手方回覆無誤後，將交接文件本體 `status` 標記為 `done` 並連同其回覆成對歸檔的具名收尾流程；是「本體不再編輯」原則的唯一例外——發起方對自己文件的生命週期標記，屬授權歸檔、不改內文，單一作者原則不變。僅發起方可執行；接手方勿在回覆檔自標 `done`，自標會使交接從所有掃描面消失、本體卻未歸檔。收尾完成後 `/kunsu-inbox` 與軍師沙盤不再掃描此交接，積壓歸零。handoff v0.8.0 起，收尾流程內建「來源 todo 查核」——以雙向檔名比對找出升級成此交接的 todo，經使用者確認後一併收尾歸檔至 `docs/todos/archive/`，納入同一確認 commit。v0.10.0 起另內建「沉澱訊號查核」——多份回覆時通讀全部回覆（新增讀檔範圍，結論確認仍以最新一份為準），判斷有無值得沉澱的教訓訊號（往返翻案、blocked 軌跡、與原規劃落差、多輪往返、經接受的驗收缺口）；有訊號時收尾回報附一句候選教訓摘要與 `/ce-compound` 建議（或手動沉澱至 `docs/solutions/`），僅提示不自動執行，無訊號靜默。
+發起方確認接手方回覆無誤後，將交接文件本體 `status` 標記為 `done` 並連同其回覆成對歸檔的具名收尾流程；是「本體不再編輯」原則的唯一例外——發起方對自己文件的生命週期標記，屬授權歸檔、不改內文，單一作者原則不變。僅發起方可執行；接手方勿在回覆檔自標 `done`，自標會使交接從所有掃描面消失、本體卻未歸檔。收尾完成後 `/kunsu-inbox` 與軍師沙盤不再掃描此交接，積壓歸零。收尾流程內建的歸檔前回頭查核（逐項驗收查核、沉澱訊號查核、來源 todo 查核）以 handoff SKILL.md done 段為準，此處不重複其細節；各查核的引入脈絡見母體 CLAUDE.md 開發狀態。
 
 ### Tripwire
 彙整信箱內容前的授權範圍核對：確認外部寫入只落在例外授權信箱的允許範圍內，任何範圍外變更視為異常、停下回報而不採信。是授權邊界的執行機制，不是可選的審慎操作。
@@ -69,7 +69,7 @@
 信箱的狀態慣例：未 commit 的信箱檔案視為尚未處理的標記，處理（彙整回覆、審核申請、審閱上報）完成後才 commit；協議流程尾端以確認 commit 收斂此狀態。
 
 ### 確認 commit
-協議流程尾端經 AskUserQuestion 逐次確認後執行的收斂 commit（見 [ADR 009](docs/adr/2026-07-09-adr-candidate-009-protocol-commit-confirmation.md)）：逐次確認即構成「使用者明確要求」，與全域「不主動 commit」規範相容而非牴觸。僅涵蓋軍師側／發起側流程（`/handoff` add／done／本地語境 reply、add-project 審核歸檔、remove-project 移除、上報歸檔第四步）；投遞端（`/kunsu-apply`、`/kunsu-report`、kunsu 語境 reply）維持不 commit——未 commit 即信箱新件訊號。內建防護：僅 add 本流程產出的具體路徑、固定 `docs:` 訊息格式、防空 commit、絕不 push。
+協議流程尾端經 AskUserQuestion 逐次確認後執行的收斂 commit（見 [ADR 009](docs/adr/2026-07-09-adr-candidate-009-protocol-commit-confirmation.md)）：逐次確認即構成「使用者明確要求」，與全域「不主動 commit」規範相容而非牴觸。僅涵蓋軍師側／發起側流程——範圍以各 SKILL 流程尾端明訂的「確認 commit（協議步驟）」為準，不在此重複窮舉；投遞端（`/kunsu-apply`、`/kunsu-report`、kunsu 語境 reply）維持不 commit——未 commit 即信箱新件訊號。內建防護：僅 add 本流程產出的具體路徑、固定 `docs:` 訊息格式、防空 commit、絕不 push。
 
 ## 申請生命週期
 
