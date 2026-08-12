@@ -1,6 +1,6 @@
 ---
 name: handoff
-version: 0.10.0
+version: 0.10.1
 description: |
   把一個需要交給「另一個 session／另一個角色（如後台、前端、DevOps）」研究或
   接手的議題，寫成一份獨立交接文件，落在當前專案的 docs/handoffs/。每份交接一個
@@ -261,7 +261,10 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
 
 1. Read 指定的 `docs/handoffs/<slug>.md`（或使用者給的關鍵字，Glob 找出對應檔案）。
 2. Glob `docs/handoffs/replies/*.md`，篩選 frontmatter `in_reply_to` 等於此交接
-   文件檔名者；若有多份，依 `created` 取最新一份 Read 確認結論。
+   文件檔名者；若有多份，依檔名的 `(日期, 序號)` **數值排序**取最新一份 Read
+   確認結論（同日多份以 `-2`、`-3`… 序號消歧；與 `/kunsu-inbox` 4a 的排序慣例
+   一致，勿以 frontmatter `created` 或整段檔名字串排序——`created` 同日無法
+   消歧、字串排序會把 `-10` 排在 `-2` 前）。
    - 若完全沒有回覆檔案，提醒使用者尚無接手方回覆，確認是否仍要標記完成（例如
      發起方自行確認已完成）。
    - **逐項驗收查核**（歸檔前守門，顯式化缺口、不強制擋下）：把交接本體的

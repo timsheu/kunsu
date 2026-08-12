@@ -1,10 +1,10 @@
 ## 交接文件狀態
 
 ```dataview
-TABLE from AS 來源, to AS 對象, status AS 狀態, date AS 日期
+TABLE from AS 來源, to AS 對象, status AS 狀態, created AS 日期
 FROM "docs/handoffs"
 WHERE status
-SORT date DESC
+SORT created DESC
 ```
 
 ## 使用提醒（軍師附加）

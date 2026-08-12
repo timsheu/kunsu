@@ -22,7 +22,7 @@ docs/
   solutions/           → 可重用學習與解法（/ce-compound 產出，YAML frontmatter 依 module/tags/problem_type 可搜尋）
   playbooks/           → 操作教學（端到端工作流程、軍師沙盤導覽；手工維護，自 README 拆出的教學唯一落點）
 skills/                → skill 原始碼
-  handoff/             → 通用交接原語（v0.10.0，2026-07-06 自部署目錄併入，見 ADR 003）
+  handoff/             → 通用交接原語（v0.10.1，2026-07-06 自部署目錄併入，見 ADR 003）
     SKILL.md           → add／reply／list／done 子指令（reply 含 kunsu 語境分支、verify 驗收方式選填欄位、逐項回答附證據指引與暫離回報最小 partial 回覆；done 含收尾口語觸發、發起方守門、歸檔前逐項驗收查核、沉澱訊號查核與來源 todo 查核一併收尾；add／done／本地 reply 尾端確認 commit）
     scripts/           → new-handoff.sh、new-handoff-reply.sh
   todo/                → CE 副作用 TODO 清單管理原語（v0.1.2，2026-07-17 自部署目錄併入，見 ADR 013）
@@ -118,16 +118,17 @@ install.sh             → 部署至 ~/.claude/skills/（預設 copy、--link �
 
 - **handoff done 收尾沉澱訊號查核**（handoff v0.10.0，2026-08-12）：源自 Agent Memory 文章（AILogora）五條發想之一（記憶 write 側補強）——教訓沉澱全靠使用者事後想起 `/ce-compound`，實際發生過「規劃時得由使用者親自指示以前已發生過」；live 軍師沉澱率實測極不均（ebook 84 筆歸檔交接對 11 篇非種子 solutions、ivm 41/2、px 16/0）。done 步驟 2 新增「沉澱訊號查核」子項——多份回覆時通讀全部回覆判斷往返軌跡（**新增讀檔範圍**，結論確認仍以最新一份為準；此前提為 doc review feasibility persona 抓出的 P1 修正：原計畫誤稱步驟 2 本來就通讀，實則僅讀最新一份，照字面實作訊號場景必然失敗）、判斷五類訊號（往返翻案、blocked 軌跡、與原規劃落差、多輪往返、經接受的驗收缺口）、字面存在即記下不確定傾向記下；步驟 9 回報附一句候選教訓摘要與 `/ce-compound` 建議（含手動沉澱至 `docs/solutions/` 的 fallback），僅提示不自動執行、無訊號靜默、暫緩收尾不提示——「CE 指令由使用者發起」原則零改動。落點僅 handoff SKILL.md 單一語意副本（依 done 收尾閉環的多副本教訓），軍師範本零改動免三軍師遷移、不新增觸發詞（掛載點依攔截點教訓選在 session 必經路徑，不吃觸發詞覆蓋上限）；kunsu-inbox 依賴聲明同步 v0.10.0（不涉掃描慣例、無豁免需求）、CONCEPTS「done 收尾」詞條同步。經 `/ce-brainstorm`（live 軍師沉澱統計實測查證）→ `/ce-plan` → 2-persona 兩輪 doc review（headless＋互動 walkthrough，共 2 筆修正）；暫存目錄 dogfooding 22 項斷言全過（訊號場景證明先前回覆確實被讀取——摘要含僅存在於第一、二份回覆的內容；乾淨場景零沉澱文字；暫緩場景不提示；無回覆邊界；歸檔全鏈 porcelain `RM` 形狀無回歸）。同批發想的 idea 2（solutions 失效欄位）查證判定不適用（`/ce-compound`／`/ce-compound-refresh` 原生已覆蓋且哲學相反，見 `docs/ideas/`），idea 3（tshehtu memory index）縮減為 kb playbook「彙整模式」補充並已於 tshehtu repo 落地。
 
+- **跨功能邏輯連結稽核與 15 筆漂移收斂**（2026-08-12）：源自使用者提問「加了諸多功能後，彼此邏輯是否仍完整連結」。四個唯讀 subagent 各查一軸——ADR 001–013 逐條 vs 實作、CONCEPTS 21 詞條 vs 行為權威來源、三條訊息生命週期全交界（申請／上報／交接鏈）、範本 vs 三 live 軍師 vs skill 三方——主幹全數通過（registry schema 六消費者一致、歸檔形狀與掃描豁免形狀精確對合、三信箱協議與七步驟三方同版），15 筆確認漂移全數修正、1 筆假警報經 grep 實證駁回（兩 agent 同稱 CLAUDE.md 停在 v0.9.0——多 agent 同錯佐證逐筆抽驗必要）。**行為級**：handoff done 取最新回覆改依檔名 `(日期, 序號)` 數值排序（v0.10.1——原依 frontmatter `created` 同日多份無法消歧，為全體系唯一未採該慣例的消費端）；`scan-replies.sh` 對修改／刪除已 commit 回覆由靜默忽略改判 tripwire（kunsu-inbox v0.4.1，憲章與機制對齊，七場景 fixture 迴歸通過）。**協議矛盾級**：範本 kunsu-concepts「交接文件」詞條補 done 唯一例外（2026-07-13 憲章掃蕩漏掉的副本，新軍師不再帶矛盾出生）；ivm 軍師申請信箱協議補 ADR 007 遷移（`proposed_role` 代碼化＋`role_desc` 欄＋語彙，live 間唯一實質分歧收斂）；HOME dataview 交接區塊 `date`→`created`（範本＋三 live，原日期欄恆空）。**文字追述級十筆**：CONCEPTS 四詞條（角色代碼誤納 `in_reply_to`、盤點外環超前、上報四步驟、確認 commit 窮舉補 remove-project）、kunsu-init 四處「六步驟」→七步驟與三信箱列舉（v0.3.1）、ADR 011 排序規格修訂註記（實作已依 2026-07-17 定案演化）、kunsu-apply「自動歸檔」改確認制措辭、範本目錄預建句（＋三 live 同句）、ebook 回覆範例枚舉去寫死、kunsu-inbox schema 註解「角色名稱」正名代碼。
+
 ### 尚未實作／後續評估
 - ADR 008 open questions 留待用量評估——歸檔 `status` 值域升級（現為單一 `archived`）、「軍師已讀」輕量標記、上報量成長後的整理慣例。
 - applications 的 HOME dataview 補齊、add-project reports 遷移不含 HOME dataview 附加（已知落差，見實作計畫 Scope Boundaries）。
 - SessionStart hook（第二階段，待 `/kunsu-inbox` 用出實際手感後再評估，ADR 002 Decision 3）。
-- `/handoff` skill 升版改查註冊表（現已內建於本 repo，施工地點明確；仍為獨立延後決策，ADR 002 Decision 6）。
+- `/handoff` 升版全面改查註冊表（reply 的 kunsu 語境分支已於 v0.3.0 實作查表定位軍師；其餘子指令未查表，維持獨立延後決策，ADR 002 Decision 6）。
 - 角色改名的追溯修復工具化（ADR 002 Deferred／[ADR 007](docs/adr/2026-07-08-adr-candidate-007-role-code-description-separation.md) Open Questions；代碼穩定＋Decision 7 唯一性可減少非必要改名，但自動批次修復仍缺，現行為 add-project 警告掃描）。
 - add-project 內建「整句 `roles` → 代碼」自動遷移偵測（ADR 007 Open Questions；本次已手動遷 ivm 三筆＋ebook-store-nginx，工具內建供其他既有軍師升級待評估）。
 - 角色說明欄留空時關聯專案表的呈現規格（ADR 007 Open Questions；顯示「無說明」佔位 vs 留空欄，待範本落地時定）。
 - 跨 repo solutions 檢索外環（全域 CLAUDE.md 慣例薄段＋ce-learnings-researcher 間接觸及）——等跨 repo 檢索實痛出現再做，落點建議全域 CLAUDE.md 直加（2026-07-24 計畫 Scope Boundaries）。
-- kunsu-init SKILL.md 三處「工作流程六步驟」實為七步（2026-07-25 doc review residual；範本步驟 5 grilling 文字三 live 軍師已於 2026-08-09 同步完畢，該項落差已收斂）。
 
 ### 相關資產（唯讀參考）
 

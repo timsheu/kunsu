@@ -1,10 +1,10 @@
 ---
 name: kunsu-init
-version: 0.3.0
+version: 0.3.1
 description: |
   為多 repo AI 協作場景 scaffold 一個「軍師」（規劃協調中心）：以訪談收集子專案清單，
-  自動查證路徑並讀取技術棧，填入固定不變量（5 條 Invariants、回覆信箱協議與
-  申請信箱協議全文、工作流程六步驟）與參數化內容，建立 Obsidian vault、git 初始化，
+  自動查證路徑並讀取技術棧，填入固定不變量（5 條 Invariants、回覆信箱、申請信箱
+  與上報信箱三協議全文、工作流程七步驟）與參數化內容，建立 Obsidian vault、git 初始化，
   並將各子專案登記至全域反向註冊表 ~/.claude/kunsu-registry.json。
   Use when asked to「建立軍師」「幫我建一個軍師」「立軍師」「新增軍師」
   「建立規劃中心」「init planner」「scaffold 規劃協調中心」
@@ -28,7 +28,7 @@ allowed-tools:
 # kunsu-init — 軍師（規劃協調中心）scaffolding
 
 在一個全新目錄下建立多 repo AI 協作的「軍師」（規劃協調中心）：包含固定 5 條 Invariants、
-回覆信箱協議、工作流程六步驟、CONCEPTS.md、solutions 種子文件、Obsidian vault，
+三信箱協議、工作流程七步驟、CONCEPTS.md、solutions 種子文件、Obsidian vault，
 並以 registry-merge.sh 登記各子專案至全域反向註冊表。
 
 **本 skill 對子專案目錄完全唯讀（只使用 Read／Grep／Glob），絕不在任何子專案目錄下
@@ -105,7 +105,7 @@ test -d "<sub-repo-abs-path>" && echo "ok" || echo "missing"
 
 ## 步驟 ④：產生軍師檔案
 
-> **範本固定段落（5 條 Invariants、回覆信箱協議與申請信箱協議全文、工作流程六步驟）逐字保留，絕不改寫；只替換 `{{...}}` 佔位符。**
+> **範本固定段落（5 條 Invariants、三信箱協議全文、工作流程七步驟）逐字保留，絕不改寫；只替換 `{{...}}` 佔位符。**
 
 ### ④-1 產生 CLAUDE.md
 
@@ -296,7 +296,7 @@ bash "$CLAUDE_SKILL_DIR/scripts/registry-merge.sh" \
 ## 設計備註
 
 - **`$CLAUDE_SKILL_DIR` 定位**：由 Claude Code harness 注入，指向此 skill 目錄（例如部署後為 `~/.claude/skills/kunsu-init/`）；若未注入，以 `Read` 查閱此 SKILL.md 所在路徑後推算。
-- **範本固定段落來源**：抽取自 ebook 專案群規劃中心母本（本機私有路徑，略），含 5 條 Invariants、回覆信箱協議全文（含 cd 陷阱說明、Method 2 備援、tripwire、不對稱授權）、工作流程六步驟。各軍師自持一份，消除對母本路徑的依賴。
+- **範本固定段落來源**：初始抽取自 ebook 專案群規劃中心母本（本機私有路徑，略），現行內容為 5 條 Invariants、三信箱協議全文（含 cd 陷阱說明、Method 2 備援、tripwire、不對稱授權）、工作流程七步驟——抽取後隨 ADR 006／008／009 等於本 repo 持續演進，母本僅為初始來源。各軍師自持一份，消除對母本路徑的依賴。
 - **`registry-merge.sh` 的 python3 依賴**：macOS 系統自帶 python3（Xcode CLT），腳本已在缺失時給出安裝提示。不引入 jq 或其他外部依賴。
 - **為何 git commit 允許**：步驟 ⑥ 的 commit 是新建軍師 repo 的初始 commit，不是對既有 repo 的未授權提交，且需使用者明確確認後才執行。add-project 步驟 ⑩ 的確認 commit 同理——依 ADR 009，逐次確認即為使用者明確要求，允許理由擴為「協議流程尾端對自身產出的收斂 commit」。
 - **Obsidian vault 呼叫既有 skill 的腳本**：直接呼叫 `init-vault.sh` 的固定部分（建立 .obsidian/），HOME.md 由本 skill 產生（含 handoffs dataview 附加），不重複執行 init-obsidian-vault 的完整流程。

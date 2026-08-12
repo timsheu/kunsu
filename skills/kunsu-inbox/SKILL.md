@@ -1,6 +1,6 @@
 ---
 name: kunsu-inbox
-version: 0.4.0
+version: 0.4.1
 description: |
   查詢跨 repo 協作信箱：列出軍師（規劃協調中心）中待接手的交接文件，或回報新抵達的回覆。
   觸發語：/kunsu-inbox、檢查信箱、有沒有待接手的交接、有沒有新的 handoff、
@@ -70,7 +70,7 @@ git rev-parse --show-toplevel
   "<子 repo 絕對路徑>": [
     {
       "kunsu": "<軍師絕對路徑>",
-      "roles": ["<角色名稱>", "..."]
+      "roles": ["<角色代碼>", "..."]
     }
   ]
 }
@@ -310,7 +310,7 @@ Edit 與 git mv 之間，頂層 ` M` 中間態亦會觸發，續行完成歸檔�
 
 ## 依賴聲明
 
-本 skill 依賴同 toolkit 內建的 `/handoff` skill（v0.10.0，原始碼位於本 repo `skills/handoff/`）所定義的下列慣例。兩者共同發版、慣例定義以本 repo 為準；更新 handoff 的以下行為時需同步核查本 skill（v0.10.0 的沉澱訊號查核為 done 流程內部指引，不涉掃描慣例、無豁免需求）：
+本 skill 依賴同 toolkit 內建的 `/handoff` skill（v0.10.1，原始碼位於本 repo `skills/handoff/`）所定義的下列慣例。兩者共同發版、慣例定義以本 repo 為準；更新 handoff 的以下行為時需同步核查本 skill（v0.10.0 的沉澱訊號查核為 done 流程內部指引，不涉掃描慣例、無豁免需求）：
 
 | 項目 | 慣例 |
 |------|------|

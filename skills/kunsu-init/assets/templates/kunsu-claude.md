@@ -24,7 +24,7 @@
 {{PLANNER_STRUCTURE}}
 ```
 
-各子目錄於第一次實際使用對應指令（`/ce-brainstorm`、`/ce-plan`、`/handoff` 等）時才建立，避免預先產生空目錄。
+三信箱目錄（`docs/handoffs/replies/`、`docs/applications/`、`docs/reports/`）由 scaffold 以 `.gitkeep` 預建；其餘子目錄於第一次實際使用對應指令（`/ce-brainstorm`、`/ce-plan` 等）時才建立，避免預先產生空目錄。
 
 ## 工作流程
 

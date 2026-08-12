@@ -18,14 +18,14 @@
 以子專案路徑為鍵、記錄其隸屬軍師與角色代碼的全域檔案；是身分偵測（判斷當前 repo 是子專案或軍師）的唯一基準，不以目錄結構推斷。
 
 ### 角色代碼
-子專案在某軍師中的身分識別碼：短、kebab-case、穩定，是交接文件 `to:` 欄位的唯一比對鍵；必須在軍師關聯專案表代碼欄、註冊表 `roles` 與交接文件 `to:`／`in_reply_to` 三處字面一致，定案權在軍師。回覆信箱 frontmatter 佔位符「角色識別」即指角色代碼。
+子專案在某軍師中的身分識別碼：短、kebab-case、穩定，是交接文件 `to:` 欄位的唯一比對鍵；必須在軍師關聯專案表代碼欄、註冊表 `roles` 與交接文件 `to:` 三處字面一致，定案權在軍師（回覆檔以 `in_reply_to` 承載原交接**檔名**對應回原交接，不直接承載角色代碼）。回覆信箱 frontmatter 佔位符「角色識別」即指角色代碼。
 *Avoid:* 角色字串（舊稱，混同了識別與描述兩職）
 
 ### 角色說明
 子專案在某軍師中的整句職責描述，display-only：只落於軍師關聯專案表的說明欄，不進註冊表、不參與任何比對。與角色代碼刻意分離，避免單一欄位同時擔任「機器比對鍵」與「人看的描述」兩個相互衝突的職責（見 [ADR 007](docs/adr/2026-07-08-adr-candidate-007-role-code-description-separation.md)）。
 
 ### 規劃前既有盤點
-軍師產出方案前的具名前置步驟：檢索自家歷史與子專案文件，確認「既有能力、做過沒、結果如何」後才開始規劃；檢索優先序為 handoffs（含回覆與 archive）→ plans → 子專案文件 → 跨 repo solutions，命中的既有能力須作為方案基礎或述明不採用的理由。檢索工具（kb／zoekt）為軟依賴，不可用時降級為手動查閱、不阻斷派發（見 [需求文件](docs/brainstorms/2026-07-24-kunsu-pre-planning-inventory-requirements.md)）。
+軍師產出方案前的具名前置步驟：檢索自家歷史與子專案文件，確認「既有能力、做過沒、結果如何」後才開始規劃；檢索優先序為 handoffs（含回覆與 archive）→ plans → 子專案文件（跨 repo solutions 檢索為延後外環，落地後再併入優先序），命中的既有能力須作為方案基礎或述明不採用的理由。檢索工具（kb／zoekt）為軟依賴，不可用時降級為手動查閱、不阻斷派發（見 [需求文件](docs/brainstorms/2026-07-24-kunsu-pre-planning-inventory-requirements.md)）。
 
 ## 信箱協作
 
@@ -49,7 +49,7 @@
 子專案投遞「申請加入軍師」的信箱：頂層放待審申請（不可變快照），歸檔區由軍師管理；審核與正式登記只在軍師端發生。
 
 ### 上報信箱
-子專案主動投遞情報的信箱：上報（report）是子專案發起、無對應交接文件的情報，不承諾軍師回覆或執行，不作為反向任務佇列；軍師彙整後手動更新 `status` → `git add` → `git mv` 至 `archive/` 完成歸檔。上報（report）與交接（handoff）、申請（application）並列為三種跨 repo 訊息類型。
+子專案主動投遞情報的信箱：上報（report）是子專案發起、無對應交接文件的情報，不承諾軍師回覆或執行，不作為反向任務佇列；軍師彙整後依四步驟歸檔：更新 `status` → `git add` → `git mv` 至 `archive/` → 確認 commit（第四步依 ADR 009 升格為協議步驟）。上報（report）與交接（handoff）、申請（application）並列為三種跨 repo 訊息類型。
 *Avoid:* 回報信箱（口語「回報」偏 reply，正式定名「上報」）
 
 ### 交接文件
@@ -69,7 +69,7 @@
 信箱的狀態慣例：未 commit 的信箱檔案視為尚未處理的標記，處理（彙整回覆、審核申請、審閱上報）完成後才 commit；協議流程尾端以確認 commit 收斂此狀態。
 
 ### 確認 commit
-協議流程尾端經 AskUserQuestion 逐次確認後執行的收斂 commit（見 [ADR 009](docs/adr/2026-07-09-adr-candidate-009-protocol-commit-confirmation.md)）：逐次確認即構成「使用者明確要求」，與全域「不主動 commit」規範相容而非牴觸。僅涵蓋軍師側／發起側流程（`/handoff` add／done／本地語境 reply、add-project 審核歸檔、上報歸檔第四步）；投遞端（`/kunsu-apply`、`/kunsu-report`、kunsu 語境 reply）維持不 commit——未 commit 即信箱新件訊號。內建防護：僅 add 本流程產出的具體路徑、固定 `docs:` 訊息格式、防空 commit、絕不 push。
+協議流程尾端經 AskUserQuestion 逐次確認後執行的收斂 commit（見 [ADR 009](docs/adr/2026-07-09-adr-candidate-009-protocol-commit-confirmation.md)）：逐次確認即構成「使用者明確要求」，與全域「不主動 commit」規範相容而非牴觸。僅涵蓋軍師側／發起側流程（`/handoff` add／done／本地語境 reply、add-project 審核歸檔、remove-project 移除、上報歸檔第四步）；投遞端（`/kunsu-apply`、`/kunsu-report`、kunsu 語境 reply）維持不 commit——未 commit 即信箱新件訊號。內建防護：僅 add 本流程產出的具體路徑、固定 `docs:` 訊息格式、防空 commit、絕不 push。
 
 ## 申請生命週期
 

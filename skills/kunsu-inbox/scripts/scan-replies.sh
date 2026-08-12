@@ -22,8 +22,10 @@
 #      此分支。此分支必須最先評估：後方 catch-all `docs/handoffs/*` 會匹配
 #      archive/ 下所有路徑，archive 分支必須先行攔截。
 #   2. replies/ 頂層 <名稱>.md（名稱不含 /）：?? 或 index A ＝新回覆；其餘
-#      狀態（修改已 commit 的回覆等）＝靜默忽略（不計新回覆、不觸發 tripwire，
-#      沿舊版行為）。
+#      狀態（修改／刪除已 commit 的回覆）＝tripwire——回覆檔 append-only、
+#      任何人不編輯既有回覆（範本回覆信箱協議明訂），合法搬移僅授權歸檔
+#      rename（形狀 b）且不落入本分支。2026-08-12 起與協議字面對齊，取消
+#      舊版「靜默忽略」取捨。
 #   3. docs/handoffs/ 下的其他路徑（頂層交接檔的新增／修改／刪除、非預期
 #      巢狀、非 .md）＝tripwire。
 #   rename（XY 含 R/C，格式 old -> new）：雙側核驗，僅以下兩形狀視為
@@ -134,8 +136,11 @@ while IFS= read -r line; do
     # replies/ 頂層回覆檔：untracked (??) 或 index 新增（X 為 A，涵蓋 A  與 AM）＝新回覆
     if [[ "$XY" == "??" ]] || [[ "$X" == "A" ]]; then
       echo "NEW_REPLY:$path_part"
+    else
+      # 修改／刪除已 commit 的回覆＝tripwire（append-only 原則之外的形狀）
+      HAS_TRIPWIRE=1
+      echo "TRIPWIRE:$XY $path_part"
     fi
-    # 其他狀態（如修改已 commit 的回覆）— 靜默忽略，不計為新回覆也不觸發 tripwire
   elif [[ "$path_part" == docs/handoffs/* ]]; then
     # tripwire：頂層交接檔的新增／修改／刪除、非預期巢狀或非 .md 路徑
     HAS_TRIPWIRE=1
