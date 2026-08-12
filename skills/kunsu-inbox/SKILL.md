@@ -1,6 +1,6 @@
 ---
 name: kunsu-inbox
-version: 0.4.1
+version: 0.5.0
 description: |
   查詢跨 repo 協作信箱：列出軍師（規劃協調中心）中待接手的交接文件，或回報新抵達的回覆。
   觸發語：/kunsu-inbox、檢查信箱、有沒有待接手的交接、有沒有新的 handoff、
@@ -29,7 +29,7 @@ allowed-tools:
 **以下三條限制不得例外：**
 
 1. **只告知不開工** — `/kunsu-inbox` 只回報信箱狀態，不自動接手任何交接文件、不自動執行任何後續動作。一切動工須使用者明確指示。
-2. **不主動輪詢** — 本 skill 僅在使用者觸發時執行一次，不設定任何定時執行或背景監聽。
+2. **不主動輪詢** — 本 skill 僅在使用者觸發時執行一次，不設定任何定時執行或背景監聽。（SessionStart hook 為使用者自行於 `~/.claude/settings.json` 掛載的**事件驅動**通道——session 啟動是使用者的動作，hook 隨之執行一次同邏輯的確定性掃描，無定時器、無背景監聽，不違反本條；見下方「SessionStart hook」節與 ADR 014。）
 3. **三個信箱是唯讀邊界的唯一例外** — 軍師的 `docs/handoffs/replies/`（接手方建立新回覆檔案）、`docs/applications/` 頂層（子專案以 `/kunsu-apply` 建立新申請檔案）與 `docs/reports/` 頂層（子專案以 `/kunsu-report` 建立新上報檔案）是僅有的三個授權寫入點。軍師其他任何目錄均屬唯讀。
 
 ---
@@ -305,6 +305,50 @@ Edit 與 git mv 之間，頂層 ` M` 中間態亦會觸發，續行完成歸檔�
 2. 步驟 4b 的軍師模式結果
 
 兩段之間加分隔線。
+
+---
+
+## SessionStart hook（第二階段傳令，選用）
+
+ADR 002 Decision 3 預留的「第二階段」（ADR 014 啟用）：`scripts/session_hook.py`
+於 session 啟動事件（startup／resume／`/clear`／compact／fork）自動執行一次與本
+skill 同邏輯的**確定性腳本掃描**（不經 LLM、零 token），把信箱摘要注入開場
+context——長駐 session 按 `/clear` 即攤開信箱，不必再手動觸發本 skill。
+
+- **分類邏輯單一來源**：子專案模式匯入軍師沙盤 `app/subrepo_status.py`（＝本
+  skill 步驟 4a 的 Python 實作），軍師模式匯入 `app/kunsu_scan.py`（＝三支
+  `scan-*.sh` 的包裝）；hook 不自帶任何判斷規則。修改步驟 4a 或掃描腳本時，
+  hook 自然跟隨，無需另行同步。
+- **只告知不開工**：輸出僅含分類摘要（每分類上限 5 筆＋「另有 N 筆」）與提示
+  行，授權邊界三條全數適用。
+- **靜默與降級**：未登記 repo 零輸出；任何錯誤一律 exit 0 不阻斷 session
+  啟動——身分確認前（如註冊表毀損）靜默，身分確認後（如沙盤模組／PyYAML
+  缺失）輸出單行降級提示。
+- **依賴**：軍師沙盤已部署（`install.sh` 一併部署）且其 PyYAML 依賴已安裝
+  （見 kunsu-dashboard SKILL.md）。
+
+**掛載**（機器層級設定，不進任何 git repo）——`~/.claude/settings.json`：
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/skills/kunsu-inbox/scripts/session_hook.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**解除**：自 `~/.claude/settings.json` 移除上述 `SessionStart` 條目即完全停用，
+無其他殘留。
 
 ---
 
