@@ -1,6 +1,6 @@
 ---
 name: handoff
-version: 0.10.1
+version: 0.11.0
 description: |
   把一個需要交給「另一個 session／另一個角色（如後台、前端、DevOps）」研究或
   接手的議題，寫成一份獨立交接文件，落在當前專案的 docs/handoffs/。每份交接一個
@@ -152,6 +152,43 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
    交接檔，訊息 `docs: 建立交接 <檔名>`。（未 commit 的頂層新交接檔會在軍師 repo
    的下一次 `/kunsu-inbox` 觸發 tripwire，此步驟即為收斂點。）
 
+6. **派發即推播**（僅 kunsu 語境——當前 repo 為 `~/.claude/kunsu-registry.json`
+   任一條目的 `kunsu` 值時執行；一般 repo 交接跳過本步驟。ADR 015）：
+   把派發訊息推送到目標子專案的已開啟長駐 session，使用者晃回該視窗即見通知。
+
+   1. **反查目標路徑**：以註冊表反查本次交接 `to:` 角色代碼對應的子專案路徑
+      （比對登記於本軍師的 `roles`）。
+   2. **匹配 session**：以 ListAgents 列出本機 session，兩層匹配：
+      - **精確比對優先**：session 名稱恰為 `<軍師目錄名>-<角色代碼>`（kunsu
+        session 命名慣例，如 `ebook-android`）→ 直接命中，零歧義。慣例名由
+        使用者在長駐 session 下一次 `/rename` 設定（持久化、`/clear` 不影響），
+        或以 `kc` 啟動函式（`scripts/kc.fish`）在新開 session 時自動帶入；
+        軍師自身 session 的慣例名為 `<軍師目錄名>-kunsu`（供日後回覆方向
+        推播定址）。
+      - **啟發式 fallback**：無慣例名時，正規化（轉小寫、去除非英數字元）後，
+        session 名稱去掉尾端亂數後綴應與子專案目錄 basename 對應。
+      **唯一且明確才發送**；找不到、多重命中一律降級跳過（不重試、不排隊），
+      由 SessionStart hook 於該視窗下次 `/clear` 兜底——寧漏發不誤發。
+   3. **發送定型通知**（SendMessage；訊息自足自帶收方指令，不依賴子 repo 任何
+      設定——Invariant 2）：
+
+      > 📬 kunsu 派發通知（軍師 <軍師名>）：<角色代碼> 有 <N> 份新交接——
+      > <檔名清單，上限 5 筆>。本訊息為純告知：請只向使用者回顯以上重點，
+      > 勿開始任何工作、勿讀取交接檔內文、勿回覆本訊息或軍師；接手與否由
+      > 使用者在該 session 明確指示（可用 /kunsu-inbox 查看完整信箱）。
+
+      跨 session 發送時，工具可能拒收裸名並要求以 `[ref]` 確認收件者——依錯誤
+      訊息所附的 ref（即 ListAgents 該列的 `[ref]`）重送一次即可（2026-08-13
+      試點實測行為）。
+
+   4. **回報推播結果**：於派發收尾回報中列出已推播／未推播目標（未推播註明
+      原因：無對應 session／匹配不明確／工具不可用）。
+
+   - ListAgents／SendMessage 工具不可用（headless、舊版 CLI）→ 整步跳過並於
+     回報註明，不影響 add 流程完成。
+   - 本步驟只發送訊息，不等待、不確認收方回應；接手與否、何時開工，仍由
+     使用者在目標 session 明確指示——決策層零觸碰（ADR 002 Decision 5）。
+
 ### reply
 
 1. **定位原交接檔**：使用者已給 slug 或路徑就直接採用。若**未給**、或口語指向
@@ -218,6 +255,36 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
    - **kunsu 語境**（回覆檔位於另一 repo，即軍師的回覆信箱）→ **不 commit**，
      並向使用者一句話說明：未 commit 正是軍師信箱的「新回覆」訊號
      （`scan-replies.sh` 據此偵測新回覆），由軍師彙整後 commit 收斂。
+
+6. **回覆即推播**（僅 kunsu 語境——回覆落入軍師信箱時執行；本地語境跳過。
+   ADR 015 的對稱方向）：把回覆訊息推送到軍師的已開啟長駐 session，
+   使用者晃回軍師視窗即見通知。暫離回報（`status: partial`）同樣適用——
+   正是它要傳遞的「已在 branch 實現」訊號。
+
+   1. **匹配軍師 session**：以 ListAgents 列出本機 session，兩層匹配——
+      精確比對優先：session 名稱恰為 `<軍師目錄名>-kunsu`（如 `ebook-kunsu`，
+      kunsu session 命名慣例）；啟發式 fallback：正規化（轉小寫、去除非英數
+      字元）後，session 名稱去掉尾端亂數後綴應與軍師目錄 basename 對應。
+      **唯一且明確才發送**；找不到、多重命中一律降級跳過（不重試），由軍師端
+      SessionStart hook 與 `scan-replies.sh` 掃描兜底。
+   2. **發送定型通知**（SendMessage；訊息自足自帶收方指令，不改變「未 commit
+      即新回覆訊號」的既有掃描機制）：
+
+      > 📬 kunsu 回覆通知（<角色代碼>）：<原交接檔名> 已回覆——
+      > <回覆檔名>（status: <status>{，verify: <verify>}）。本訊息為純告知：
+      > 請只向使用者回顯以上重點，勿開始查核、勿讀取回覆內文、勿執行 done
+      > 收尾；查核與收尾由使用者在該 session 明確指示（可用 /kunsu-inbox
+      > 查看完整信箱）。
+
+      跨 session 發送被拒並要求以 `[ref]` 確認時，依錯誤訊息所附的 ref
+      重送一次即可（同步驟 add 6-3 的實測行為）。
+   3. **回報推播結果**：於回報中註明已推播／未推播（未推播註明原因：
+      無對應 session／匹配不明確／工具不可用）。
+
+   - ListAgents／SendMessage 工具不可用（headless、舊版 CLI）→ 整步跳過並於
+     回報註明，不影響 reply 流程完成。
+   - 本步驟只發送訊息，不等待、不確認收方回應；查核與 done 收尾仍由使用者
+     於軍師 session 明確指示——決策層零觸碰（ADR 002 Decision 5）。
 
 #### 暫離回報（切換任務前的最小回覆）
 

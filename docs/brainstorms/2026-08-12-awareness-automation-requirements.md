@@ -129,3 +129,25 @@ topic: awareness-automation
 - Phase A 以四種真實情境手動驗證：未登記 repo（無輸出、無感延遲）、子專案 startup、子專案 **`/clear`**（本案關鍵路徑）、軍師（若納入首版）。
 - Phase B 依 R13 以單一子專案試點，逐項記錄推斷一至三的實測結果後再全面啟用。
 - 兩階段皆不引入新服務、新依賴、新常駐程序，無需額外維運驗證。
+
+## Phase A 實作紀錄（2026-08-13）
+
+依本文件動工完成並 commit（`bf06037`）：`session_hook.py`（kunsu-inbox v0.5.0）＋ 12 項 pytest（全套 149 過）＋ [ADR Candidate 014](../adr/2026-08-13-adr-candidate-014-sessionstart-hook-activation.md)（proposed）；六場景部署後實測——未登記 repo 靜默 59ms、子專案空信箱 86ms、有待辦子專案 77ms（partial＋verify 標籤正確）、軍師模式 263ms（新回覆 2）、未接手偵測正確、非 git 目錄靜默。R8 效能目標全數達標。
+
+## Phase B 試點紀錄（2026-08-13，R13）
+
+自本工具 repo 的開發 session 向 eBookApp 長駐 session（`ebookapp-07`，idle 16 小時）發送定型通知（內容為真實待接手交接：xcstrings 佔位符一案），實測結果：
+
+- **發送機制可用**：本機 session 網格可定址，訊息送達成功（收方 idle，於其下一輪處理）。
+- **`[ref]` 確認機制（新發現）**：跨 session 首次以裸名發送被拒，錯誤訊息附上正確 ref，附 ref 重送即成功——已補進 handoff SKILL.md 步驟 6-3。
+- **名稱啟發式驗證**：eBookApp → `ebookapp-07` 正規化前綴唯一命中，與 Open Questions 1 定案的匹配慣例一致。
+- **推斷一（收方僅回顯）**：✅ 已驗證（2026-08-13）——使用者確認軍師端真實派發至 ios-app session 觸發成功、收方行為正常。
+- **推斷二（busy 排隊）**：本輪目標為 idle session 未直接測得；工具文件明載訊息對 busy 收方「enqueue and drain at the receiver's next tool round」，行為有官方定義，風險評為低。
+- **推斷三（軍師 session 具傳訊工具）**：✅ 已驗證（2026-08-13）——與推斷一同一事件：由軍師 session 實發成功，工具可用。
+
+**試點結論：通過（2026-08-13）**。ADR Candidate 015 併同 014 待審定。
+
+## 命名慣例與回覆方向（2026-08-13，試點通過後同日延伸）
+
+- **kunsu session 命名慣例**：查證 settings.json 無命名 key；官方機制為 `/rename`（持久化）與 `claude -n`，且該名稱即 SendMessage 定址名。慣例定為子專案 `<軍師目錄名>-<角色代碼>`（如 `ebook-android`）、軍師 `<軍師目錄名>-kunsu`；handoff 步驟 6-2 升為兩層匹配（慣例名精確比對優先、啟發式 fallback）。新增 `scripts/kc.fish` 啟動函式（依 registry 自動 `-n` 命名，五路徑解析實測正確，已部署 `~/.config/fish/functions/`）。
+- **回覆方向推播（Open Questions 3 的對稱延伸）**：handoff reply 新增步驟 6「回覆即推播」——kunsu 語境回覆（含暫離回報）落入軍師信箱後，以同一套兩層匹配通知軍師 session（慣例名 `<軍師目錄名>-kunsu`）；降級由軍師端 SessionStart hook 與 `scan-replies.sh` 兜底，「未 commit 即新回覆訊號」機制零改動。ADR 015 Decision 6 同日修訂為對稱納入。

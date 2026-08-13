@@ -18,11 +18,11 @@ docs/
   README.md            → 文件中心主索引
   brainstorms/         → 需求（種子：2026-07-06 需求彙整）
   plans/               → 實作計畫（/ce-plan 產出）
-  adr/                 → ADR（001–013 accepted；014 proposed）
+  adr/                 → ADR（001–013 accepted；014–015 proposed）
   solutions/           → 可重用學習與解法（/ce-compound 產出，YAML frontmatter 依 module/tags/problem_type 可搜尋）
   playbooks/           → 操作教學（端到端工作流程、軍師沙盤導覽；手工維護，自 README 拆出的教學唯一落點）
 skills/                → skill 原始碼
-  handoff/             → 通用交接原語（v0.10.1，2026-07-06 自部署目錄併入，見 ADR 003）
+  handoff/             → 通用交接原語（v0.11.0，2026-07-06 自部署目錄併入，見 ADR 003）
     SKILL.md           → add／reply／list／done 子指令（reply 含 kunsu 語境分支、verify 驗收方式選填欄位、逐項回答附證據指引與暫離回報最小 partial 回覆；done 含收尾口語觸發、發起方守門、歸檔前逐項驗收查核、沉澱訊號查核與來源 todo 查核一併收尾；add／done／本地 reply 尾端確認 commit）
     scripts/           → new-handoff.sh、new-handoff-reply.sh
   todo/                → CE 副作用 TODO 清單管理原語（v0.1.2，2026-07-17 自部署目錄併入，見 ADR 013）
@@ -55,6 +55,7 @@ skills/                → skill 原始碼
     requirements.txt   → fastapi／uvicorn[standard]／PyYAML（本專案首次 pip 依賴）
     app/               → registry.py／kunsu_scan.py／subrepo_status.py／todo_status.py／main.py
     tests/             → pytest，137 項測試
+scripts/kc.fish        → kunsu claude 啟動函式（fish autoload；依 registry 自動以命名慣例 `-n` 啟動，部署至 ~/.config/fish/functions/）
 scripts/consistency-check.sh → 跨檔案一致性機械檢查（版號鏈、值域副本、定型文字實跑比對、install 覆蓋、分類詞對映、live 軍師 WARN 級抽查；沉澱自 2026-08-12 邏輯連結稽核）
 install.sh             → 部署至 ~/.claude/skills/（預設 copy、--link 開發模式）
 ```
@@ -67,7 +68,7 @@ install.sh             → 部署至 ~/.claude/skills/（預設 copy、--link �
 | [docs/playbooks/end-to-end-workflow.md](docs/playbooks/end-to-end-workflow.md) | 操作教學：端到端工作流程（README 只留門面摘要） |
 | [docs/playbooks/dashboard.md](docs/playbooks/dashboard.md) | 操作教學：軍師沙盤安裝與頁面導覽 |
 | [docs/brainstorms/2026-07-06-planner-toolkit-requirements.md](docs/brainstorms/2026-07-06-planner-toolkit-requirements.md) | 種子需求：問題定義、ce-team 教訓、母本解剖、方案設計 |
-| [docs/adr/](docs/adr/) | ADR（001–004 於 2026-07-06、005 於 2026-07-07 審定為 accepted；006 申請信箱與 008 上報信箱於 2026-07-09 accepted；007 角色代碼／說明分離於 2026-07-08 accepted；010 kunsu-dashboard 對 Invariant 1 的例外於 2026-07-11 accepted；011 回覆 verify 欄位與分類拆分、012 remove-project 子指令於 2026-07-12 accepted；013 `/todo` skill 併入 toolkit 於 2026-07-17 accepted——001–013 全數 accepted；014 SessionStart hook 第二階段啟用於 2026-08-13 proposed，待審定） |
+| [docs/adr/](docs/adr/) | ADR（001–004 於 2026-07-06、005 於 2026-07-07 審定為 accepted；006 申請信箱與 008 上報信箱於 2026-07-09 accepted；007 角色代碼／說明分離於 2026-07-08 accepted；010 kunsu-dashboard 對 Invariant 1 的例外於 2026-07-11 accepted；011 回覆 verify 欄位與分類拆分、012 remove-project 子指令於 2026-07-12 accepted；013 `/todo` skill 併入 toolkit 於 2026-07-17 accepted——001–013 全數 accepted；014 SessionStart hook 第二階段啟用、015 派發即推播於 2026-08-13 proposed，待審定） |
 | [docs/brainstorms/2026-07-17-dashboard-todo-list-requirements.md](docs/brainstorms/2026-07-17-dashboard-todo-list-requirements.md) | 軍師沙盤 todo 列表顯示需求 |
 | [docs/plans/2026-07-17-001-feat-dashboard-todo-list-plan.md](docs/plans/2026-07-17-001-feat-dashboard-todo-list-plan.md) | 軍師沙盤 todo 列表顯示與 `/todo` skill 併入實作計畫（R1–R9、七個實作單元，已執行完畢） |
 | [docs/plans/2026-07-06-001-feat-planner-toolkit-skills-plan.md](docs/plans/2026-07-06-001-feat-planner-toolkit-skills-plan.md) | 實作計畫（12 條 requirements、7 個實作單元，已執行完畢） |
@@ -126,10 +127,12 @@ install.sh             → 部署至 ~/.claude/skills/（預設 copy、--link �
 
 - **SessionStart hook 第二階段啟用（知悉層自動化 Phase A）**（[ADR 014 candidate](docs/adr/2026-08-13-adr-candidate-014-sessionstart-hook-activation.md)，2026-08-13）：源自使用者實況回饋（[需求文件](docs/brainstorms/2026-08-12-awareness-automation-requirements.md)）——一次派發同時涵蓋 3～4 個子專案、各 session 長駐不關以 `/clear` 清理，逐視窗手動 `/kunsu-inbox` 的輪詢成本全落在使用者身上；官方文件查證 `/clear` 觸發 SessionStart（matcher source 五值）且 stdout 注入清空後 context，hook 與既有習慣直接咬合。新增 `skills/kunsu-inbox/scripts/session_hook.py`（kunsu-inbox v0.5.0）：身分獨立雙判斷（ADR 002 Decision 2，raw registry＋git root 快速比對，不跑全路徑健康檢查以保未登記快退）、子專案模式匯入沙盤 `subrepo_status.py`、軍師模式匯入 `kunsu_scan.py`（分類邏輯零重寫、單一來源）、每分類上限 5 筆＋「另有 N 筆」、created／最新回覆日期升冪陳年件浮頂、stale 軍師路徑失聯警示、fail-open（身分確認前靜默、確認後單行降級，一律 exit 0 不阻斷 session）。SKILL.md 授權邊界第 2 條補「事件驅動非輪詢」明文化（機制先行、憲章同步的既有教訓），新增「SessionStart hook」節含 settings.json 掛載範例與解除說明；掛載為機器層級設定不進 repo。launchd 通知哨兵原案於需求審視階段廢棄（單人拓撲推播只轉述自己觸發的事件＋通知時刻與遺忘時刻錯位）。12 項 pytest（149 全過）、consistency-check 21 項通過。Phase B（派發即推播——軍師 session 派發完成當下向目標子專案長駐 session 發送純告知訊息，落地點以本機 session 網格實測確認存在）待 ADR Candidate 015 對 ADR 002 推播否決翻案後另行動工。
 
+- **派發即推播（知悉層自動化 Phase B）**（[ADR 015 candidate](docs/adr/2026-08-13-adr-candidate-015-dispatch-push-notification.md)，2026-08-13）：對 ADR 002「daemon 輪詢推播」否決的翻案——翻案基礎為事實前提變更（使用者 session 長駐實況＋本機 session 網格實測可定址）與機制變更（非 daemon 輪詢，而是軍師 session 於派發完成當下發送的一次性事件驅動訊息，零輪詢零常駐零狀態檔，Invariant 1 字面合規、無需比照 ADR 010 開例外）。handoff add 新增步驟 6（v0.11.0，僅 kunsu 語境）：registry 反查 `to:` 角色對應子專案 → ListAgents 名稱啟發式匹配（唯一且明確才發送，寧漏發不誤發，降級不重試由 SessionStart hook 兜底）→ SendMessage 定型通知（訊息自足自帶收方指令——僅回顯勿開工勿讀檔，Invariant 2 零觸碰）→ 回報已推播／未推播清單；ListAgents／SendMessage 不可用整步跳過。CONCEPTS「派發即推播」詞條、kunsu-inbox 依賴聲明同步 v0.11.0（不涉掃描慣例）。R13 試點（2026-08-13）：向 eBookApp 長駐 session 實發真實待接手通知成功，實測發現跨 session 裸名發送需依錯誤訊息附 `[ref]` 重送（已補進步驟 6-3）；試點於同日通過（使用者確認軍師 session 實發至 ios-app session 觸發成功、收方僅回顯——推斷一、三同時驗證），**回覆方向同日對稱納入**（ADR 015 Decision 6 修訂）：handoff reply 新增步驟 6「回覆即推播」——kunsu 語境回覆（含暫離回報）落入軍師信箱後，以同一套兩層匹配通知軍師 session（慣例名 `<軍師目錄名>-kunsu`），降級由軍師端 hook 與 `scan-replies.sh` 兜底，「未 commit 即新回覆」訊號零改動。同批確立 **kunsu session 命名慣例**（查證 settings.json 無命名 key；`/rename`／`claude -n` 為官方機制且該名稱即 SendMessage 定址名）：子專案 `<軍師目錄名>-<角色代碼>`、軍師 `<軍師目錄名>-kunsu`，步驟 6-2 升為兩層匹配（慣例名精確比對優先、啟發式 fallback）；新增 `scripts/kc.fish` 啟動函式（fish autoload，依 registry 自動 `-n` 命名，未登記／`--resume` 透傳，五路徑解析實測正確，已部署 ~/.config/fish/functions/）。
+
 ### 尚未實作／後續評估
 - ADR 008 open questions 留待用量評估——歸檔 `status` 值域升級（現為單一 `archived`）、「軍師已讀」輕量標記、上報量成長後的整理慣例。
 - applications 的 HOME dataview 補齊、add-project reports 遷移不含 HOME dataview 附加（已知落差，見實作計畫 Scope Boundaries）。
-- 知悉層自動化 Phase B「派發即推播」（ADR Candidate 015 翻案待提出與審定；名稱啟發式 session 匹配、單一子專案試點先行、回覆方向推播為試點成功後的對稱延伸——2026-08-12 需求文件 Open Questions 已定案）。
+- ADR 014–015 candidate 待使用者審定為 accepted（雙向推播機制已上線）；busy session 收訊排隊時機（推斷二）留待實際使用觀察。
 - `/handoff` 升版全面改查註冊表（reply 的 kunsu 語境分支已於 v0.3.0 實作查表定位軍師；其餘子指令未查表，維持獨立延後決策，ADR 002 Decision 6）。
 - 角色改名的追溯修復工具化（ADR 002 Deferred／[ADR 007](docs/adr/2026-07-08-adr-candidate-007-role-code-description-separation.md) Open Questions；代碼穩定＋Decision 7 唯一性可減少非必要改名，但自動批次修復仍缺，現行為 add-project 警告掃描）。
 - add-project 內建「整句 `roles` → 代碼」自動遷移偵測（ADR 007 Open Questions；本次已手動遷 ivm 三筆＋ebook-store-nginx，工具內建供其他既有軍師升級待評估）。
