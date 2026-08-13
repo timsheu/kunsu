@@ -18,11 +18,11 @@
 |--------|------|
 | `/kunsu-init` | 訪談式 scaffolding 建軍師（CLAUDE.md 五條不變量＋三信箱協議、Obsidian vault、git、註冊表登記）；含 `add-project`（申請審核制登記）與 `remove-project`（整筆移除登記）子指令 |
 | `/kunsu-apply` | 子專案端投遞「申請加入軍師」到申請信箱，路徑與技術棧自動偵測；正式登記留給軍師端審核 |
-| `/kunsu-inbox` | 跨 session 傳令：子專案列出待接手交接，軍師回報新回覆／新申請／新上報並跑 tripwire 核對 |
+| `/kunsu-inbox` | 跨 session 傳令：子專案列出待接手交接，軍師回報新回覆／新申請／新上報並跑 tripwire 核對，回報附收尾與分流提示（行動項落 todo、答案回填） |
 | `/kunsu-report` | 子專案端投遞「主動上報」到上報信箱；單向情報傳遞，不設軍師回覆義務 |
 | `/kunsu-list` | 唯讀列出全域註冊表全部登記，含 stale 偵測與當前位置標記 |
-| `/handoff` | 通用交接原語：`add`／`reply`（含 `verify:` 驗收方式與暫離回報）／`list`／`done`（逐項驗收查核＋來源 todo 一併收尾）。單 repo 專案也能獨立使用；kunsu 語境下 `add`／`reply` 內建派發即推播／回覆即推播（[ADR 015](docs/adr/2026-08-13-adr-candidate-015-dispatch-push-notification.md)） |
-| `/todo` | CE 副作用技術債清單：一檔一項落在 `docs/todos/`，`add`／`list`／`done`／`rm` |
+| `/handoff` | 通用交接原語：`add`／`reply`（含 `verify:` 驗收方式與暫離回報）／`list`／`done`（逐項驗收查核＋反向路由查核——回覆中指向發起方的行動項與已解答疑問不再靜默蒸發——＋來源 todo 一併收尾與殘項清點）。單 repo 專案也能獨立使用；kunsu 語境下 `add`／`reply` 內建派發即推播／回覆即推播（[ADR 015](docs/adr/2026-08-13-adr-candidate-015-dispatch-push-notification.md)） |
+| `/todo` | CE 副作用技術債清單：一檔一項落在 `docs/todos/`，`add`／`list`／`done`（歸檔前先清點檔內未完成殘項）／`rm` |
 | 軍師沙盤 | 本機網頁一頁彙整所有軍師與子專案的訊息狀態與待辦技術債（非 skill，見 [ADR 010](docs/adr/2026-07-11-adr-candidate-010-dashboard-service-exception.md)） |
 | SessionStart hook | session 啟動（含 `/clear`）自動攤開 kunsu 信箱摘要；未登記 repo 靜默、fail-open 不阻斷 session（隨 `/kunsu-inbox` 部署，掛載後生效，見 [ADR 014](docs/adr/2026-08-13-adr-candidate-014-sessionstart-hook-activation.md)） |
 | `kc` 啟動函式 | fish 函式：依註冊表以 kunsu session 命名慣例自動 `claude -n` 啟動，使推播匹配走精確比對（`scripts/kc.fish`） |
