@@ -150,3 +150,5 @@ install.sh             → 部署至 ~/.claude/skills/（預設 copy、--link �
 ## 版本控制
 
 本目錄為獨立 git repo。不主動 commit，除非使用者明確要求。
+
+里程碑以 **git tag** 標記（annotated tag，repo 層級 semver，自 v1.0.0 起；2026-08-13 立約）——與各 skill 的 SKILL.md frontmatter 版號**互相獨立**：skill 版號隨個別 skill 演進照舊記錄於 frontmatter 與 commit 訊息，tag 則標記整個工具組的發布里程碑；打 tag 與 push 均由使用者明確要求時執行。
