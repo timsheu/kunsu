@@ -45,12 +45,13 @@ else
   ng "A2 todo 版號鏈不一致（SKILL=${tv} CLAUDE.md=${tc}）"
 fi
 
-# --- B. status 值域副本 ---
+# --- B. status 值域副本（含種子沉澱文件——2026-08-13 發現的第五份副本，見開發狀態）---
 for f in "skills/handoff/SKILL.md" \
          "skills/handoff/scripts/new-handoff.sh" \
-         "skills/kunsu-init/assets/templates/kunsu-claude.md"; do
+         "skills/kunsu-init/assets/templates/kunsu-claude.md" \
+         "skills/kunsu-init/assets/solutions/conventions/cross-repo-handoff-reply-inbox-convention.md"; do
   v="$(grep -c 'submitted.*partial.*blocked' "${f}" || true)"
-  z="$(grep -c '勿自標\|請勿自標' "${f}" || true)"
+  z="$(grep -c '勿自標\|請勿自標\|不自標' "${f}" || true)"
   if [[ "${v}" -ge 1 && "${z}" -ge 1 ]]; then
     ok "B  值域副本齊全：${f}（值域行 ${v}、勿自標 ${z}）"
   else
