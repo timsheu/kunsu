@@ -145,7 +145,7 @@ topic: awareness-automation
 - **推斷二（busy 排隊）**：本輪目標為 idle session 未直接測得；工具文件明載訊息對 busy 收方「enqueue and drain at the receiver's next tool round」，行為有官方定義，風險評為低。
 - **推斷三（軍師 session 具傳訊工具）**：✅ 已驗證（2026-08-13）——與推斷一同一事件：由軍師 session 實發成功，工具可用。
 
-**試點結論：通過（2026-08-13）**。ADR Candidate 015 併同 014 待審定。
+**試點結論：通過（2026-08-13）**。ADR 014、015 已於 2026-08-13 由使用者審定為 accepted。
 
 ## 命名慣例與回覆方向（2026-08-13，試點通過後同日延伸）
 

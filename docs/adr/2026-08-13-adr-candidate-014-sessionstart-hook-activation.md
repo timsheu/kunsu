@@ -2,12 +2,12 @@
 title: ADR Candidate 014 — SessionStart hook 第二階段啟用
 date: 2026-08-13
 type: adr
-status: proposed
+status: accepted
 ---
 
 # ADR 014：SessionStart hook 第二階段啟用
 
-> 狀態：**Proposed**（依 [2026-08-12 知悉層自動化需求](../brainstorms/2026-08-12-awareness-automation-requirements.md) Phase A 動工，待使用者審定）。
+> 狀態：**Accepted**（2026-08-13 由使用者審定；源自 [2026-08-12 知悉層自動化需求](../brainstorms/2026-08-12-awareness-automation-requirements.md) Phase A，實作與六場景驗收先行完成後審定）。
 
 ## Context
 

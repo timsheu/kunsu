@@ -2,12 +2,12 @@
 title: ADR Candidate 015 — 派發即推播：對 ADR 002 推播否決的翻案
 date: 2026-08-13
 type: adr
-status: proposed
+status: accepted
 ---
 
 # ADR 015：派發即推播（軍師 session 派發完成當下通知目標子專案長駐 session）
 
-> 狀態：**Proposed**（依 [2026-08-12 知悉層自動化需求](../brainstorms/2026-08-12-awareness-automation-requirements.md) Phase B 動工，待使用者審定；全面啟用前須先完成單一子專案試點——R13）。
+> 狀態：**Accepted**（2026-08-13 由使用者審定；源自 [2026-08-12 知悉層自動化需求](../brainstorms/2026-08-12-awareness-automation-requirements.md) Phase B。R13 試點同日通過——軍師端實發 ios-app 觸發成功，推斷一、三驗證；Decision 6 回覆方向同日修訂納入並實測送達）。
 
 ## Context
 

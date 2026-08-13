@@ -18,7 +18,7 @@ docs/
   README.md            → 文件中心主索引
   brainstorms/         → 需求（種子：2026-07-06 需求彙整）
   plans/               → 實作計畫（/ce-plan 產出）
-  adr/                 → ADR（001–013 accepted；014–015 proposed）
+  adr/                 → ADR（001–015 全數 accepted）
   solutions/           → 可重用學習與解法（/ce-compound 產出，YAML frontmatter 依 module/tags/problem_type 可搜尋）
   playbooks/           → 操作教學（端到端工作流程、軍師沙盤導覽；手工維護，自 README 拆出的教學唯一落點）
 skills/                → skill 原始碼
@@ -68,7 +68,7 @@ install.sh             → 部署至 ~/.claude/skills/（預設 copy、--link �
 | [docs/playbooks/end-to-end-workflow.md](docs/playbooks/end-to-end-workflow.md) | 操作教學：端到端工作流程（README 只留門面摘要） |
 | [docs/playbooks/dashboard.md](docs/playbooks/dashboard.md) | 操作教學：軍師沙盤安裝與頁面導覽 |
 | [docs/brainstorms/2026-07-06-planner-toolkit-requirements.md](docs/brainstorms/2026-07-06-planner-toolkit-requirements.md) | 種子需求：問題定義、ce-team 教訓、母本解剖、方案設計 |
-| [docs/adr/](docs/adr/) | ADR（001–004 於 2026-07-06、005 於 2026-07-07 審定為 accepted；006 申請信箱與 008 上報信箱於 2026-07-09 accepted；007 角色代碼／說明分離於 2026-07-08 accepted；010 kunsu-dashboard 對 Invariant 1 的例外於 2026-07-11 accepted；011 回覆 verify 欄位與分類拆分、012 remove-project 子指令於 2026-07-12 accepted；013 `/todo` skill 併入 toolkit 於 2026-07-17 accepted——001–013 全數 accepted；014 SessionStart hook 第二階段啟用、015 派發即推播於 2026-08-13 proposed，待審定） |
+| [docs/adr/](docs/adr/) | ADR（001–004 於 2026-07-06、005 於 2026-07-07 審定為 accepted；006 申請信箱與 008 上報信箱於 2026-07-09 accepted；007 角色代碼／說明分離於 2026-07-08 accepted；010 kunsu-dashboard 對 Invariant 1 的例外於 2026-07-11 accepted；011 回覆 verify 欄位與分類拆分、012 remove-project 子指令於 2026-07-12 accepted；013 `/todo` skill 併入 toolkit 於 2026-07-17 accepted；014 SessionStart hook 第二階段啟用與 015 派發即推播於 2026-08-13 accepted——全數 accepted） |
 | [docs/brainstorms/2026-07-17-dashboard-todo-list-requirements.md](docs/brainstorms/2026-07-17-dashboard-todo-list-requirements.md) | 軍師沙盤 todo 列表顯示需求 |
 | [docs/plans/2026-07-17-001-feat-dashboard-todo-list-plan.md](docs/plans/2026-07-17-001-feat-dashboard-todo-list-plan.md) | 軍師沙盤 todo 列表顯示與 `/todo` skill 併入實作計畫（R1–R9、七個實作單元，已執行完畢） |
 | [docs/plans/2026-07-06-001-feat-planner-toolkit-skills-plan.md](docs/plans/2026-07-06-001-feat-planner-toolkit-skills-plan.md) | 實作計畫（12 條 requirements、7 個實作單元，已執行完畢） |
@@ -132,7 +132,7 @@ install.sh             → 部署至 ~/.claude/skills/（預設 copy、--link �
 ### 尚未實作／後續評估
 - ADR 008 open questions 留待用量評估——歸檔 `status` 值域升級（現為單一 `archived`）、「軍師已讀」輕量標記、上報量成長後的整理慣例。
 - applications 的 HOME dataview 補齊、add-project reports 遷移不含 HOME dataview 附加（已知落差，見實作計畫 Scope Boundaries）。
-- ADR 014–015 candidate 待使用者審定為 accepted（雙向推播機制已上線）；busy session 收訊排隊時機（推斷二）留待實際使用觀察。
+- busy session 收訊排隊時機（派發即推播推斷二）留待實際使用觀察。
 - `/handoff` 升版全面改查註冊表（reply 的 kunsu 語境分支已於 v0.3.0 實作查表定位軍師；其餘子指令未查表，維持獨立延後決策，ADR 002 Decision 6）。
 - 角色改名的追溯修復工具化（ADR 002 Deferred／[ADR 007](docs/adr/2026-07-08-adr-candidate-007-role-code-description-separation.md) Open Questions；代碼穩定＋Decision 7 唯一性可減少非必要改名，但自動批次修復仍缺，現行為 add-project 警告掃描）。
 - add-project 內建「整句 `roles` → 代碼」自動遷移偵測（ADR 007 Open Questions；本次已手動遷 ivm 三筆＋ebook-store-nginx，工具內建供其他既有軍師升級待評估）。
