@@ -22,11 +22,11 @@ docs/
   solutions/           → 可重用學習與解法（/ce-compound 產出，YAML frontmatter 依 module/tags/problem_type 可搜尋）
   playbooks/           → 操作教學（端到端工作流程、軍師沙盤導覽；手工維護，自 README 拆出的教學唯一落點）
 skills/                → skill 原始碼
-  handoff/             → 通用交接原語（v0.11.0，2026-07-06 自部署目錄併入，見 ADR 003）
-    SKILL.md           → add／reply／list／done 子指令（reply 含 kunsu 語境分支、verify 驗收方式選填欄位、逐項回答附證據指引與暫離回報最小 partial 回覆；done 含收尾口語觸發、發起方守門、歸檔前逐項驗收查核、沉澱訊號查核與來源 todo 查核一併收尾；add／done／本地 reply 尾端確認 commit）
+  handoff/             → 通用交接原語（v0.12.0，2026-07-06 自部署目錄併入，見 ADR 003）
+    SKILL.md           → add／reply／list／done 子指令（reply 含 kunsu 語境分支、verify 驗收方式選填欄位、逐項回答附證據指引與暫離回報最小 partial 回覆；done 含收尾口語觸發、發起方守門、歸檔前逐項驗收查核、沉澱訊號查核、反向路由查核與來源 todo 查核一併收尾（todo 收尾含殘項清點）；add／done／本地 reply 尾端確認 commit）
     scripts/           → new-handoff.sh、new-handoff-reply.sh
-  todo/                → CE 副作用 TODO 清單管理原語（v0.1.2，2026-07-17 自部署目錄併入，見 ADR 013）
-    SKILL.md           → add／list／done／rm 子指令，管理 docs/todos/ 一檔一項技術債（done／rm 含 untracked 前置檢查）
+  todo/                → CE 副作用 TODO 清單管理原語（v0.2.0，2026-07-17 自部署目錄併入，見 ADR 013）
+    SKILL.md           → add／list／done／rm 子指令，管理 docs/todos/ 一檔一項技術債（done 含殘項清點；done／rm 含 untracked 前置檢查）
     scripts/           → new-todo.sh
   kunsu-init/          → 軍師 scaffolding
     SKILL.md           → 訪談→查證→產檔→vault→git→註冊表主流程＋add-project（申請審核制）＋remove-project（整筆移除）子指令
@@ -35,7 +35,7 @@ skills/                → skill 原始碼
     assets/templates/  → 軍師範本（CLAUDE.md／CONCEPTS.md／README／HOME dataview 區塊＋PLACEHOLDERS.md）
     assets/solutions/  → 兩篇種子沉澱文件（自母本通用化）
   kunsu-inbox/         → 跨 session 傳令自動化
-    SKILL.md           → 模式偵測（獨立雙判斷）＋子 repo／軍師雙模式
+    SKILL.md           → 模式偵測（獨立雙判斷）＋子 repo／軍師雙模式（軍師模式含收尾與分流提示行）
     scripts/scan-replies.sh → 未 commit 回覆掃描＋tripwire（done 授權歸檔豁免、雙側核驗）
     scripts/scan-applications.sh → 申請信箱掃描＋tripwire（雙側核驗授權歸檔）
     scripts/scan-reports.sh → 上報信箱掃描＋tripwire（結構同 scan-applications.sh）
@@ -128,6 +128,8 @@ install.sh             → 部署至 ~/.claude/skills/（預設 copy、--link �
 - **SessionStart hook 第二階段啟用（知悉層自動化 Phase A）**（[ADR 014 candidate](docs/adr/2026-08-13-adr-candidate-014-sessionstart-hook-activation.md)，2026-08-13）：源自使用者實況回饋（[需求文件](docs/brainstorms/2026-08-12-awareness-automation-requirements.md)）——一次派發同時涵蓋 3～4 個子專案、各 session 長駐不關以 `/clear` 清理，逐視窗手動 `/kunsu-inbox` 的輪詢成本全落在使用者身上；官方文件查證 `/clear` 觸發 SessionStart（matcher source 五值）且 stdout 注入清空後 context，hook 與既有習慣直接咬合。新增 `skills/kunsu-inbox/scripts/session_hook.py`（kunsu-inbox v0.5.0）：身分獨立雙判斷（ADR 002 Decision 2，raw registry＋git root 快速比對，不跑全路徑健康檢查以保未登記快退）、子專案模式匯入沙盤 `subrepo_status.py`、軍師模式匯入 `kunsu_scan.py`（分類邏輯零重寫、單一來源）、每分類上限 5 筆＋「另有 N 筆」、created／最新回覆日期升冪陳年件浮頂、stale 軍師路徑失聯警示、fail-open（身分確認前靜默、確認後單行降級，一律 exit 0 不阻斷 session）。SKILL.md 授權邊界第 2 條補「事件驅動非輪詢」明文化（機制先行、憲章同步的既有教訓），新增「SessionStart hook」節含 settings.json 掛載範例與解除說明；掛載為機器層級設定不進 repo。launchd 通知哨兵原案於需求審視階段廢棄（單人拓撲推播只轉述自己觸發的事件＋通知時刻與遺忘時刻錯位）。12 項 pytest（149 全過）、consistency-check 21 項通過。Phase B（派發即推播——軍師 session 派發完成當下向目標子專案長駐 session 發送純告知訊息，落地點以本機 session 網格實測確認存在）待 ADR Candidate 015 對 ADR 002 推播否決翻案後另行動工。
 
 - **派發即推播（知悉層自動化 Phase B）**（[ADR 015 candidate](docs/adr/2026-08-13-adr-candidate-015-dispatch-push-notification.md)，2026-08-13）：對 ADR 002「daemon 輪詢推播」否決的翻案——翻案基礎為事實前提變更（使用者 session 長駐實況＋本機 session 網格實測可定址）與機制變更（非 daemon 輪詢，而是軍師 session 於派發完成當下發送的一次性事件驅動訊息，零輪詢零常駐零狀態檔，Invariant 1 字面合規、無需比照 ADR 010 開例外）。handoff add 新增步驟 6（v0.11.0，僅 kunsu 語境）：registry 反查 `to:` 角色對應子專案 → ListAgents 名稱啟發式匹配（唯一且明確才發送，寧漏發不誤發，降級不重試由 SessionStart hook 兜底）→ SendMessage 定型通知（訊息自足自帶收方指令——僅回顯勿開工勿讀檔，Invariant 2 零觸碰）→ 回報已推播／未推播清單；ListAgents／SendMessage 不可用整步跳過。CONCEPTS「派發即推播」詞條、kunsu-inbox 依賴聲明同步 v0.11.0（不涉掃描慣例）。R13 試點（2026-08-13）：向 eBookApp 長駐 session 實發真實待接手通知成功，實測發現跨 session 裸名發送需依錯誤訊息附 `[ref]` 重送（已補進步驟 6-3）；試點於同日通過（使用者確認軍師 session 實發至 ios-app session 觸發成功、收方僅回顯——推斷一、三同時驗證），**回覆方向同日對稱納入**（ADR 015 Decision 6 修訂）：handoff reply 新增步驟 6「回覆即推播」——kunsu 語境回覆（含暫離回報）落入軍師信箱後，以同一套兩層匹配通知軍師 session（慣例名 `<軍師目錄名>-kunsu`），降級由軍師端 hook 與 `scan-replies.sh` 兜底，「未 commit 即新回覆」訊號零改動。同批確立 **kunsu session 命名慣例**（查證 settings.json 無命名 key；`/rename`／`claude -n` 為官方機制且該名稱即 SendMessage 定址名）：子專案 `<軍師目錄名>-<角色代碼>`、軍師 `<軍師目錄名>-kunsu`，步驟 6-2 升為兩層匹配（慣例名精確比對優先、啟發式 fallback）；新增 `scripts/kc.fish` 啟動函式（fish autoload，依 registry 自動 `-n` 命名，未登記／`--resume` 透傳，五路徑解析實測正確，已部署 ~/.config/fish/functions/）。
+
+- **回覆內容路由與收尾殘項清點**（handoff v0.12.0／todo v0.2.0／kunsu-inbox v0.6.0，2026-08-13）：源自 ebook 軍師檢討「回覆讀完後內容各自去哪」的流程缺口（事件三、四、六——指向軍師的行動項與已解答疑問無落點，只靠當次 session 記憶承載；事件四時間線證明含行動項回覆在 done 收尾當下已被讀取、僅查核面未涵蓋）。三軍師實例查證確認屬系統層面：ivm 51 份回覆 19 筆行動項僅 1 筆漏接、且為「行動項曾入 todo、整檔標已解決歸檔時殘項蒸發」的容器蒸發型；px 33 份逾 20 筆全路由、靠 kunsu 未規定的自建紀律補位。三道輕量查核全掛既有收尾／彙整必經路徑（比照沉澱訊號查核掛載模式，零觸發詞、僅提示不自動執行）：done 步驟 2 新增**反向路由查核**（附掛沉澱訊號查核通讀動作、零新增回覆讀檔，偵測指向發起方／第三方的行動項與已解答既有疑問——全回覆聯集、撤回者標註不剔除；命中於步驟 2 當下回報、查核無狀態暫緩重跑必再提示，與沉澱訊號「留待步驟 9」刻意相反；回填白名單限 todo／plan，交接本體為定案快照不可回填、改提示附回覆路徑；疑問查核範圍設優先序上限——todos 頂層全讀→本體引用文件→plans 標題段，archive 不入範圍、範圍外漏報顯式接受）；done 步驟 4 與 `/todo` done 新增**殘項清點**（todo 標已解決前掃描「下一步」等段未完成子項，三去向：一併已解決／轉出新 todo（裁決即授權代建，內文註明轉出自原檔歸檔後路徑）／保留退出收尾並自 commit 訊息剔除；孤兒同樣清點、不改終態；步驟 9 `git add` 擴及轉出 todo、訊息加註「；轉出殘項 todo <slug>」含訊息表格第二副本同步；rm 明文不清點）；kunsu-inbox 軍師模式新回覆／新上報段各加**分流提示行**（比照 v0.4.0 收尾提示行的 inbox 提示／handoff 執行分工）；步驟 3 候選 todo 同時被反向查核命中時 description 註明衝突且不建議收尾（防堵容器蒸發重演）。零腳本零範本改動免三軍師遷移；SessionStart hook 摘要不加提示行（hook 導引 `/kunsu-inbox`，避免第二文案副本）；上報顯式接受單層保障（歸檔四步驟人工審閱為等效攔截點）。事件五拆出兩筆 idea 另行發想（接手方矛盾回報義務、交接本體勘誤落點——後者涉 Invariant #5 屬 ADR 層級）。經 `/ce-brainstorm`（三軍師查證定範圍）→ 三路研究（repo 結構／learnings／flow 分析 2 Critical＋8 Important＋8 Minor 全數收攏為計畫 R9–R16）→ `/ce-plan` → 3-persona doc review（3 筆 P2 全套用，含 commit 訊息第二副本漏列）；dogfooding 23 項斷言全過（歸檔全鏈 porcelain `RM`／`A` 無回歸、轉出 todo add 範圍與新訊息格式、不可觸碰定型行零 diff、步驟編號引用零漂移）、consistency-check 22 項全 PASS、149 項 pytest 零改動照常通過。
 
 ### 尚未實作／後續評估
 - ADR 008 open questions 留待用量評估——歸檔 `status` 值域升級（現為單一 `archived`）、「軍師已讀」輕量標記、上報量成長後的整理慣例。

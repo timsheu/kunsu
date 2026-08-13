@@ -1,6 +1,6 @@
 ---
 name: todo
-version: 0.1.2
+version: 0.2.0
 description: |
   管理專案的 CE 副作用 TODO 清單：一檔一項技術債，存放於當前專案的 docs/todos/，
   含 Dataview 友善 frontmatter（status/date/source/severity）。用於記錄
@@ -82,7 +82,12 @@ docs/todos/  →（解決後）status 改 已解決，git mv 到 docs/todos/arch
 ### done
 
 1. Read 指定的 `docs/todos/<slug>.md`（或使用者給的檔名關鍵字，Glob 找出對應檔案）。
-2. 用 Edit 只改 frontmatter 的 `status: 未處理` → `status: 已解決`（不動內文其他部分）。
+2. **殘項清點後再 Edit**：先掃描檔內「下一步」「待辦」等段落中未註記完成的
+   子項（無可辨識的子項段落時靜默通過）；有殘項時逐項回報，由使用者決定——
+   一併視為已解決（續行收尾）／轉出為新 todo（使用者裁決即授權、由 session
+   代建，新檔內文首行註明 `轉出自 docs/todos/archive/<原slug>.md`，填歸檔後
+   路徑）／保留（中止本次 done，維持原 status 不動）。續行時用 Edit 只改
+   frontmatter 的 `status: 未處理` → `status: 已解決`（不動內文其他部分）。
 3. 詢問或從對話取得解決依據（commit hash、solution 文件連結），用 Edit 補一行
    在標題下方，例如：`**解決依據**：commit \`abc1234\`，見 docs/solutions/xxx.md`。
 4. **歸檔前置檢查**：先 `mkdir -p docs/todos/archive/`（目錄不存在時 `git mv`
@@ -96,7 +101,8 @@ docs/todos/  →（解決後）status 改 已解決，git mv 到 docs/todos/arch
 
 ### rm
 
-語意是「確認不需處理／非 bug，封存但不刪除」，不是刪檔案：
+語意是「確認不需處理／非 bug，封存但不刪除」，不是刪檔案。rm **不執行**殘項
+清點——封存語意為整檔判定不處理，檔內殘項一併封存：
 
 1. Read 指定檔案，用 Edit 把 frontmatter `status` 改成 `已封存`，並在內文補一行
    結案原因（例如「三項假設皆不成立，logcat 實測排除」）。
@@ -140,7 +146,7 @@ severity: medium
 - 多筆待辦請逐一建檔，不要塞進同一個檔。
 - 若某筆 todo 已升級為交接文件處理，`/handoff done`（v0.8.0 起）收尾時會以雙向
   檔名比對找出它，經使用者確認後代執行本 skill 的 done 收尾（status、解決依據、
-  歸檔），不需事後再跑 `/todo done`；於該查核中略過或取消的 todo 不在此列，
-  仍由本 skill 自行收尾。
+  歸檔，v0.12.0 起含殘項清點），不需事後再跑 `/todo done`；於該查核中略過或
+  取消的 todo 不在此列，仍由本 skill 自行收尾。
 - `done`／`rm` 都是「搬到 archive + 改 status」，不是刪檔案；只有使用者明確要求
   刪除誤建檔案時才用一般 `rm`。
