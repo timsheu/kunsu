@@ -356,7 +356,7 @@ context——長駐 session 按 `/clear` 即攤開信箱，不必再手動觸發
 
 ## 依賴聲明
 
-本 skill 依賴同 toolkit 內建的 `/handoff` skill（v0.12.0，原始碼位於本 repo `skills/handoff/`）所定義的下列慣例。兩者共同發版、慣例定義以本 repo 為準；更新 handoff 的以下行為時需同步核查本 skill（v0.10.0 的沉澱訊號查核為 done 流程內部指引、v0.11.0 的派發即推播／回覆即推播為 add／reply 流程收尾通知、v0.12.0 的反向路由查核與 todo 殘項清點為 done 流程內部指引——皆不涉掃描慣例、無豁免需求；回覆即推播不改變「未 commit 即新回覆」訊號）：
+本 skill 依賴同 toolkit 內建的 `/handoff` skill（v0.13.0，原始碼位於本 repo `skills/handoff/`）所定義的下列慣例。兩者共同發版、慣例定義以本 repo 為準；更新 handoff 的以下行為時需同步核查本 skill（v0.10.0 的沉澱訊號查核為 done 流程內部指引、v0.11.0 的派發即推播／回覆即推播為 add／reply 流程收尾通知、v0.12.0 的反向路由查核與 todo 殘項清點為 done 流程內部指引、v0.13.0 的矛盾回報指引為 reply 流程內部指引——皆不涉掃描慣例、無豁免需求；回覆即推播不改變「未 commit 即新回覆」訊號）：
 
 | 項目 | 慣例 |
 |------|------|
