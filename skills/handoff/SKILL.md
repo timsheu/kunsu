@@ -1,6 +1,6 @@
 ---
 name: handoff
-version: 0.13.0
+version: 0.14.0
 description: |
   把一個需要交給「另一個 session／另一個角色（如後台、前端、DevOps）」研究或
   接手的議題，寫成一份獨立交接文件，落在當前專案的 docs/handoffs/。每份交接一個
@@ -97,7 +97,7 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
 
 | 子指令 | 訊息 |
 |--------|------|
-| add | `docs: 建立交接 <檔名>` |
+| add | `docs: 建立交接 <檔名>`（更正交接補記指標時再附：`；補記更正指標 <原本體檔名>`） |
 | done | `docs: 歸檔交接 <檔名>`（含 todo 一併收尾時：`docs: 歸檔交接 <檔名>；一併收尾 todo <slug>[、<slug>…]`；殘項清點有轉出時再附：`；轉出殘項 todo <slug>[、<slug>…]`） |
 | reply（本地語境） | `docs: 回覆交接 <檔名>` |
 
@@ -118,7 +118,9 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
      引用具體 `檔案:行號`，不要只給結論
    - **需要你研究／決策的問題**：明確列點，讓接手方知道要回答什麼
    - **期望交付**：希望接手方回什麼（API 契約、可行性評估、估算數字…）
-   - **相關檔案 / 連結**：關鍵檔案路徑、相關 plan／brainstorm／solution 連結
+   - **相關檔案 / 連結**：關鍵檔案路徑、相關 plan／brainstorm／solution 連結。
+     引用其他交接／回覆時必含**完整檔名**（含日期）——檔名是權威識別，路徑僅為
+     當下位置提示；歸檔造成的路徑失效不構成錯誤，讀者以檔名搜尋定位（ADR 016）
 
    **投遞前 redact**：交接檔會 commit 進 repo（kunsu 語境下更落入軍師 repo、可能
    公開），內文與引用的日誌／設定片段務必移除敏感資訊——API key、密碼、token／
@@ -188,6 +190,26 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
      回報註明，不影響 add 流程完成。
    - 本步驟只發送訊息，不等待、不確認收方回應；接手與否、何時開工，仍由
      使用者在目標 session 明確指示——決策層零觸碰（ADR 002 Decision 5）。
+
+#### 更正交接（發現已定案交接內容有誤時）
+
+已產出的交接（含已歸檔者）被發現內容有誤時，勘誤以**新交接**傳遞，不編輯原本體
+內文（ADR 016）：
+
+1. 照常以 add 流程建立更正交接：標題建議以「更正」開頭，內文指名**被更正檔
+   （完整檔名）與錯誤點**，並給出更正後的內容。
+2. 產檔後，用 Edit 在**原交接本體** frontmatter 補
+   `corrected_by: <更正交接檔名>`（檔名不含路徑；已有 `corrected_by` 時改為
+   YAML 列表累加，保留全部更正歷史）。原本體已歸檔（`archive/` 內）時同樣
+   適用——這是發起方對自己文件的生命週期標記，位置無關。此欄位僅供 display
+   與追溯，不進任何掃描、tripwire 或分類邏輯。
+3. 確認 commit 的 `git add` 範圍**包括更正交接檔與原本體路徑**（含 archive 內
+   路徑），訊息沿 add 格式加註記（見指令格式段表格）。
+4. 原本體在**頂層**時，步驟 2 的 Edit 至確認 commit 之間不執行 `/kunsu-inbox`
+   （中間態 ` M` 屬 catch-all tripwire 範圍，比照 done 步驟 4–7 連續執行約束）；
+   archive 內本體無此疑慮。取消 commit 時保留變更並附可手動執行的指令，同時
+   明示：頂層本體未 commit 的 ` M` 會使 `/kunsu-inbox` 觸發 tripwire，屬預期
+   訊號、以補 commit 收斂，不是外部入侵。
 
 ### reply
 
@@ -438,7 +460,9 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
    回覆檔案則略過。
 
 8. 檢查是否有其他文件連結指向舊路徑（`grep -Frl "docs/handoffs/<slug>.md" docs/`，
-   `-F` 固定字串比對避免 `.` 誤中），逐一修正為 `docs/handoffs/archive/<slug>.md`；
+   `-F` 固定字串比對避免 `.` 誤中），逐一修正為 `docs/handoffs/archive/<slug>.md`——
+   但 grep 命中**交接文件本體**（含 `archive/` 內）時不修正、僅回報供追溯
+   （Invariant #5 本體內文不可變；讀者依檔名為權威識別自行定位，ADR 016）；
    步驟 4 有**成功歸檔**的 todo 時，對每筆同樣檢查
    （`grep -Frl "docs/todos/<todo-slug>.md" docs/`）並逐一修正為
    `docs/todos/archive/<todo-slug>.md`（失敗筆不改連結——其檔案仍在頂層）。
