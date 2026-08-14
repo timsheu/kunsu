@@ -1,11 +1,13 @@
 ---
 name: kunsu-inbox
-version: 0.6.0
+version: 0.7.0
 description: |
   查詢跨 repo 協作信箱：列出軍師（規劃協調中心）中待接手的交接文件，或回報新抵達的回覆。
   觸發語：/kunsu-inbox、檢查信箱、有沒有待接手的交接、有沒有新的 handoff、
   查看 handoff 清單、檢查新回覆、inbox、收件匣、有沒有待處理的交接、
+  信箱還有幾件、信箱幾件、還有哪些待收尾、待收尾有哪些、現在有幾件待處理、
   查看交接狀態、kunsu inbox、kunsu-inbox。
+  （回報自身信箱狀態的具體數字一律以本 skill 的掃描結果為準，不憑對話記憶作答。）
   依當前 repo 在 ~/.claude/kunsu-registry.json 中的身分自動選擇模式：
   - 子 repo 模式：列出所屬軍師中 to: 為本角色的未接手／部分完成／已回覆待確認交接文件
   - 軍師模式：回報 docs/handoffs/replies/ 新回覆、docs/applications/ 新申請與
@@ -356,7 +358,7 @@ context——長駐 session 按 `/clear` 即攤開信箱，不必再手動觸發
 
 ## 依賴聲明
 
-本 skill 依賴同 toolkit 內建的 `/handoff` skill（v0.14.0，原始碼位於本 repo `skills/handoff/`）所定義的下列慣例。兩者共同發版、慣例定義以本 repo 為準；更新 handoff 的以下行為時需同步核查本 skill（v0.10.0 的沉澱訊號查核為 done 流程內部指引、v0.11.0 的派發即推播／回覆即推播為 add／reply 流程收尾通知、v0.12.0 的反向路由查核與 todo 殘項清點為 done 流程內部指引、v0.13.0 的矛盾回報指引為 reply 流程內部指引、v0.14.0 的更正交接與 `corrected_by` 為 add 流程內部慣例（corrected_by 為 display-only frontmatter 欄位；其 Edit 中間態頂層屬既有 catch-all tripwire、archive 內屬既有靜默略過分支，皆無新豁免）——皆不涉掃描慣例、無豁免需求；回覆即推播不改變「未 commit 即新回覆」訊號）：
+本 skill 依賴同 toolkit 內建的 `/handoff` skill（v0.15.0，原始碼位於本 repo `skills/handoff/`）所定義的下列慣例。兩者共同發版、慣例定義以本 repo 為準；更新 handoff 的以下行為時需同步核查本 skill（v0.10.0 的沉澱訊號查核為 done 流程內部指引、v0.11.0 的派發即推播／回覆即推播為 add／reply 流程收尾通知、v0.12.0 的反向路由查核與 todo 殘項清點為 done 流程內部指引、v0.13.0 的矛盾回報指引為 reply 流程內部指引、v0.14.0 的更正交接與 `corrected_by` 為 add 流程內部慣例（corrected_by 為 display-only frontmatter 欄位；其 Edit 中間態頂層屬既有 catch-all tripwire、archive 內屬既有靜默略過分支，皆無新豁免）、v0.15.0 的斷言層級紀律與 done 斷言自查為 add／done 流程內部指引——皆不涉掃描慣例、無豁免需求；回覆即推播不改變「未 commit 即新回覆」訊號）：
 
 | 項目 | 慣例 |
 |------|------|
