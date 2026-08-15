@@ -1,6 +1,6 @@
 ---
 name: kunsu-init
-version: 0.5.0
+version: 0.6.0
 description: |
   為多 repo AI 協作場景 scaffold 一個「軍師」（規劃協調中心）：以訪談收集子專案清單，
   自動查證路徑並讀取技術棧，填入固定不變量（5 條 Invariants、回覆信箱、申請信箱

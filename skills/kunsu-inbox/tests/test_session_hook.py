@@ -73,6 +73,22 @@ def registry_path(tmp_path: Path, monkeypatch) -> Path:
     return reg
 
 
+@pytest.fixture(autouse=True)
+def hook_state_isolation(tmp_path: Path, monkeypatch) -> tuple[Path, Path]:
+    """全部測試隔離版號狀態檔與 SKILL 來源，不讀寫真實 ~/.claude。
+
+    autouse：否則既有測試會直寫真實狀態檔、吃掉使用者的一次性更新提示。
+    fake SKILL 版號 9.9.9，各測試首跑為「首次」路徑（靜默建檔），不影響
+    既有斷言。版號測試可請求本 fixture 操作 state／skill 兩檔。
+    """
+    state = tmp_path / "hook-state.json"
+    skill = tmp_path / "fake-handoff-SKILL.md"
+    skill.write_text("---\nname: handoff\nversion: 9.9.9\n---\n", encoding="utf-8")
+    monkeypatch.setattr(session_hook, "STATE_PATH", state)
+    monkeypatch.setattr(session_hook, "_HANDOFF_SKILL_PATH", skill)
+    return state, skill
+
+
 def _run_main(monkeypatch, cwd: str) -> int:
     monkeypatch.setattr(
         "sys.stdin",
@@ -256,6 +272,61 @@ def test_nested_topology_merges_both_modes(tmp_path, registry_path, monkeypatch,
     assert "[sub-planner @ 軍師 upper]" in out   # 子專案模式段
     assert "2026-08-01-up.md" in out
     assert "[軍師模式 @ nested]" in out          # 軍師模式段
+
+
+# ── 版號變動提示（機制觸及率三件套 R7–R8） ─────────────────────────────────────
+
+def test_version_notice_first_run_silent(hook_state_isolation):
+    state, _ = hook_state_isolation
+    assert session_hook._handoff_version_notice() == []
+    assert json.loads(state.read_text(encoding="utf-8"))["handoff_version"] == "9.9.9"
+
+
+def test_version_notice_on_change_then_silent(hook_state_isolation):
+    state, _ = hook_state_isolation
+    state.write_text(json.dumps({"handoff_version": "0.15.0"}), encoding="utf-8")
+    notice = session_hook._handoff_version_notice()
+    assert len(notice) == 1
+    assert "9.9.9" in notice[0] and "0.15.0" in notice[0]
+    assert json.loads(state.read_text(encoding="utf-8"))["handoff_version"] == "9.9.9"
+    assert session_hook._handoff_version_notice() == []  # 已記錄，不重複提示
+
+
+def test_version_notice_missing_skill_fail_open(hook_state_isolation, tmp_path, monkeypatch):
+    state, _ = hook_state_isolation
+    state.write_text(json.dumps({"handoff_version": "0.15.0"}), encoding="utf-8")
+    monkeypatch.setattr(session_hook, "_HANDOFF_SKILL_PATH", tmp_path / "no-such.md")
+    assert session_hook._handoff_version_notice() == []
+    assert json.loads(state.read_text(encoding="utf-8"))["handoff_version"] == "0.15.0"
+
+
+def test_version_notice_corrupt_state_rebuilds_silently(hook_state_isolation):
+    state, _ = hook_state_isolation
+    state.write_text("{ not json", encoding="utf-8")
+    assert session_hook._handoff_version_notice() == []
+    assert json.loads(state.read_text(encoding="utf-8"))["handoff_version"] == "9.9.9"
+
+
+def test_version_notice_precedes_mailbox_summary(sub_topology, hook_state_isolation, monkeypatch, capsys):
+    state, _ = hook_state_isolation
+    state.write_text(json.dumps({"handoff_version": "0.15.0"}), encoding="utf-8")
+    _, sub_root = sub_topology
+    assert _run_main(monkeypatch, sub_root) == 0
+    out = capsys.readouterr().out
+    assert "📌 handoff skill 已更新至 v9.9.9" in out
+    assert out.index("📌") < out.index("📬")  # 提示行在信箱摘要之前（顯式順序）
+
+
+def test_unregistered_repo_no_version_notice(tmp_path, registry_path, hook_state_isolation, monkeypatch, capsys):
+    state, _ = hook_state_isolation
+    state.write_text(json.dumps({"handoff_version": "0.15.0"}), encoding="utf-8")
+    repo = _make_git_repo(tmp_path / "some-repo")
+    registry_path.write_text(
+        json.dumps({"/other": [{"kunsu": "/k", "roles": ["x"]}]}), encoding="utf-8"
+    )
+    assert _run_main(monkeypatch, repo) == 0
+    assert capsys.readouterr().out == ""  # 快退零輸出，版號提示不出現
+    assert json.loads(state.read_text(encoding="utf-8"))["handoff_version"] == "0.15.0"
 
 
 # ── R7：fail-open ─────────────────────────────────────────────────────────────

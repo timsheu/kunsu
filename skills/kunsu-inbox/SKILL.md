@@ -1,6 +1,6 @@
 ---
 name: kunsu-inbox
-version: 0.7.0
+version: 0.8.0
 description: |
   查詢跨 repo 協作信箱：列出軍師（規劃協調中心）中待接手的交接文件，或回報新抵達的回覆。
   觸發語：/kunsu-inbox、檢查信箱、有沒有待接手的交接、有沒有新的 handoff、
@@ -330,6 +330,12 @@ context——長駐 session 按 `/clear` 即攤開信箱，不必再手動觸發
   缺失）輸出單行降級提示。
 - **依賴**：軍師沙盤已部署（`install.sh` 一併部署）且其 PyYAML 依賴已安裝
   （見 kunsu-dashboard SKILL.md）。
+- **skill 版號變動提示**（機制觸及率三件套之一）：身分確認後比對部署
+  handoff SKILL.md 版號與狀態檔 `~/.claude/kunsu-hook-state.json`（機器層級，
+  不進任何 repo），版號變動時於信箱摘要前輸出一行「handoff skill 已更新至
+  vX（自 vY）……」並更新狀態檔；首次執行靜默建檔不提示、相同零輸出、任何
+  失敗 fail-open 跳過。動機：熟練 session 手動執行等效步驟時 skill 指引靜默
+  失效，更新提示使其在下個 session 得知指引有變。
 
 **掛載**（機器層級設定，不進任何 git repo）——`~/.claude/settings.json`：
 
@@ -358,7 +364,7 @@ context——長駐 session 按 `/clear` 即攤開信箱，不必再手動觸發
 
 ## 依賴聲明
 
-本 skill 依賴同 toolkit 內建的 `/handoff` skill（v0.15.0，原始碼位於本 repo `skills/handoff/`）所定義的下列慣例。兩者共同發版、慣例定義以本 repo 為準；更新 handoff 的以下行為時需同步核查本 skill（v0.10.0 的沉澱訊號查核為 done 流程內部指引、v0.11.0 的派發即推播／回覆即推播為 add／reply 流程收尾通知、v0.12.0 的反向路由查核與 todo 殘項清點為 done 流程內部指引、v0.13.0 的矛盾回報指引為 reply 流程內部指引、v0.14.0 的更正交接與 `corrected_by` 為 add 流程內部慣例（corrected_by 為 display-only frontmatter 欄位；其 Edit 中間態頂層屬既有 catch-all tripwire、archive 內屬既有靜默略過分支，皆無新豁免）、v0.15.0 的斷言層級紀律與 done 斷言自查為 add／done 流程內部指引——皆不涉掃描慣例、無豁免需求；回覆即推播不改變「未 commit 即新回覆」訊號）：
+本 skill 依賴同 toolkit 內建的 `/handoff` skill（v0.16.0，原始碼位於本 repo `skills/handoff/`）所定義的下列慣例。兩者共同發版、慣例定義以本 repo 為準；更新 handoff 的以下行為時需同步核查本 skill（v0.10.0 的沉澱訊號查核為 done 流程內部指引、v0.11.0 的派發即推播／回覆即推播為 add／reply 流程收尾通知、v0.12.0 的反向路由查核與 todo 殘項清點為 done 流程內部指引、v0.13.0 的矛盾回報指引為 reply 流程內部指引、v0.14.0 的更正交接與 `corrected_by` 為 add 流程內部慣例（corrected_by 為 display-only frontmatter 欄位；其 Edit 中間態頂層屬既有 catch-all tripwire、archive 內屬既有靜默略過分支，皆無新豁免）、v0.15.0 的斷言層級紀律與 done 斷言自查為 add／done 流程內部指引、v0.16.0 的產檔腳本 stderr 指路行不改變產出檔內容與 stdout 路徑契約——皆不涉掃描慣例、無豁免需求；回覆即推播不改變「未 commit 即新回覆」訊號）：
 
 | 項目 | 慣例 |
 |------|------|

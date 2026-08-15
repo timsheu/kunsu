@@ -118,10 +118,10 @@ REG="${HOME}/.claude/kunsu-registry.json"
 if [[ -f "${REG}" ]] && command -v python3 >/dev/null; then
   while IFS= read -r kroot; do
     [[ -z "${kroot}" || ! -f "${kroot}/CLAUDE.md" ]] && continue
-    if grep -q '規劃前既有盤點' "${kroot}/CLAUDE.md" && grep -q '勿自標' "${kroot}/CLAUDE.md" && grep -q 'corrected_by' "${kroot}/CLAUDE.md" && grep -q '副官' "${kroot}/CLAUDE.md"; then
+    if grep -q '規劃前既有盤點' "${kroot}/CLAUDE.md" && grep -q '勿自標' "${kroot}/CLAUDE.md" && grep -q 'corrected_by' "${kroot}/CLAUDE.md" && grep -q '副官' "${kroot}/CLAUDE.md" && grep -q '不豁免' "${kroot}/CLAUDE.md" && grep -q '不豁免' "${kroot}/CONCEPTS.md" 2>/dev/null; then
       ok "H  live 軍師遷移標記齊全：${kroot}"
     else
-      wn "H  live 軍師疑似漏遷移（缺 規劃前既有盤點／勿自標／corrected_by／副官 之一）：${kroot}"
+      wn "H  live 軍師疑似漏遷移（缺 規劃前既有盤點／勿自標／corrected_by／副官／不豁免（CLAUDE 與 CONCEPTS 各自） 之一）：${kroot}"
     fi
   done < <(python3 -c "
 import json

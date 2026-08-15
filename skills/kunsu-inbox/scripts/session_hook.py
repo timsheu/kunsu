@@ -28,6 +28,15 @@ from pathlib import Path
 
 REGISTRY_PATH = Path.home() / ".claude" / "kunsu-registry.json"
 
+# skill 版號變動提示的狀態檔（機器層級，不進任何 repo）：只記「上次看到的版號」
+# 這一項告知性事實。測試以 monkeypatch 指向 tmp_path，不觸真實 home。
+STATE_PATH = Path.home() / ".claude" / "kunsu-hook-state.json"
+
+# handoff SKILL.md 於部署樹的相對位置：本腳本 → scripts/ → kunsu-inbox/ →
+# skills/ → handoff/SKILL.md。resolve() 跟隨 symlink，copy／symlink 兩種部署
+# 模式與 repo 內直跑測試皆可解析（比照 _DASHBOARD_ROOT 註解）。
+_HANDOFF_SKILL_PATH = Path(__file__).resolve().parents[2] / "handoff" / "SKILL.md"
+
 # 每分類最多列出筆數，超出以「另有 N 筆」收尾（需求 R5）
 MAX_ITEMS_PER_CATEGORY = 5
 
@@ -198,6 +207,47 @@ def _kunsu_mode_lines(root: str) -> list[str]:
     return [f"[軍師模式 @ {Path(root).name}]"] + body
 
 
+def _handoff_version_notice() -> list[str]:
+    """比對部署 handoff SKILL.md 版號與狀態檔，變動時回傳單行提示。
+
+    首次執行（無狀態檔）靜默記錄當前版號、不提示——避免每台機器首個
+    session 收到無意義提示；狀態檔損壞視同首次重建。任何失敗 fail-open
+    回傳空清單，不阻斷 hook 既有輸出。僅於身分確認後呼叫（ADR 002
+    未登記快退零輸出不受影響）。
+    """
+    try:
+        current: str | None = None
+        for line in _HANDOFF_SKILL_PATH.read_text(encoding="utf-8").splitlines()[:10]:
+            if line.startswith("version:"):
+                current = line.split(":", 1)[1].strip()
+                break
+        if not current:
+            return []
+
+        state: dict = {}
+        try:
+            loaded = json.loads(STATE_PATH.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                state = loaded
+        except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+            state = {}  # 缺檔或損壞：視同首次
+
+        last = state.get("handoff_version")
+        if last == current:
+            return []
+
+        state["handoff_version"] = current
+        STATE_PATH.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+        if last is None:
+            return []  # 首次：靜默建檔不提示
+        return [
+            f"📌 handoff skill 已更新至 v{current}（自 v{last}），流程指引有變——"
+            "本輪 add／done 建議經 /handoff 執行或回讀 SKILL.md 對應段"
+        ]
+    except Exception:
+        return []  # fail-open：版號提示屬告知層，任何失敗靜默跳過
+
+
 def main() -> int:
     identity_established = False
     try:
@@ -215,6 +265,9 @@ def main() -> int:
         if not (is_sub or is_kunsu):
             return 0
         identity_established = True
+
+        for notice in _handoff_version_notice():
+            print(notice)
 
         _ensure_dashboard_on_path()
         lines: list[str] = []

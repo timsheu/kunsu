@@ -22,7 +22,7 @@ docs/
   solutions/           → 可重用學習與解法（/ce-compound 產出，YAML frontmatter 依 module/tags/problem_type 可搜尋）
   playbooks/           → 操作教學（端到端工作流程、軍師沙盤導覽；手工維護，自 README 拆出的教學唯一落點）
 skills/                → skill 原始碼
-  handoff/             → 通用交接原語（v0.15.0，2026-07-06 自部署目錄併入，見 ADR 003）
+  handoff/             → 通用交接原語（v0.16.0，2026-07-06 自部署目錄併入，見 ADR 003）
     SKILL.md           → add／reply／list／done 子指令（add 含引用檔名權威慣例、斷言層級紀律與更正交接子節（corrected_by 補記）；done 回報含斷言自查兩態附句；reply 含 kunsu 語境分支、verify 驗收方式選填欄位、逐項回答附證據指引、矛盾回報指引與暫離回報最小 partial 回覆；done 含收尾口語觸發、發起方守門、歸檔前逐項驗收查核、沉澱訊號查核、反向路由查核與來源 todo 查核一併收尾（todo 收尾含殘項清點）；add／done／本地 reply 尾端確認 commit）
     scripts/           → new-handoff.sh、new-handoff-reply.sh
   todo/                → CE 副作用 TODO 清單管理原語（v0.2.0，2026-07-17 自部署目錄併入，見 ADR 013）
@@ -39,7 +39,7 @@ skills/                → skill 原始碼
     scripts/scan-replies.sh → 未 commit 回覆掃描＋tripwire（done 授權歸檔豁免、雙側核驗）
     scripts/scan-applications.sh → 申請信箱掃描＋tripwire（雙側核驗授權歸檔）
     scripts/scan-reports.sh → 上報信箱掃描＋tripwire（結構同 scan-applications.sh）
-    scripts/session_hook.py → SessionStart hook：session 啟動（含 /clear）自動注入信箱摘要（ADR 014，複用沙盤分類模組）
+    scripts/session_hook.py → SessionStart hook：session 啟動（含 /clear）自動注入信箱摘要（ADR 014，複用沙盤分類模組；含 handoff skill 版號變動提示——狀態檔 ~/.claude/kunsu-hook-state.json）
     tests/             → pytest，session hook 單元測試
   kunsu-apply/         → 子專案端投遞申請加入
     SKILL.md           → 自動偵測＋registry 選軍師＋守門與冪等預檢
@@ -136,6 +136,8 @@ install.sh             → 部署至 ~/.claude/skills/（預設 copy、--link �
 - **Invariant #5 生命週期 metadata 邊界與勘誤、引用兩慣例**（[ADR 016 candidate](docs/adr/2026-08-14-adr-candidate-016-lifecycle-metadata-boundary.md)，handoff v0.14.0／kunsu-init v0.4.0，2026-08-14）：源自 ebook 軍師兩缺口——已歸檔本體有錯無指標可尋（事件五勘誤落點）、交接引用剛收回覆的路徑隨收尾歸檔必然失效（引用腐化，回覆路徑不入 done 步驟 8 偵測、本體路徑命中卻受 Invariant #5 限制，兩形狀修復可能性同為零）。ADR 016 把 Invariant #5 例外邊界自「status 更新」明文重述為「**內文不可變；frontmatter 生命週期 metadata 由發起方維護**」（範本原文「生命週期標記」定性的明文化，附四要件擴張判準防滑坡、合規欄位窮舉 `status`＋`corrected_by`）。落地兩慣例：**更正交接**——勘誤以新交接傳遞（標題建議「更正」開頭，田野已驗證），發起方同時在原本體（含 archive 內）frontmatter 補 `corrected_by: <更正交接檔名>`（檔名不含路徑、與引用慣例自洽，多份累加列表；頂層中間態沿 done 步驟 4–7 連續執行約束收斂、archive 內為既有靜默略過分支，零掃描腳本改動）；**引用檔名權威**——add 指引明訂引用交接／回覆必含完整檔名、路徑僅當下位置提示，歸檔失效不構成錯誤，archive 既有失效引用不回溯。done 步驟 8 隨 ADR 補一行明文「grep 命中交接本體（含 archive 內）不修正、僅回報」——doc review 抓出跳過行為原僅存於憲章隱含、步驟字面無此規則，且 archive 內本體被 Edit 會被掃描靜默放行（憲章與機制字面一致教訓再現）。範本 Invariant #5 例外句與三處「唯一例外」措辭一致化（72／73 行外部寫入邊界確認不動）、kunsu-concepts 與母體 CONCEPTS（交接文件、done 收尾例外句、新增「更正交接」）詞條同步、consistency-check H 追加 `corrected_by` 比對字串。ADR 經 2-persona headless doc review（feasibility 1 筆 conf 100 P1 步驟 8 字面缺口＋2 筆機制敘述失實，全數修正）；三 live 軍師遷移與軍師端防線計畫（003）合批執行。
 
 - **軍師端斷言層級紀律與副官慣例**（handoff v0.15.0／kunsu-inbox v0.7.0／kunsu-init v0.5.0，2026-08-14）：源自使用者收斂「副官其實就是 subagent，讓軍師積極用即可；量大時顧此失彼」與 ebook 文件二（查 `pages-index.md` 當查證、正確一方被說服改口）。成因定為兩並列假說——判準錯位（全域 subagent 規範早存在卻沒生效：查證斷言看起來像「簡單查找」，通用規範反說直接處理，實則是忙碌 context 會偷工的多步深掘）與過載時規則不被查閱（後者無法靠改寫規範治癒，只能靠可觀察訊號判別）。四掛載點落地：**add 斷言層級紀律**——「查閱中介文件所得＝二手」定義句；措辭義務全涵蓋（凡來源為中介文件即寫「依 X 記載」不以「事實是」轉述——創始事件實害通道「事實語氣壓過對方自查」不必經據以實作級，唯全涵蓋才擋得住）、查證義務才分級（據以實作級，判準「對方會不會據此寫程式或改設計」，須一手並於內文註明方式與位置留跨 session 文本痕跡；現況分析定義句同步調和）；**done 斷言自查**——步驟 9 常設附句，錨定步驟 1–2 已讀文本逐筆點數、兩態回報（已一手查證／僅標明層級，後者列缺口待裁決）、零筆顯式一行「本輪無他方系統斷言」使靜默只剩「查核未執行」一種含義（兩假說判別機制；掛載位置比照沉澱訊號附句、輸出契約刻意相反）；**kunsu-inbox 觸發詞**——「信箱還有幾件」「還有哪些待收尾」等帶語境口語（自身狀態誤報 11 實 7 發生於對話回報時刻、不經工作流程步驟，比照 v0.3.0 路由補洞改掛觸發詞使其命中掃描腳本而非憑記憶）；**範本副官慣例小節**——用途／負載觸發判準（能力提示非義務）、原文回傳與完備性契約（證據原文＋`檔案:行號` 禁轉述結論；提取副官逐份清單含零命中明列，防「挑選偏誤無矛盾可偵測」）、判斷不外包（done 通讀不替代），步驟 2 盤點優先序補「子專案原始碼」層＋步驟 6 提取副官鉤子、自身狀態不憑記憶原則句。經 `/ce-brainstorm`（harness 不做枷鎖前提下自「強制核對」收斂為帶理由慣例）→ 3-persona × 2 輪 doc review（adversarial 連兩輪抓「判別器與被測現象共用失效通道」的自指弱點——R10 死信側不可觀察→零筆顯式、查證塌縮為措辭→兩態回報、R9 掛載錯位→觸發詞重掛；17 筆修正全收斂）→ `/ce-plan` → 3-persona 計畫審查（9 筆，含 kunsu-concepts 詞條血統補環——live CONCEPTS 承自範本非母體）。consistency-check H 追加「副官」比對字串；母體 CONCEPTS「副官」「斷言層級紀律」與範本 kunsu-concepts「副官」詞條新增；三軍師遷移與 ADR 016 合批；副官成本以一次真實派遣實測（對 eBookApp 查證副官：約 2.7 萬 token、49 秒、9 次工具呼叫，契約完整遵循且自發回報路徑修正，創始事件斷言「13 檔含 account-bind 非註解」一次驗證）。
+
+- **機制觸及率三件套：範本指路牌、腳本指路行與 hook 版號提示**（handoff v0.16.0／kunsu-inbox v0.8.0／kunsu-init v0.6.0，2026-08-15）：源自 ebook 審計第五份研究文件（第四份觀察五獨立成篇）——skill 內部指引只在 skill 被實際呼叫時生效，熟練軍師手動執行等效步驟時指引**靜默失效且產物層無法區分**（ebook 8/14 全日 8 建立＋6 收尾全手動；量化查核十項機制六項僅在 skill 內、軍師 CLAUDE.md 零命中，v0.10.0 起三道 done 查核可能一次未跑，既有機制有效性評估失去資料基礎）。結構定調：攔截點教訓的一般化——**必經路徑是動態的**，熟練 session 的必經只剩 CLAUDE.md（自動載入）、腳本本身（reply 側生效靠腳本計算複雜度、非指引品質）、仍被呼叫的入口三處，觸及率由手動繞道成本決定；「單一副本教訓 vs 觸及率」張力以**指路牌**調和——只搬名字與權威位置、細節單一副本留 SKILL。三件套：範本指路牌（kunsu-concepts 新增「done 收尾」詞條點名六查核＋「手動等效執行不豁免」、工作流程第 5／7 步指路句；母體 CONCEPTS 詞條同步補「斷言自查」點名消除五／六分歧）；腳本 **stderr** 指路行（兩支產檔腳本輸出尾端一行「本腳本僅產檔，指引見 SKILL 對應段」——手動路徑上唯一倖存的載體；走 stderr 為前瞻契約保護，stdout 維持單行路徑的機器可讀契約，經使用者裁決修訂 origin「stdout 指路」字面——scope-guardian 實查 repo 現無 `$()` 消費端、原理由不成立）；hook 版號變動提示（session_hook.py 身分確認後比對部署 handoff 版號與 `~/.claude/kunsu-hook-state.json`——kunsu 首個 hook 持久化狀態、機器層級不進 repo，變動輸出一行、首次靜默建檔、fail-open；測試以 autouse fixture 隔離狀態檔——doc review 抓出既有測試會直寫真實狀態檔、吃掉使用者的一次性提示）。consistency-check H 首次擴及 CONCEPTS.md（「不豁免」於 CLAUDE.md 與 CONCEPTS.md 雙檔各自命中，防詞條單側漏遷不可見）。否決：提高手動摩擦（反 harness 不做枷鎖前提）、查核細節全文搬 CLAUDE.md（副本漂移回歸）。經 `/ce-brainstorm` → `/ce-plan` → 3-persona doc review（10 筆全收斂）；hook 測試 18 項（12 既有＋6 新增）。三軍師第四波遷移合批執行。
 
 ### 尚未實作／後續評估
 - ADR 008 open questions 留待用量評估——歸檔 `status` 值域升級（現為單一 `archived`）、「軍師已讀」輕量標記、上報量成長後的整理慣例。

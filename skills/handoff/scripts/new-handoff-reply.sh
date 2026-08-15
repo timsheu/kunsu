@@ -146,3 +146,4 @@ BODY="$(cat || true)"
 } > "$file"
 
 echo "$file"
+echo "ℹ 本腳本僅產檔；回覆指引（逐項回答附證據、矛盾回報、暫離回報、verify 欄位）見 handoff SKILL.md reply 段——未經 /handoff skill 執行時請回讀對應步驟" >&2

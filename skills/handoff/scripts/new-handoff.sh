@@ -138,3 +138,4 @@ fi
 } > "$file"
 
 echo "$file"
+echo "ℹ 本腳本僅產檔；撰寫與查核指引（斷言層級紀律、引用檔名權威、更正交接）見 handoff SKILL.md add 段——未經 /handoff skill 執行時請回讀對應步驟" >&2

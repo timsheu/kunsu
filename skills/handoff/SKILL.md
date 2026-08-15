@@ -1,6 +1,6 @@
 ---
 name: handoff
-version: 0.15.0
+version: 0.16.0
 description: |
   把一個需要交給「另一個 session／另一個角色（如後台、前端、DevOps）」研究或
   接手的議題，寫成一份獨立交接文件，落在當前專案的 docs/handoffs/。每份交接一個
