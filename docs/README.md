@@ -28,7 +28,17 @@ kunsu 專案的文件集合。專案定位與核心規範見上層 [CLAUDE.md](.
 - **remove-project 子指令（2026-07-12）**：`kunsu-init` 新增 `remove-project` 子指令（v0.2.0 → v0.3.0），對稱 `add-project`，整筆移除子專案在本軍師的登記；新增 `registry-remove.sh`（獨立 exit code 區分冪等略過與成功移除）、清單失效感知選取、移除前未完成交接警告、雙階段不可逆確認、CLAUDE.md 先於 registry 的寫入順序設計。經 `/ce-brainstorm` → `/ce-plan`（4-persona doc-review）完整流程定案（ADR 012 accepted，[實作計畫](plans/2026-07-12-002-feat-remove-project-subcommand-plan.md)）。
 - **軍師沙盤新增 todo 列表顯示，`/todo` skill 併入 toolkit（2026-07-17）**：全域 `/todo` skill（v0.1.1）逐字併入 `skills/todo/`（比照 ADR 003 handoff 先例），`install.sh` 與 CLAUDE.md 同步；軍師沙盤新增 `app/todo_status.py` 唯讀彙整軍師自己 `docs/todos/` 未歸檔技術債（兩桶計數＋三層顯示樣式，比照 ADR 011 verify 欄位模式，severity 排序＋archive 計數），`main.py` 新增「待辦技術債」卡片與全域總覽整合。經 `/ce-brainstorm` → `/ce-plan` 完整流程定案（ADR 013 accepted），計畫期 doc-review 與 `ce-simplify-code` 各修正正確性缺陷，8-agent Tier 2 code review 修正 status 欄位 falsy 值誤判，並發現 `/todo` skill 併入前既有的 `git mv` 缺 `git add`、slug 產生順序兩個缺陷（零行為變更決策下留待後續版號修正）。137 項 pytest 通過（自 111 項增至 137）。
 - **軍師規劃前既有盤點與 kb 檢索接線（2026-07-25）**：軍師範本工作流程步驟 2 新增「規劃前既有盤點」子步驟（以 `/kb`／zoekt 依 handoffs→plans→子專案文件優先序檢索既有能力與結論，kb 軟依賴降級不阻斷）、步驟 5 加「相關既有教訓（選附）」；ebook／ivm／px 三 live 軍師同步遷移，tshehtu kb skill 補「搜教訓／搜歷史」playbook 並記兩筆既有缺陷 todo；dogfooding AE1／AE2 通過（[實作計畫](plans/2026-07-24-001-feat-kunsu-pre-planning-inventory-plan.md)）。
-- **下一步**：於真實專案群首輪使用 `/kunsu-init` 建立軍師（如 ebook 中心加入 iOS 時的 add-project 案例），累積手感後評估 SessionStart hook（ADR 002 第二階段）。
+- **軍師沙盤與收尾強化系列（2026-07-11 – 2026-07-19）**：軍師沙盤上線（ADR 010，本機 FastAPI 訊息聚合頁）與多輪易用性迭代；回覆 `verify:` 驗收方式欄位與交接三分類（ADR 011）；done 收尾口語觸發與憲章例外明文化、歸檔前逐項驗收查核、來源 todo 查核與一併收尾。
+- **暫離回報（2026-07-26，handoff v0.9.0）**：接手方切換任務前投遞最小 `partial` 回覆（branch 名＋一句現況＋回來意向），消除「工作已在 branch 卻顯示未接手」的訊號缺席。
+- **done 收尾沉澱訊號查核（2026-08-12，handoff v0.10.0）**：收尾時通讀全部回覆判斷五類沉澱訊號，回報附候選教訓與 `/ce-compound` 建議——僅提示不自動執行。
+- **跨功能邏輯連結稽核（2026-08-12）**：四軸唯讀稽核收斂 15 筆漂移；機械層檢查沉澱為 `scripts/consistency-check.sh`，可隨時重跑。
+- **知悉層自動化（2026-08-13，ADR 014／015 accepted）**：SessionStart hook 於 session 啟動（含 `/clear`）攤開信箱摘要；派發即推播／回覆即推播與 kunsu session 命名慣例（`kc` 啟動函式）。
+- **回覆內容路由與收尾殘項清點（2026-08-13，handoff v0.12.0）**：反向路由查核（回覆中指向發起方的行動項與已解答疑問不再靜默蒸發）、todo 殘項清點、inbox 分流提示行。
+- **接手方矛盾回報（2026-08-14，handoff v0.13.0）**：reply 步驟 2 帶理由規範——發現交接內容與自身參照物不符或內文自相矛盾時，即使不影響自身實作也在回覆中明列；讀方由既有反向路由查核承接。
+- **Invariant #5 生命週期 metadata 邊界（2026-08-14，ADR 016 candidate、handoff v0.14.0）**：本體內文不可變、frontmatter 生命週期欄位（`status`、`corrected_by`）由發起方維護；勘誤採更正交接＋原本體補指標、引用以完整檔名為權威識別，歸檔路徑失效不構成錯誤。
+- **軍師端斷言層級紀律與副官慣例（2026-08-14，handoff v0.15.0）**：查閱中介文件所得＝二手，據以實作的斷言須落原始碼並留查證痕跡；副官（subagent）慣例——原文回傳與完備性契約、判斷不外包；done 斷言自查兩態回報；kunsu-inbox 自身狀態觸發詞。
+- **機制觸及率三件套（2026-08-15，handoff v0.16.0）**：修復「skill 內部指引在手動執行等效步驟時靜默失效」——範本指路牌（done 收尾詞條點名六查核＋手動不豁免句）、產檔腳本 stderr 指路行、SessionStart hook 版號變動提示。
+- **下一步**：ADR 016 candidate 待審定；done 斷言自查與觸及率三件套的實績觀察（判準錯位／規則不被查閱兩假說判別）；ebook 軍師側五份審計研究 todo 依對應機制收尾。
 
 ## 文件清單
 
@@ -59,5 +69,26 @@ kunsu 專案的文件集合。專案定位與核心規範見上層 [CLAUDE.md](.
 | [plans/2026-07-17-001-feat-dashboard-todo-list-plan.md](plans/2026-07-17-001-feat-dashboard-todo-list-plan.md) | 實作計畫：軍師沙盤 todo 列表顯示與 `/todo` skill 併入（R1–R9、七個實作單元，已執行完畢） |
 | [brainstorms/2026-07-24-kunsu-pre-planning-inventory-requirements.md](brainstorms/2026-07-24-kunsu-pre-planning-inventory-requirements.md) | 需求：軍師規劃前既有盤點與 kb 檢索接線（主從反轉、檢索優先序、軟依賴降級） |
 | [plans/2026-07-24-001-feat-kunsu-pre-planning-inventory-plan.md](plans/2026-07-24-001-feat-kunsu-pre-planning-inventory-plan.md) | 實作計畫：規劃前既有盤點（核心＋kb playbook、六個實作單元，已執行完畢） |
+| [adr/2026-07-11-adr-candidate-010-dashboard-service-exception.md](adr/2026-07-11-adr-candidate-010-dashboard-service-exception.md) | ADR 010（accepted）：軍師沙盤對 Invariant 1 的例外範圍界定（唯讀、無背景輪詢、不得自主重啟） |
+| [adr/2026-07-12-adr-candidate-011-reply-verify-field.md](adr/2026-07-12-adr-candidate-011-reply-verify-field.md) | ADR 011（accepted）：回覆 `verify:` 驗收方式欄位（display-only 開放值域）與交接三分類 |
+| [adr/2026-08-13-adr-candidate-014-sessionstart-hook-activation.md](adr/2026-08-13-adr-candidate-014-sessionstart-hook-activation.md) | ADR 014（accepted）：SessionStart hook 第二階段啟用——事件驅動信箱摘要注入 |
+| [adr/2026-08-13-adr-candidate-015-dispatch-push-notification.md](adr/2026-08-13-adr-candidate-015-dispatch-push-notification.md) | ADR 015（accepted）：派發即推播／回覆即推播——對 ADR 002 推播否決的翻案（限縮於 daemon 輪詢形態） |
+| [adr/2026-08-14-adr-candidate-016-lifecycle-metadata-boundary.md](adr/2026-08-14-adr-candidate-016-lifecycle-metadata-boundary.md) | ADR 016（candidate，待審定）：Invariant #5 例外邊界重述——內文不可變、frontmatter 生命週期 metadata 由發起方維護 |
+| [plans/2026-07-11-001-feat-kunsu-dashboard-plan.md](plans/2026-07-11-001-feat-kunsu-dashboard-plan.md) | 實作計畫：軍師沙盤（R1–R10、六個實作單元，已執行完畢） |
+| [plans/2026-07-12-001-feat-reply-verify-field-plan.md](plans/2026-07-12-001-feat-reply-verify-field-plan.md) | 實作計畫：回覆 verify 欄位與沙盤「部分完成」子分類（U0–U7，已執行完畢） |
+| [brainstorms/2026-07-25-handoff-pause-report-requirements.md](brainstorms/2026-07-25-handoff-pause-report-requirements.md) | 需求：handoff 暫離回報慣例 |
+| [brainstorms/2026-08-12-handoff-done-compound-prompt-requirements.md](brainstorms/2026-08-12-handoff-done-compound-prompt-requirements.md) | 需求：done 收尾沉澱訊號查核（R1–R7、AE 三例） |
+| [plans/2026-08-12-001-feat-handoff-done-compound-prompt-plan.md](plans/2026-08-12-001-feat-handoff-done-compound-prompt-plan.md) | 實作計畫：沉澱訊號查核（三個實作單元，已執行完畢） |
+| [brainstorms/2026-08-12-awareness-automation-requirements.md](brainstorms/2026-08-12-awareness-automation-requirements.md) | 需求：知悉層自動化（Phase A SessionStart hook＋Phase B 派發即推播） |
+| [brainstorms/2026-08-13-reply-routing-and-residual-check-requirements.md](brainstorms/2026-08-13-reply-routing-and-residual-check-requirements.md) | 需求：回覆內容路由與收尾殘項清點（反向路由查核、殘項清點、分流提示） |
+| [plans/2026-08-13-001-feat-reply-routing-closure-checks-plan.md](plans/2026-08-13-001-feat-reply-routing-closure-checks-plan.md) | 實作計畫：收尾查核三件套（已執行完畢） |
+| [brainstorms/2026-08-14-reply-contradiction-reporting-norm-requirements.md](brainstorms/2026-08-14-reply-contradiction-reporting-norm-requirements.md) | 需求：接手方矛盾回報規範（帶理由 norm、命中才報、兩語境通用） |
+| [plans/2026-08-14-001-feat-reply-contradiction-reporting-norm-plan.md](plans/2026-08-14-001-feat-reply-contradiction-reporting-norm-plan.md) | 實作計畫：矛盾回報指引（三個實作單元，已執行完畢） |
+| [brainstorms/2026-08-14-invariant5-lifecycle-metadata-requirements.md](brainstorms/2026-08-14-invariant5-lifecycle-metadata-requirements.md) | 需求：Invariant #5 生命週期 metadata 邊界與勘誤、引用兩慣例 |
+| [plans/2026-08-14-002-feat-invariant5-lifecycle-metadata-plan.md](plans/2026-08-14-002-feat-invariant5-lifecycle-metadata-plan.md) | 實作計畫：ADR 016、更正交接與引用檔名權威（五個實作單元，已執行完畢） |
+| [brainstorms/2026-08-14-adjutant-source-level-requirements.md](brainstorms/2026-08-14-adjutant-source-level-requirements.md) | 需求：軍師端斷言層級紀律與副官慣例（經 3-persona × 2 輪 doc review 收斂） |
+| [plans/2026-08-14-003-feat-adjutant-source-level-plan.md](plans/2026-08-14-003-feat-adjutant-source-level-plan.md) | 實作計畫：斷言層級紀律、done 斷言自查、觸發詞與副官小節（五個實作單元，已執行完畢） |
+| [brainstorms/2026-08-15-mechanism-reach-signpost-requirements.md](brainstorms/2026-08-15-mechanism-reach-signpost-requirements.md) | 需求：機制投放點與觸及率——指路牌、腳本 stdout 指路與 hook 版號提示 |
+| [plans/2026-08-15-001-feat-mechanism-reach-signpost-plan.md](plans/2026-08-15-001-feat-mechanism-reach-signpost-plan.md) | 實作計畫：觸及率三件套（五個實作單元，已執行完畢） |
 | [playbooks/end-to-end-workflow.md](playbooks/end-to-end-workflow.md) | 操作教學：從建立軍師到一輪交接完成收尾的完整工作流程（自 README 拆出，操作教學唯一落點） |
 | [playbooks/dashboard.md](playbooks/dashboard.md) | 操作教學：軍師沙盤安裝、啟動與頁面導覽（自 README 拆出） |

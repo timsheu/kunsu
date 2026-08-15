@@ -16,15 +16,15 @@
 
 | 交付物 | 用途 |
 |--------|------|
-| `/kunsu-init` | 訪談式 scaffolding 建軍師（CLAUDE.md 五條不變量＋三信箱協議、Obsidian vault、git、註冊表登記）；含 `add-project`（申請審核制登記）與 `remove-project`（整筆移除登記）子指令 |
+| `/kunsu-init` | 訪談式 scaffolding 建軍師（CLAUDE.md 五條不變量＋三信箱協議、規劃前既有盤點與副官慣例、Obsidian vault、git、註冊表登記）；含 `add-project`（申請審核制登記）與 `remove-project`（整筆移除登記）子指令 |
 | `/kunsu-apply` | 子專案端投遞「申請加入軍師」到申請信箱，路徑與技術棧自動偵測；正式登記留給軍師端審核 |
 | `/kunsu-inbox` | 跨 session 傳令：子專案列出待接手交接，軍師回報新回覆／新申請／新上報並跑 tripwire 核對，回報附收尾與分流提示（行動項落 todo、答案回填） |
 | `/kunsu-report` | 子專案端投遞「主動上報」到上報信箱；單向情報傳遞，不設軍師回覆義務 |
 | `/kunsu-list` | 唯讀列出全域註冊表全部登記，含 stale 偵測與當前位置標記 |
-| `/handoff` | 通用交接原語：`add`／`reply`（含 `verify:` 驗收方式與暫離回報）／`list`／`done`（逐項驗收查核＋反向路由查核——回覆中指向發起方的行動項與已解答疑問不再靜默蒸發——＋來源 todo 一併收尾與殘項清點）。單 repo 專案也能獨立使用；kunsu 語境下 `add`／`reply` 內建派發即推播／回覆即推播（[ADR 015](docs/adr/2026-08-13-adr-candidate-015-dispatch-push-notification.md)） |
+| `/handoff` | 通用交接原語：`add`（斷言層級紀律——引用中介文件標「依 X 記載」、據以實作的斷言落原始碼並留查證痕跡；引用以完整檔名為權威識別；更正交接——已定案交接有誤時發更正交接並在原本體 frontmatter 補 `corrected_by` 指標）／`reply`（`verify:` 驗收方式、暫離回報、矛盾回報——發現交接與自身參照物不符時即使不影響實作也明列）／`list`／`done`（逐項驗收、沉澱訊號、反向路由、來源 todo 收尾與殘項清點、斷言自查等歸檔前查核）。單 repo 專案也能獨立使用；kunsu 語境下 `add`／`reply` 內建派發即推播／回覆即推播（[ADR 015](docs/adr/2026-08-13-adr-candidate-015-dispatch-push-notification.md)）；手動呼叫產檔腳本時 stderr 指路行提示回讀對應指引 |
 | `/todo` | CE 副作用技術債清單：一檔一項落在 `docs/todos/`，`add`／`list`／`done`（歸檔前先清點檔內未完成殘項）／`rm` |
 | 軍師沙盤 | 本機網頁一頁彙整所有軍師與子專案的訊息狀態與待辦技術債（非 skill，見 [ADR 010](docs/adr/2026-07-11-adr-candidate-010-dashboard-service-exception.md)） |
-| SessionStart hook | session 啟動（含 `/clear`）自動攤開 kunsu 信箱摘要；未登記 repo 靜默、fail-open 不阻斷 session（隨 `/kunsu-inbox` 部署，掛載後生效，見 [ADR 014](docs/adr/2026-08-13-adr-candidate-014-sessionstart-hook-activation.md)） |
+| SessionStart hook | session 啟動（含 `/clear`）自動攤開 kunsu 信箱摘要；toolkit 升版後另提示一行「handoff skill 已更新至 vX」使長駐 session 得知指引有變。未登記 repo 靜默、fail-open 不阻斷 session（隨 `/kunsu-inbox` 部署，掛載後生效，見 [ADR 014](docs/adr/2026-08-13-adr-candidate-014-sessionstart-hook-activation.md)） |
 | `kc` 啟動函式 | fish 函式：依註冊表以 kunsu session 命名慣例自動 `claude -n` 啟動，使推播匹配走精確比對（`scripts/kc.fish`） |
 
 核心設計（詳見 `docs/adr/`）：
@@ -34,6 +34,8 @@
 - **例外授權三信箱**：子專案 session 對軍師 repo 的寫入僅限三個信箱各新增新檔案：回覆信箱（`docs/handoffs/replies/`）、申請信箱（`docs/applications/`）與上報信箱（`docs/reports/`）；tripwire 核對守住這條邊界。
 - **上報是情報，不是委派**：`/kunsu-report` 讓子專案主動告知軍師，但不設回覆義務，與 handoff／reply 的雙向協作明確區分。
 - **傳令自動化、審核閘門不動**：`/kunsu-inbox`、SessionStart hook 與雙向推播一律只告知不開工；推播為派發／回覆事件當下的一次性訊息，非輪詢、非常駐服務；方案核准與驗收照舊由使用者把關（ADR 014、015）。
+- **內文不可變、生命週期 metadata 可維護**：交接本體是定案快照、內文永不回頭修改；frontmatter 生命週期欄位（`status`、`corrected_by`）由發起方維護——勘誤以更正交接傳遞、原本體留指標可尋，引用以檔名為權威識別、歸檔造成的路徑失效不構成錯誤（[ADR 016](docs/adr/2026-08-14-adr-candidate-016-lifecycle-metadata-boundary.md)）。
+- **帶理由的規範，不做枷鎖**：查核與紀律以帶理由的指引掛在 session 必經路徑，不強制儀式；軍師可派副官（subagent）分擔原始碼查證與大量彙整的原文提取（原文回傳、判斷不外包），為能力提示非義務。手動執行等效步驟不豁免查核——範本指路牌、腳本 stderr 指路行與 hook 版號提示三路確保指引送達手動執行者。
 
 ## 安裝
 
