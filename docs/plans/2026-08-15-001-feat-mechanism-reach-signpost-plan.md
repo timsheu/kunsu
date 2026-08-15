@@ -1,7 +1,7 @@
 ---
 title: "feat: 機制觸及率三件套——指路牌、腳本指路行與 hook 版號提示"
 type: feat
-status: active
+status: completed
 date: 2026-08-15
 origin: docs/brainstorms/2026-08-15-mechanism-reach-signpost-requirements.md
 ---
