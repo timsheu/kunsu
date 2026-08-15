@@ -1,7 +1,7 @@
 ---
 title: "feat: Invariant #5 生命週期 metadata 邊界與勘誤、引用兩慣例"
 type: feat
-status: active
+status: completed
 date: 2026-08-14
 origin: docs/brainstorms/2026-08-14-invariant5-lifecycle-metadata-requirements.md
 ---

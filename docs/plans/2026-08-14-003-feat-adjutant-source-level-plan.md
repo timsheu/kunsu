@@ -1,7 +1,7 @@
 ---
 title: "feat: 軍師端斷言層級紀律與副官慣例"
 type: feat
-status: active
+status: completed
 date: 2026-08-14
 origin: docs/brainstorms/2026-08-14-adjutant-source-level-requirements.md
 ---
