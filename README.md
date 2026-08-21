@@ -53,7 +53,7 @@ cd kunsu
 選用配件（皆為機器層級設定，解除即完全停用）：
 
 - **SessionStart hook**：已隨 `/kunsu-inbox` 一併部署，於 `~/.claude/settings.json` 掛載後生效——掛載範例與解除方式見 `skills/kunsu-inbox/SKILL.md` 的「SessionStart hook」節。
-- **`kc` 啟動函式**（fish shell 限定）：`cp scripts/kc.fish ~/.config/fish/functions/`——之後以 `kc` 取代 `claude` 啟動，依註冊表自動命名 session；未登記目錄、自帶 `-n`／`--name` 與 `--resume` 一律透傳、行為同 `claude`。同一資料夾要開多個 session 分頭處理不同工作時，加 `kc --slot <後綴>`（後綴限英數、`-`、`_`）取得 `<慣例名>.<後綴>`（如 `ebook-android.auth`），讓 `/park`／`/unpark` 各持一份停車格（slot 取 session 名稱）。
+- **`kc` 啟動函式**（fish shell 限定）：`cp scripts/kc.fish ~/.config/fish/functions/`——之後以 `kc` 取代 `claude` 啟動，依註冊表自動命名 session；未登記目錄、自帶 `-n`／`--name` 與 `--resume` 一律透傳、行為同 `claude`。同一資料夾要開多個 session 分頭做不同工作時，改用 `kc --slot <後綴>` 啟動，session 名會變成 `<慣例名>.<後綴>`（例如 `ebook-android.auth`；後綴限英數、`-`、`_`），`/park`／`/unpark` 就能各持一份停車格。
 
 > 外部軟依賴：`/kunsu-init` 的 Obsidian vault 步驟會呼叫全域 `/init-obsidian-vault` skill，未安裝時自動略過；軍師的「規劃前既有盤點」使用 `/kb`（zoekt 本機索引），未安裝時降級為手動查閱。兩者缺席都不影響其餘功能。交接慣例所需的 `/handoff` 已內建（見 ADR 003）。
 
@@ -75,7 +75,7 @@ cd kunsu
 
 - **SessionStart hook**：session 啟動（含 `/clear`）時以確定性腳本掃描信箱、把摘要注入開場 context——長駐視窗按 `/clear` 即攤開待接手清單。零 token、未登記 repo 靜默、fail-open 絕不阻斷 session 啟動。
 - **派發即推播／回覆即推播**：軍師派發完成、子專案回覆投遞（含暫離回報）的當下，向對方的已開啟長駐 session 發送一次性告知訊息——事件驅動、零輪詢、零常駐服務，訊息自帶「僅回顯、勿開工」收方指令，子專案 repo 零注入。
-- **session 命名慣例**：子專案 `<軍師目錄名>-<角色代碼>`（如 `ebook-android`）、軍師 `<軍師目錄名>-kunsu`，以及兩者後接 `.` 與後綴的 slot 變體（如 `ebook-android.auth`，`kc --slot` 產生）——以 `/rename` 一次設定（持久化）或以 `kc` 啟動函式自動帶入，使推播匹配走精確比對；無慣例名時退回名稱啟發式，兩層皆唯一命中才發送、寧漏發不誤發（同一慣例名的多個 slot 變體並存即多重命中、一律降級），未推播由 hook 與掃描兜底。
+- **session 命名慣例**：子專案 `<軍師目錄名>-<角色代碼>`（如 `ebook-android`）、軍師 `<軍師目錄名>-kunsu`，以及兩者再接上 `.` 與後綴的 slot 變體（如 `ebook-android.auth`，`kc --slot` 產生）——以 `/rename` 一次設定（持久化）或以 `kc` 啟動函式自動帶入，使推播匹配走精確比對；無慣例名時退回名稱啟發式，兩層皆唯一命中才發送、寧漏發不誤發（同一慣例名的多個 slot 變體並存即多重命中、一律降級），未推播由 hook 與掃描兜底。
 
 三者皆屬知悉層：接手、開工、查核、done 收尾的決策閘門一律留在使用者手上。
 
