@@ -11,7 +11,7 @@
 #
 # 行為：
 #   1. 從當前目錄往上找最近的 CLAUDE.md/AGENTS.md 定位專案根；找不到才退回
-#      git 根，最後退回當前目錄（與 new-handoff.sh 一致；僅供片段搜尋用）
+#      git 根，最後退回當前目錄；往上找到家目錄即停，不把家目錄當專案根（與 new-handoff.sh 一致；僅供片段搜尋用）
 #   2. 定位原交接文件：可傳完整路徑（含跨 repo 絕對路徑），或當前專案
 #      docs/handoffs/（含 archive）底下足以唯一比對的檔名片段；找不到或有
 #      多筆符合會報錯並列出候選
@@ -38,10 +38,12 @@ if [[ -z "$ORIG_REF" ]]; then
   exit 1
 fi
 
-# 定位專案根：優先往上找最近的 CLAUDE.md/AGENTS.md，其次 git 根，最後當前目錄
+# 定位專案根：優先往上找最近的 CLAUDE.md/AGENTS.md，其次 git 根，最後當前目錄。
+# 往上找到家目錄即停：家目錄可能放著全域規範檔（如 Codex 的 ~/AGENTS.md），專案
+# 沒有標記檔時若不設界，會把家目錄誤認為專案根、檔案寫進 ~/docs/
 ROOT=""
 dir="$(pwd)"
-while [[ "$dir" != "/" ]]; do
+while [[ "$dir" != "/" && "$dir" != "${HOME:-}" ]]; do
   if [[ -f "$dir/CLAUDE.md" || -f "$dir/AGENTS.md" ]]; then
     ROOT="$dir"
     break

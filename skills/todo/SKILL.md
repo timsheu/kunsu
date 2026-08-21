@@ -1,6 +1,6 @@
 ---
 name: todo
-version: 0.2.0
+version: 0.2.1
 description: |
   管理專案的 CE 副作用 TODO 清單：一檔一項技術債，存放於當前專案的 docs/todos/，
   含 Dataview 友善 frontmatter（status/date/source/severity）。用於記錄

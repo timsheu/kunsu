@@ -364,7 +364,7 @@ context——長駐 session 按 `/clear` 即攤開信箱，不必再手動觸發
 
 ## 依賴聲明
 
-本 skill 依賴同 toolkit 內建的 `/handoff` skill（v0.17.0，原始碼位於本 repo `skills/handoff/`）所定義的下列慣例。兩者共同發版、慣例定義以本 repo 為準；更新 handoff 的以下行為時需同步核查本 skill（v0.10.0 的沉澱訊號查核為 done 流程內部指引、v0.11.0 的派發即推播／回覆即推播為 add／reply 流程收尾通知、v0.12.0 的反向路由查核與 todo 殘項清點為 done 流程內部指引、v0.13.0 的矛盾回報指引為 reply 流程內部指引、v0.14.0 的更正交接與 `corrected_by` 為 add 流程內部慣例（corrected_by 為 display-only frontmatter 欄位；其 Edit 中間態頂層屬既有 catch-all tripwire、archive 內屬既有靜默略過分支，皆無新豁免）、v0.15.0 的斷言層級紀律與 done 斷言自查為 add／done 流程內部指引、v0.16.0 的產檔腳本 stderr 指路行不改變產出檔內容與 stdout 路徑契約、v0.17.0 的 session 命名慣例 slot 變體（`kc --slot`，推播精確比對納入 `<慣例名>.<後綴>`、多重命中仍降級）為 add／reply 推播匹配規則——皆不涉掃描慣例、無豁免需求；回覆即推播不改變「未 commit 即新回覆」訊號）：
+本 skill 依賴同 toolkit 內建的 `/handoff` skill（v0.17.1，原始碼位於本 repo `skills/handoff/`）所定義的下列慣例。兩者共同發版、慣例定義以本 repo 為準；更新 handoff 的以下行為時需同步核查本 skill（v0.10.0 的沉澱訊號查核為 done 流程內部指引、v0.11.0 的派發即推播／回覆即推播為 add／reply 流程收尾通知、v0.12.0 的反向路由查核與 todo 殘項清點為 done 流程內部指引、v0.13.0 的矛盾回報指引為 reply 流程內部指引、v0.14.0 的更正交接與 `corrected_by` 為 add 流程內部慣例（corrected_by 為 display-only frontmatter 欄位；其 Edit 中間態頂層屬既有 catch-all tripwire、archive 內屬既有靜默略過分支，皆無新豁免）、v0.15.0 的斷言層級紀律與 done 斷言自查為 add／done 流程內部指引、v0.16.0 的產檔腳本 stderr 指路行不改變產出檔內容與 stdout 路徑契約、v0.17.0 的 session 命名慣例 slot 變體（`kc --slot`，推播精確比對納入 `<慣例名>.<後綴>`、多重命中仍降級）為 add／reply 推播匹配規則、v0.17.1 的產檔腳本專案根定位「往上找到家目錄即停」為腳本內部防呆（不改變產出檔內容與 stdout 路徑契約）——皆不涉掃描慣例、無豁免需求；回覆即推播不改變「未 commit 即新回覆」訊號）：
 
 | 項目 | 慣例 |
 |------|------|

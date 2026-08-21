@@ -22,10 +22,10 @@ docs/
   solutions/           → 可重用學習與解法（/ce-compound 產出，YAML frontmatter 依 module/tags/problem_type 可搜尋）
   playbooks/           → 操作教學（端到端工作流程、軍師沙盤導覽；手工維護，自 README 拆出的教學唯一落點）
 skills/                → skill 原始碼
-  handoff/             → 通用交接原語（v0.17.0，2026-07-06 自部署目錄併入，見 ADR 003）
+  handoff/             → 通用交接原語（v0.17.1，2026-07-06 自部署目錄併入，見 ADR 003）
     SKILL.md           → add／reply／list／done 子指令（add 含引用檔名權威慣例、斷言層級紀律與更正交接子節（corrected_by 補記）；done 回報含斷言自查兩態附句；reply 含 kunsu 語境分支、verify 驗收方式選填欄位、逐項回答附證據指引、矛盾回報指引與暫離回報最小 partial 回覆；done 含收尾口語觸發、發起方守門、歸檔前逐項驗收查核、沉澱訊號查核、反向路由查核與來源 todo 查核一併收尾（todo 收尾含殘項清點）；add／done／本地 reply 尾端確認 commit）
     scripts/           → new-handoff.sh、new-handoff-reply.sh
-  todo/                → CE 副作用 TODO 清單管理原語（v0.2.0，2026-07-17 自部署目錄併入，見 ADR 013）
+  todo/                → CE 副作用 TODO 清單管理原語（v0.2.1，2026-07-17 自部署目錄併入，見 ADR 013）
     SKILL.md           → add／list／done／rm 子指令，管理 docs/todos/ 一檔一項技術債（done 含殘項清點；done／rm 含 untracked 前置檢查）
     scripts/           → new-todo.sh
   kunsu-init/          → 軍師 scaffolding
@@ -140,6 +140,8 @@ install.sh             → 部署至 ~/.claude/skills/（預設 copy、--link �
 - **機制觸及率三件套：範本指路牌、腳本指路行與 hook 版號提示**（handoff v0.16.0／kunsu-inbox v0.8.0／kunsu-init v0.6.0，2026-08-15）：源自 ebook 審計第五份研究文件（第四份觀察五獨立成篇）——skill 內部指引只在 skill 被實際呼叫時生效，熟練軍師手動執行等效步驟時指引**靜默失效且產物層無法區分**（ebook 8/14 全日 8 建立＋6 收尾全手動；量化查核十項機制六項僅在 skill 內、軍師 CLAUDE.md 零命中，v0.10.0 起三道 done 查核可能一次未跑，既有機制有效性評估失去資料基礎）。結構定調：攔截點教訓的一般化——**必經路徑是動態的**，熟練 session 的必經只剩 CLAUDE.md（自動載入）、腳本本身（reply 側生效靠腳本計算複雜度、非指引品質）、仍被呼叫的入口三處，觸及率由手動繞道成本決定；「單一副本教訓 vs 觸及率」張力以**指路牌**調和——只搬名字與權威位置、細節單一副本留 SKILL。三件套：範本指路牌（kunsu-concepts 新增「done 收尾」詞條點名六查核＋「手動等效執行不豁免」、工作流程第 5／7 步指路句；母體 CONCEPTS 詞條同步補「斷言自查」點名消除五／六分歧）；腳本 **stderr** 指路行（兩支產檔腳本輸出尾端一行「本腳本僅產檔，指引見 SKILL 對應段」——手動路徑上唯一倖存的載體；走 stderr 為前瞻契約保護，stdout 維持單行路徑的機器可讀契約，經使用者裁決修訂 origin「stdout 指路」字面——scope-guardian 實查 repo 現無 `$()` 消費端、原理由不成立）；hook 版號變動提示（session_hook.py 身分確認後比對部署 handoff 版號與 `~/.claude/kunsu-hook-state.json`——kunsu 首個 hook 持久化狀態、機器層級不進 repo，變動輸出一行、首次靜默建檔、fail-open；測試以 autouse fixture 隔離狀態檔——doc review 抓出既有測試會直寫真實狀態檔、吃掉使用者的一次性提示）。consistency-check H 首次擴及 CONCEPTS.md（「不豁免」於 CLAUDE.md 與 CONCEPTS.md 雙檔各自命中，防詞條單側漏遷不可見）。否決：提高手動摩擦（反 harness 不做枷鎖前提）、查核細節全文搬 CLAUDE.md（副本漂移回歸）。經 `/ce-brainstorm` → `/ce-plan` → 3-persona doc review（10 筆全收斂）；hook 測試 18 項（12 既有＋6 新增）。三軍師第四波遷移合批執行。
 
 - **kc `--slot` 後綴與推播 slot 變體匹配**（handoff v0.17.0，2026-08-21）：源自使用者需求：同一資料夾要開多個 session 分頭處理不同工作，`kc` 只會給出同一個慣例名，`/park`／`/unpark` 的停車格（slot 取 session 名稱）因此互撞；且同名多 session 本來就會讓派發即推播的精確比對多重命中、降級跳過。`kc.fish` 新增 `--slot <後綴>`（亦接受 `--slot=<後綴>`；後綴限英數、`-`、`_`），產生 `<慣例名>.<後綴>`（如 `ebook-android.auth`、`ebook-kunsu.review`）。分隔符固定 `.`：角色代碼是 kebab-case、不含 `.`，解析唯一，也在 park 名稱 regex 允許範圍內；自帶 `-n`／`--name`、`--resume`／`-r`、非 git 或未登記目錄時一律略過命名並於 stderr 提示 `--slot` 被忽略（順帶修正一個潛伏錯誤：原版用 `test "$a" = "-r"` 比對旗標，參數值本身是 `-r`／`-n` 時會被 fish 當成一元運算子，改用 `contains`）。handoff add 步驟 6-2 與 reply 步驟 6-1 精確比對納入 slot 變體，**多重命中處理維持「唯一才發送」**（使用者定案：多 session 分頭作業不需每個視窗都收推播，手動 `/kunsu-inbox` 即可），無後綴與有後綴並存亦屬多重命中、不挑選其一。park／unpark、範本、ADR 015 本文零改動；kunsu-inbox 依賴聲明同步 v0.17.0、CONCEPTS「派發即推播」詞條同步。stub `claude` 函式實跑九場景全過（無後綴／`--slot`／`--slot=` 帶其他參數／非法後綴 exit 2／自帶 `-n`／`--name`／`-r`／`--resume`／軍師目錄／未登記目錄）。
+
+- **產檔腳本專案根定位家目錄止步與 init-docs 標記檔必建**（handoff v0.17.1／todo v0.2.1／全域 idea v0.1.2，2026-08-21）：源自使用者回報「add todo 時往上找專案資料夾，很常錯誤找到家目錄」。根因：`new-todo.sh`／`new-handoff.sh`／`new-handoff-reply.sh`／`new-idea.sh` 以「從 cwd 往上找最近的 CLAUDE.md／AGENTS.md」定位專案根，而家目錄放著 Codex 全域規範 `~/AGENTS.md`，專案沒有標記檔時必然一路撞到家目錄、檔案寫進 `~/docs/`。兩層修補：腳本端四支產檔腳本的往上迴圈加「走到 `$HOME` 即停」守門（`while [[ "$dir" != "/" && "$dir" != "${HOME:-}" ]]`），家目錄與其上層不再被視為專案根，退回 git 根／cwd 的既有 fallback 不變，產出檔內容與 stdout 路徑契約零改動；源頭端全域 `/init-docs` 指令（`~/.claude/commands/init-docs.prompt.md`，不在本 repo）改寫——新增步驟 0 無條件先寫最小 `CLAUDE.md` 作專案根標記（再以完整版覆寫，確認清單中不可取消）、步驟 6 以與腳本相同的往上迴圈驗證解析結果等於 `pwd`，並修正其子文件路徑仍寫 `.claude/*.md` 的既有漂移（對齊 `project-docs.md` 的 `docs/modules/`／`docs/playbooks/`）。kunsu-inbox 依賴聲明同步 v0.17.1。暫存目錄 dogfooding：家目錄底下無標記無 git 退回 cwd、有 git 退回 git 根、有標記取標記、家目錄外不受影響。
 
 ### 尚未實作／後續評估
 - ADR 008 open questions 留待用量評估——歸檔 `status` 值域升級（現為單一 `archived`）、「軍師已讀」輕量標記、上報量成長後的整理慣例。

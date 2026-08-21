@@ -6,7 +6,7 @@
 #
 # 行為：
 #   1. 從當前目錄往上找最近的 CLAUDE.md/AGENTS.md 定位專案根（monorepo/submodule
-#      場景下，實際專案常不等於 git 根目錄）；找不到才退回 git 根，最後退回當前目錄
+#      場景下，實際專案常不等於 git 根目錄）；找不到才退回 git 根，最後退回當前目錄；往上找到家目錄即停，不把家目錄當專案根
 #   2. 確保 docs/handoffs/ 存在
 #   3. 檔名 = YYYY-MM-DD-<slug>.md；同日同名自動加 -2、-3...
 #   4. 寫入 Dataview 友善 frontmatter（from/to/status）+ stdin 內文 +
@@ -28,10 +28,12 @@ if [[ -z "$TITLE" ]]; then
   exit 1
 fi
 
-# 定位專案根：優先往上找最近的 CLAUDE.md/AGENTS.md，其次 git 根，最後當前目錄
+# 定位專案根：優先往上找最近的 CLAUDE.md/AGENTS.md，其次 git 根，最後當前目錄。
+# 往上找到家目錄即停：家目錄可能放著全域規範檔（如 Codex 的 ~/AGENTS.md），專案
+# 沒有標記檔時若不設界，會把家目錄誤認為專案根、檔案寫進 ~/docs/
 ROOT=""
 dir="$(pwd)"
-while [[ "$dir" != "/" ]]; do
+while [[ "$dir" != "/" && "$dir" != "${HOME:-}" ]]; do
   if [[ -f "$dir/CLAUDE.md" || -f "$dir/AGENTS.md" ]]; then
     ROOT="$dir"
     break
