@@ -22,7 +22,7 @@ docs/
   solutions/           → 可重用學習與解法（/ce-compound 產出，YAML frontmatter 依 module/tags/problem_type 可搜尋）
   playbooks/           → 操作教學（端到端工作流程、軍師沙盤導覽；手工維護，自 README 拆出的教學唯一落點）
 skills/                → skill 原始碼
-  handoff/             → 通用交接原語（v0.16.0，2026-07-06 自部署目錄併入，見 ADR 003）
+  handoff/             → 通用交接原語（v0.17.0，2026-07-06 自部署目錄併入，見 ADR 003）
     SKILL.md           → add／reply／list／done 子指令（add 含引用檔名權威慣例、斷言層級紀律與更正交接子節（corrected_by 補記）；done 回報含斷言自查兩態附句；reply 含 kunsu 語境分支、verify 驗收方式選填欄位、逐項回答附證據指引、矛盾回報指引與暫離回報最小 partial 回覆；done 含收尾口語觸發、發起方守門、歸檔前逐項驗收查核、沉澱訊號查核、反向路由查核與來源 todo 查核一併收尾（todo 收尾含殘項清點）；add／done／本地 reply 尾端確認 commit）
     scripts/           → new-handoff.sh、new-handoff-reply.sh
   todo/                → CE 副作用 TODO 清單管理原語（v0.2.0，2026-07-17 自部署目錄併入，見 ADR 013）
@@ -55,7 +55,7 @@ skills/                → skill 原始碼
     requirements.txt   → fastapi／uvicorn[standard]／PyYAML（本專案首次 pip 依賴）
     app/               → registry.py／kunsu_scan.py／subrepo_status.py／todo_status.py／main.py
     tests/             → pytest，137 項測試
-scripts/kc.fish        → kunsu claude 啟動函式（fish autoload；依 registry 自動以命名慣例 `-n` 啟動，部署至 ~/.config/fish/functions/）
+scripts/kc.fish        → kunsu claude 啟動函式（fish autoload；依 registry 自動以命名慣例 `-n` 啟動，`--slot <後綴>` 產生 `<慣例名>.<後綴>` 區分同資料夾多 session，部署至 ~/.config/fish/functions/）
 scripts/consistency-check.sh → 跨檔案一致性機械檢查（版號鏈、值域副本、定型文字實跑比對、install 覆蓋、分類詞對映、live 軍師 WARN 級抽查；沉澱自 2026-08-12 邏輯連結稽核）
 install.sh             → 部署至 ~/.claude/skills/（預設 copy、--link 開發模式）
 ```
@@ -138,6 +138,8 @@ install.sh             → 部署至 ~/.claude/skills/（預設 copy、--link �
 - **軍師端斷言層級紀律與副官慣例**（handoff v0.15.0／kunsu-inbox v0.7.0／kunsu-init v0.5.0，2026-08-14）：源自使用者收斂「副官其實就是 subagent，讓軍師積極用即可；量大時顧此失彼」與 ebook 文件二（查 `pages-index.md` 當查證、正確一方被說服改口）。成因定為兩並列假說——判準錯位（全域 subagent 規範早存在卻沒生效：查證斷言看起來像「簡單查找」，通用規範反說直接處理，實則是忙碌 context 會偷工的多步深掘）與過載時規則不被查閱（後者無法靠改寫規範治癒，只能靠可觀察訊號判別）。四掛載點落地：**add 斷言層級紀律**——「查閱中介文件所得＝二手」定義句；措辭義務全涵蓋（凡來源為中介文件即寫「依 X 記載」不以「事實是」轉述——創始事件實害通道「事實語氣壓過對方自查」不必經據以實作級，唯全涵蓋才擋得住）、查證義務才分級（據以實作級，判準「對方會不會據此寫程式或改設計」，須一手並於內文註明方式與位置留跨 session 文本痕跡；現況分析定義句同步調和）；**done 斷言自查**——步驟 9 常設附句，錨定步驟 1–2 已讀文本逐筆點數、兩態回報（已一手查證／僅標明層級，後者列缺口待裁決）、零筆顯式一行「本輪無他方系統斷言」使靜默只剩「查核未執行」一種含義（兩假說判別機制；掛載位置比照沉澱訊號附句、輸出契約刻意相反）；**kunsu-inbox 觸發詞**——「信箱還有幾件」「還有哪些待收尾」等帶語境口語（自身狀態誤報 11 實 7 發生於對話回報時刻、不經工作流程步驟，比照 v0.3.0 路由補洞改掛觸發詞使其命中掃描腳本而非憑記憶）；**範本副官慣例小節**——用途／負載觸發判準（能力提示非義務）、原文回傳與完備性契約（證據原文＋`檔案:行號` 禁轉述結論；提取副官逐份清單含零命中明列，防「挑選偏誤無矛盾可偵測」）、判斷不外包（done 通讀不替代），步驟 2 盤點優先序補「子專案原始碼」層＋步驟 6 提取副官鉤子、自身狀態不憑記憶原則句。經 `/ce-brainstorm`（harness 不做枷鎖前提下自「強制核對」收斂為帶理由慣例）→ 3-persona × 2 輪 doc review（adversarial 連兩輪抓「判別器與被測現象共用失效通道」的自指弱點——R10 死信側不可觀察→零筆顯式、查證塌縮為措辭→兩態回報、R9 掛載錯位→觸發詞重掛；17 筆修正全收斂）→ `/ce-plan` → 3-persona 計畫審查（9 筆，含 kunsu-concepts 詞條血統補環——live CONCEPTS 承自範本非母體）。consistency-check H 追加「副官」比對字串；母體 CONCEPTS「副官」「斷言層級紀律」與範本 kunsu-concepts「副官」詞條新增；三軍師遷移與 ADR 016 合批；副官成本以一次真實派遣實測（對 eBookApp 查證副官：約 2.7 萬 token、49 秒、9 次工具呼叫，契約完整遵循且自發回報路徑修正，創始事件斷言「13 檔含 account-bind 非註解」一次驗證）。
 
 - **機制觸及率三件套：範本指路牌、腳本指路行與 hook 版號提示**（handoff v0.16.0／kunsu-inbox v0.8.0／kunsu-init v0.6.0，2026-08-15）：源自 ebook 審計第五份研究文件（第四份觀察五獨立成篇）——skill 內部指引只在 skill 被實際呼叫時生效，熟練軍師手動執行等效步驟時指引**靜默失效且產物層無法區分**（ebook 8/14 全日 8 建立＋6 收尾全手動；量化查核十項機制六項僅在 skill 內、軍師 CLAUDE.md 零命中，v0.10.0 起三道 done 查核可能一次未跑，既有機制有效性評估失去資料基礎）。結構定調：攔截點教訓的一般化——**必經路徑是動態的**，熟練 session 的必經只剩 CLAUDE.md（自動載入）、腳本本身（reply 側生效靠腳本計算複雜度、非指引品質）、仍被呼叫的入口三處，觸及率由手動繞道成本決定；「單一副本教訓 vs 觸及率」張力以**指路牌**調和——只搬名字與權威位置、細節單一副本留 SKILL。三件套：範本指路牌（kunsu-concepts 新增「done 收尾」詞條點名六查核＋「手動等效執行不豁免」、工作流程第 5／7 步指路句；母體 CONCEPTS 詞條同步補「斷言自查」點名消除五／六分歧）；腳本 **stderr** 指路行（兩支產檔腳本輸出尾端一行「本腳本僅產檔，指引見 SKILL 對應段」——手動路徑上唯一倖存的載體；走 stderr 為前瞻契約保護，stdout 維持單行路徑的機器可讀契約，經使用者裁決修訂 origin「stdout 指路」字面——scope-guardian 實查 repo 現無 `$()` 消費端、原理由不成立）；hook 版號變動提示（session_hook.py 身分確認後比對部署 handoff 版號與 `~/.claude/kunsu-hook-state.json`——kunsu 首個 hook 持久化狀態、機器層級不進 repo，變動輸出一行、首次靜默建檔、fail-open；測試以 autouse fixture 隔離狀態檔——doc review 抓出既有測試會直寫真實狀態檔、吃掉使用者的一次性提示）。consistency-check H 首次擴及 CONCEPTS.md（「不豁免」於 CLAUDE.md 與 CONCEPTS.md 雙檔各自命中，防詞條單側漏遷不可見）。否決：提高手動摩擦（反 harness 不做枷鎖前提）、查核細節全文搬 CLAUDE.md（副本漂移回歸）。經 `/ce-brainstorm` → `/ce-plan` → 3-persona doc review（10 筆全收斂）；hook 測試 18 項（12 既有＋6 新增）。三軍師第四波遷移合批執行。
+
+- **kc `--slot` 後綴與推播 slot 變體匹配**（handoff v0.17.0，2026-08-21）：源自使用者需求——同一資料夾要開多個 session 分頭處理不同工作，`kc` 只會給出同一個慣例名，`/park`／`/unpark` 的停車格（slot 取 session 名稱）因此互撞；且同名多 session 本就使派發即推播精確比對多重命中而降級。`kc.fish` 新增 `--slot <後綴>`（亦接受 `--slot=<後綴>`；後綴限英數、`-`、`_`），產生 `<慣例名>.<後綴>`（如 `ebook-android.auth`、`ebook-kunsu.review`）——分隔符固定 `.`，因角色代碼為 kebab-case 不含 `.`，解析唯一且在 park 名稱 regex 允許範圍內；自帶 `-n`／`--name`、`--resume`／`-r`、非 git 或未登記目錄時一律略過命名並於 stderr 提示 `--slot` 被忽略（順帶修正原版以 `test "$a" = "-r"` 比對旗標在參數值為 `-r`／`-n` 時被 fish 當成一元運算子的潛伏錯誤，改用 `contains`）。handoff add 步驟 6-2 與 reply 步驟 6-1 精確比對納入 slot 變體，**多重命中處理維持「唯一才發送」**（使用者定案：多 session 分頭作業不需每個視窗都收推播，手動 `/kunsu-inbox` 即可），無後綴與有後綴並存亦屬多重命中、不挑選其一。park／unpark、範本、ADR 015 本文零改動；kunsu-inbox 依賴聲明同步 v0.17.0、CONCEPTS「派發即推播」詞條同步。stub `claude` 函式實跑九場景全過（無後綴／`--slot`／`--slot=` 帶其他參數／非法後綴 exit 2／自帶 `-n`／`--name`／`-r`／`--resume`／軍師目錄／未登記目錄）。
 
 ### 尚未實作／後續評估
 - ADR 008 open questions 留待用量評估——歸檔 `status` 值域升級（現為單一 `archived`）、「軍師已讀」輕量標記、上報量成長後的整理慣例。

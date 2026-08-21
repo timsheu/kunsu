@@ -1,6 +1,6 @@
 ---
 name: handoff
-version: 0.16.0
+version: 0.17.0
 description: |
   把一個需要交給「另一個 session／另一個角色（如後台、前端、DevOps）」研究或
   接手的議題，寫成一份獨立交接文件，落在當前專案的 docs/handoffs/。每份交接一個
@@ -172,15 +172,20 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
       （比對登記於本軍師的 `roles`）。
    2. **匹配 session**：以 ListAgents 列出本機 session，兩層匹配：
       - **精確比對優先**：session 名稱恰為 `<軍師目錄名>-<角色代碼>`（kunsu
-        session 命名慣例，如 `ebook-android`）→ 直接命中，零歧義。慣例名由
-        使用者在長駐 session 下一次 `/rename` 設定（持久化、`/clear` 不影響），
-        或以 `kc` 啟動函式（`scripts/kc.fish`）在新開 session 時自動帶入；
+        session 命名慣例，如 `ebook-android`），或該慣例名後接 `.` 與任意
+        後綴（同資料夾多 session 的 slot 變體，如 `ebook-android.auth`）→
+        直接命中，零歧義。慣例名由使用者在長駐 session 下一次 `/rename`
+        設定（持久化、`/clear` 不影響），或以 `kc` 啟動函式（`scripts/kc.fish`，
+        `kc --slot <後綴>` 產生 slot 變體）在新開 session 時自動帶入；
         軍師自身 session 的慣例名為 `<軍師目錄名>-kunsu`（供日後回覆方向
         推播定址）。
       - **啟發式 fallback**：無慣例名時，正規化（轉小寫、去除非英數字元）後，
         session 名稱去掉尾端亂數後綴應與子專案目錄 basename 對應。
       **唯一且明確才發送**；找不到、多重命中一律降級跳過（不重試、不排隊），
-      由 SessionStart hook 於該視窗下次 `/clear` 兜底——寧漏發不誤發。
+      由 SessionStart hook 於該視窗下次 `/clear` 或使用者手動 `/kunsu-inbox`
+      兜底——寧漏發不誤發。同一慣例名的 slot 變體開了兩個以上（或無後綴與
+      有後綴並存）即屬多重命中，同樣降級、不挑選其一（2026-08-21 定案：多
+      session 分頭作業時不需每個視窗都收推播）。
    3. **發送定型通知**（SendMessage；訊息自足自帶收方指令，不依賴子 repo 任何
       設定——Invariant 2）：
 
@@ -303,10 +308,12 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
 
    1. **匹配軍師 session**：以 ListAgents 列出本機 session，兩層匹配——
       精確比對優先：session 名稱恰為 `<軍師目錄名>-kunsu`（如 `ebook-kunsu`，
-      kunsu session 命名慣例）；啟發式 fallback：正規化（轉小寫、去除非英數
-      字元）後，session 名稱去掉尾端亂數後綴應與軍師目錄 basename 對應。
-      **唯一且明確才發送**；找不到、多重命中一律降級跳過（不重試），由軍師端
-      SessionStart hook 與 `scan-replies.sh` 掃描兜底。
+      kunsu session 命名慣例）或其後接 `.` 與任意後綴的 slot 變體（如
+      `ebook-kunsu.review`，`kc --slot` 產生）；啟發式 fallback：正規化（轉
+      小寫、去除非英數字元）後，session 名稱去掉尾端亂數後綴應與軍師目錄
+      basename 對應。**唯一且明確才發送**；找不到、多重命中（含同一慣例名的
+      多個 slot 變體並存）一律降級跳過（不重試），由軍師端 SessionStart hook
+      與 `scan-replies.sh` 掃描兜底。
    2. **發送定型通知**（SendMessage；訊息自足自帶收方指令，不改變「未 commit
       即新回覆訊號」的既有掃描機制）：
 

@@ -25,7 +25,7 @@
 | `/todo` | CE 副作用技術債清單：一檔一項落在 `docs/todos/`，`add`／`list`／`done`（歸檔前先清點檔內未完成殘項）／`rm` |
 | 軍師沙盤 | 本機網頁一頁彙整所有軍師與子專案的訊息狀態與待辦技術債（非 skill，見 [ADR 010](docs/adr/2026-07-11-adr-candidate-010-dashboard-service-exception.md)） |
 | SessionStart hook | session 啟動（含 `/clear`）自動攤開 kunsu 信箱摘要；toolkit 升版後另提示一行「handoff skill 已更新至 vX」使長駐 session 得知指引有變。未登記 repo 靜默、fail-open 不阻斷 session（隨 `/kunsu-inbox` 部署，掛載後生效，見 [ADR 014](docs/adr/2026-08-13-adr-candidate-014-sessionstart-hook-activation.md)） |
-| `kc` 啟動函式 | fish 函式：依註冊表以 kunsu session 命名慣例自動 `claude -n` 啟動，使推播匹配走精確比對（`scripts/kc.fish`） |
+| `kc` 啟動函式 | fish 函式：依註冊表以 kunsu session 命名慣例自動 `claude -n` 啟動，使推播匹配走精確比對；`--slot <後綴>` 區分同資料夾多 session（`scripts/kc.fish`） |
 
 核心設計（詳見 `docs/adr/`）：
 
@@ -53,7 +53,7 @@ cd kunsu
 選用配件（皆為機器層級設定，解除即完全停用）：
 
 - **SessionStart hook**：已隨 `/kunsu-inbox` 一併部署，於 `~/.claude/settings.json` 掛載後生效——掛載範例與解除方式見 `skills/kunsu-inbox/SKILL.md` 的「SessionStart hook」節。
-- **`kc` 啟動函式**（fish shell 限定）：`cp scripts/kc.fish ~/.config/fish/functions/`——之後以 `kc` 取代 `claude` 啟動，依註冊表自動命名 session；未登記目錄與 `--resume` 一律透傳、行為同 `claude`。
+- **`kc` 啟動函式**（fish shell 限定）：`cp scripts/kc.fish ~/.config/fish/functions/`——之後以 `kc` 取代 `claude` 啟動，依註冊表自動命名 session；未登記目錄、自帶 `-n`／`--name` 與 `--resume` 一律透傳、行為同 `claude`。同一資料夾要開多個 session 分頭處理不同工作時，加 `kc --slot <後綴>`（後綴限英數、`-`、`_`）取得 `<慣例名>.<後綴>`（如 `ebook-android.auth`），讓 `/park`／`/unpark` 各持一份停車格（slot 取 session 名稱）。
 
 > 外部軟依賴：`/kunsu-init` 的 Obsidian vault 步驟會呼叫全域 `/init-obsidian-vault` skill，未安裝時自動略過；軍師的「規劃前既有盤點」使用 `/kb`（zoekt 本機索引），未安裝時降級為手動查閱。兩者缺席都不影響其餘功能。交接慣例所需的 `/handoff` 已內建（見 ADR 003）。
 
@@ -75,7 +75,7 @@ cd kunsu
 
 - **SessionStart hook**：session 啟動（含 `/clear`）時以確定性腳本掃描信箱、把摘要注入開場 context——長駐視窗按 `/clear` 即攤開待接手清單。零 token、未登記 repo 靜默、fail-open 絕不阻斷 session 啟動。
 - **派發即推播／回覆即推播**：軍師派發完成、子專案回覆投遞（含暫離回報）的當下，向對方的已開啟長駐 session 發送一次性告知訊息——事件驅動、零輪詢、零常駐服務，訊息自帶「僅回顯、勿開工」收方指令，子專案 repo 零注入。
-- **session 命名慣例**：子專案 `<軍師目錄名>-<角色代碼>`（如 `ebook-android`）、軍師 `<軍師目錄名>-kunsu`——以 `/rename` 一次設定（持久化）或以 `kc` 啟動函式自動帶入，使推播匹配走精確比對；無慣例名時退回名稱啟發式，兩層皆唯一命中才發送、寧漏發不誤發，未推播由 hook 與掃描兜底。
+- **session 命名慣例**：子專案 `<軍師目錄名>-<角色代碼>`（如 `ebook-android`）、軍師 `<軍師目錄名>-kunsu`，以及兩者後接 `.` 與後綴的 slot 變體（如 `ebook-android.auth`，`kc --slot` 產生）——以 `/rename` 一次設定（持久化）或以 `kc` 啟動函式自動帶入，使推播匹配走精確比對；無慣例名時退回名稱啟發式，兩層皆唯一命中才發送、寧漏發不誤發（同一慣例名的多個 slot 變體並存即多重命中、一律降級），未推播由 hook 與掃描兜底。
 
 三者皆屬知悉層：接手、開工、查核、done 收尾的決策閘門一律留在使用者手上。
 
@@ -91,7 +91,7 @@ skills/
   kunsu-report/        → 上報投遞 skill（SKILL.md＋new-report.sh）
   kunsu-list/          → 全域登記清單查詢 skill（SKILL.md＋registry-list.sh）
   kunsu-dashboard/     → 軍師沙盤（kunsu dashboard），本機訊息聚合頁面（非 Claude Code skill，見 ADR 010）
-scripts/               → kc.fish（session 自動命名啟動函式）、consistency-check.sh（跨檔案一致性機械檢查）
+scripts/               → kc.fish（session 自動命名啟動函式，`--slot` 後綴）、consistency-check.sh（跨檔案一致性機械檢查）
 install.sh             → 部署腳本
 docs/                  → 本工具組自身的需求、ADR、實作計畫、操作教學與可重用學習
 ```
