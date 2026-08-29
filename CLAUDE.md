@@ -148,6 +148,8 @@ install.sh             → 部署至 ~/.claude/skills/（預設 copy、--link �
 
 - **ADR 017 審定 accepted 與 git add 守門實作**（kunsu-inbox v0.10.0，2026-08-29）：同日使用者審定 accept 並裁決三項開放問題——逃生門採**環境變數豁免**（指令前綴 `KUNSU_ADD_GUARD_OFF=1` 單次放行，打字成本即摩擦、指令史留痕可稽）、黑名單**凍結三形狀**（`-A`／`--all`、`.`／`:/`、涵蓋信箱路徑的整目錄——含祖先與子目錄；增列須 ADR 修訂，變體後果面由歷史夾帶偵測兜底）、**deny 事件記入掃描統計檔**（`GUARD_DENY`＋`guard_denies` 計數，誤擋率與命中率同一觀測體系）。新增 `skills/kunsu-inbox/scripts/pretooluse_git_guard.py`（PreToolUse matcher Bash，機器層級掛載 `~/.claude/settings.json` 不進 repo）：raw registry＋git root 身分判定（含指令中 `git -C` 路徑，從外部 cwd 指向軍師 repo 亦攔）、deny 訊息內嵌正確做法（逐檔列名、歸檔改用 archive-handoff.sh）、具體檔案路徑與非信箱目錄放行（`git add skills` 不攔——範圍嚴格依 ADR Decision 1）、fail-open（registry 不可讀、hook 自身錯誤一律放行）。kunsu 首個行為強制機制正式成立，判準四要件（機械可判、規則已明文、可逆、零能力限縮）為後續任何強制點提案的把關基準。16 項 pytest（純函式三形狀判定＋端到端 subprocess deny／allow／逃生門／損毀 registry fail-open，registry 與統計檔全程 env 隔離）。
 
+- **範本 done 收尾指路句與三軍師第五波遷移**（kunsu-init v0.6.1，2026-08-29）：範本 kunsu-concepts「done 收尾」詞條於查核清單句後插入歸檔腳本指路句（`archive-handoff.sh` 用法、「git 編排細節該被計算而非被記憶」理由與 `-A` 夾帶事故一句、PreToolUse 守門提及）——熟練 session 的必經路徑只剩 CLAUDE.md／CONCEPTS 與腳本本身（v0.16.0 觸及率教訓），指路句使手動收尾的軍師 session 能發現腳本存在；ebook／ivm／px 三 live CONCEPTS 同句同步（四副本逐字一致，python3 批次替換前置唯一性斷言）。consistency-check H 擴充 `archive-handoff`（CONCEPTS）比對字串，防詞條單側漏遷不可見。
+
 ### 尚未實作／後續評估
 - ADR 008 open questions 留待用量評估——歸檔 `status` 值域升級（現為單一 `archived`）、「軍師已讀」輕量標記、上報量成長後的整理慣例。
 - applications 的 HOME dataview 補齊、add-project reports 遷移不含 HOME dataview 附加（已知落差，見實作計畫 Scope Boundaries）。
@@ -159,7 +161,6 @@ install.sh             → 部署至 ~/.claude/skills/（預設 copy、--link �
 - 跨 repo solutions 檢索外環（全域 CLAUDE.md 慣例薄段＋ce-learnings-researcher 間接觸及）——等跨 repo 檢索實痛出現再做，落點建議全域 CLAUDE.md 直加（2026-07-24 計畫 Scope Boundaries）。
 - 沙盤與 SessionStart hook 對 `HISTORY_WARN:` 的顯示（現僅 `/kunsu-inbox` CLI 呈現；`kunsu_scan.py` 對未知前綴靜默略過，無誤動作風險）。
 - git add 守門的誤擋率觀察期（ADR 017 開放問題 3）：以統計檔 `guard_denies`／`GUARD_DENY` 事件累積數據，據以定版或撤除。
-- 軍師範本 kunsu-concepts「done 收尾」詞條補歸檔腳本指路句＋三 live 軍師遷移（母體 CONCEPTS 已補；範本改動牽動 live 遷移確認 commit，另批執行）。
 
 ### 相關資產（唯讀參考）
 
