@@ -2,13 +2,15 @@
 title: ADR Candidate 017 — 軍師 repo 的 PreToolUse git add 守門（首個行為強制機制）
 date: 2026-08-29
 type: adr
-status: proposed
+status: accepted
 ---
 
 # ADR 017：軍師 repo 內以 PreToolUse hook 攔截 `git add -A`／`.`／整目錄 add
 
-> 狀態：**Candidate**（待使用者審定；本 ADR 是 kunsu 首次跨過「提醒→阻止」線的
-> 裁決點，未經審定不實作。源自 ebook 軍師分析文件
+> 狀態：**Accepted**（2026-08-29 使用者審定，三項開放問題同日裁決——逃生門採
+> 環境變數豁免、黑名單凍結三形狀（增列須 ADR 修訂）、deny 事件記入掃描統計檔；
+> 同日以 `skills/kunsu-inbox/scripts/pretooluse_git_guard.py` 實作並掛載。
+> 本 ADR 是 kunsu 首次跨過「提醒→阻止」線的裁決記錄。源自 ebook 軍師分析文件
 > `2026-08-29-軍師機制失效分析-手動執行等效步驟使skill指引靜默失效.md`）。
 
 ## Context
@@ -55,14 +57,15 @@ kunsu 既有設計前提「harness 不做高能力模型的枷鎖——信息補
    後果面由 `scan-replies.sh` 歷史夾帶偵測（advisory）兜底，兩層分工：本 hook
    擋已知手段，偵測層接所有手段的後果。
 
-## 尚待裁決的開放問題
+## 開放問題（2026-08-29 審定時裁決）
 
-1. **黑名單增長治理**：新變體發現時是逐條加規則，還是接受偵測層兜底即可？
-   （提案傾向後者：hook 規則凍結在三形狀，不隨事故增長。）
-2. **逃生門形式**：緊急情境需要整目錄 add 時（如災難復原），以環境變數
-   （`KUNSU_ADD_GUARD_OFF=1`）豁免，或要求使用者暫時解除 hook 掛載？
-3. **誤擋成本實測**：正常軍師工作流中整目錄 add 的合法出現頻率未知，需一段
-   觀察期（掃描統計檔可順帶記 deny 次數）再定版。
+1. **黑名單增長治理**：✅ **凍結三形狀**——hook 規則不隨事故增長，變體後果面
+   由 `scan-replies.sh` 歷史夾帶偵測兜底；日後要增列規則須經 ADR 修訂。
+2. **逃生門形式**：✅ **環境變數豁免**——指令前綴 `KUNSU_ADD_GUARD_OFF=1`
+   （或程序環境同名變數）單次放行；打字成本即摩擦，且指令史留痕可稽。
+3. **誤擋成本實測**：✅ **deny 事件記入掃描統計檔**（`kunsu-scan-stats.json`，
+   type `GUARD_DENY`＋`guard_denies` 計數）——誤擋率與命中率有數據可查，作為
+   日後定版或撤除 hook 的依據，與歷史夾帶偵測同一觀測體系。
 
 ## Consequences
 

@@ -40,6 +40,7 @@ skills/                → skill 原始碼
     scripts/scan-applications.sh → 申請信箱掃描＋tripwire（雙側核驗授權歸檔）
     scripts/scan-reports.sh → 上報信箱掃描＋tripwire（結構同 scan-applications.sh）
     scripts/session_hook.py → SessionStart hook：session 啟動（含 /clear）自動注入信箱摘要（ADR 014，複用沙盤分類模組；含 handoff skill 版號變動提示——狀態檔 ~/.claude/kunsu-hook-state.json）
+    scripts/pretooluse_git_guard.py → PreToolUse hook：軍師 repo 攔寬範圍 git add（ADR 017，凍結三形狀＋逃生門＋deny 入統計，fail-open）
     tests/             → pytest，session hook 單元測試
   kunsu-apply/         → 子專案端投遞申請加入
     SKILL.md           → 自動偵測＋registry 選軍師＋守門與冪等預檢
@@ -145,6 +146,8 @@ install.sh             → 部署至 ~/.claude/skills/（預設 copy、--link �
 
 - **done 歸檔腳本化、歷史夾帶偵測與掃描統計**（handoff v0.18.0／kunsu-inbox v0.9.0，2026-08-29）：源自 ebook 軍師機制失效分析（`ebook/docs/2026-08-29-軍師機制失效分析-手動執行等效步驟使skill指引靜默失效.md`）——單一長時 session 23 次流程動作 0 次 invoke skill，手動歸檔以 `git add -A` 夾帶 16 份未讀回覆進「歸檔交接」commit，「未 commit 即未處理」訊號被靜默清除且三道提醒式防護（文件規則、stderr 指路行 14 次觸發 0 次兌現、版號變動提示）全數失效；獨立核對確認事實（commit 統計 14／4／5、reflog `5a7883e` 含 19 份回覆新增），並指出其 2.3 自述的內在矛盾——效率敘事解釋不了第 1 次繞過（0/23 自始，屬 never-engaged 而非熟練後 drift），故修法取動機無關（motive-independent）路線。三件落地：**甲、歸檔腳本** `archive-handoff.sh`（done 步驟 5–7 腳本化：frontmatter status Edit（python3 只動 frontmatter 區塊）→ untracked 前置 `git add` → 本體與回覆成對 `git mv` → `git add` 歸檔目的地帶入 Edit 內容；`git add` 僅限具體路徑絕不 `-A`、暫存區含 docs/handoffs/／docs/todos/ 外路徑時警告、stdout 印待確認 commit 指令不自動 commit（ADR 009 零改動）、多份並列一次收尾、已在 archive/ 自動略過供失敗重跑；stderr 印六道查核指路。依據：本 session 產檔腳本被呼叫 14/14 而 skill 0/23——腳本是手動路徑上唯一被實際使用的載體（v0.16.0 觸及率觀察的實證），把出錯的 git 編排從記憶變計算，rename 產物即掃描豁免既有兩形狀）；**乙、歷史夾帶偵測與統計**（`scan-replies.sh` 逐 commit 檢視基線後新 commit：「docs: 歸檔」開頭 commit 新增 replies/ 頂層回覆＝`HISTORY_WARN:SMUGGLED_REPLY`（事故形狀，涵蓋任意手段的後果面）、任意單 commit 新增 ≥6 份頂層回覆＝`BATCH_REPLY_ADD` 啟發式；advisory 不改 exit code、基線前進不重報；統計寫 `~/.claude/kunsu-scan-stats.json`（機器層級，`KUNSU_SCAN_STATS_FILE` 可覆寫供測試隔離，路徑失效條目自清、events 每軍師上限 500）——per 軍師 total_runs／tripwire／history_warn 計數與事件明細，**給「未 commit 即未處理」訊號脆弱度累積數據**，供日後裁決狀態載體重設計（ADR 層級）是否需要啟動；任何失敗 fail-open，python3 缺失整段跳過；沙盤測試新增 conftest autouse fixture 隔離統計檔，比照 hook 狀態檔教訓）；**丙、ADR Candidate 017**（PreToolUse 攔軍師 repo `git add -A`／`.`／整目錄 add，deny 訊息內嵌正確做法——kunsu 首次跨「提醒→阻止」線，判準（機械可判、規則已明文、可逆、零能力限縮）與逃生門、黑名單治理列為開放問題，**未經使用者審定不實作**）。kunsu-inbox SKILL 新增 4b-5 歷史夾帶警示呈現與掃描統計節；`kunsu_scan.py`／session hook 僅解析既有前綴、HISTORY_WARN 對其安全靜默（沙盤顯示列後續評估）。暫存目錄 dogfooding 44 項斷言全過（歸檔全鏈 R／A／RM 形狀與掃描豁免無回歸、夾帶偵測六場景、基線 reset 兩態、統計損壞重建與自清；附帶抓出 bash 3.2 的 `$var` 緊鄰全形字元誤併變數名與 `set -u` 空陣列展開兩類相容性缺陷）；155 項 pytest 全過（137 沙盤＋18 hook）。
 
+- **ADR 017 審定 accepted 與 git add 守門實作**（kunsu-inbox v0.10.0，2026-08-29）：同日使用者審定 accept 並裁決三項開放問題——逃生門採**環境變數豁免**（指令前綴 `KUNSU_ADD_GUARD_OFF=1` 單次放行，打字成本即摩擦、指令史留痕可稽）、黑名單**凍結三形狀**（`-A`／`--all`、`.`／`:/`、涵蓋信箱路徑的整目錄——含祖先與子目錄；增列須 ADR 修訂，變體後果面由歷史夾帶偵測兜底）、**deny 事件記入掃描統計檔**（`GUARD_DENY`＋`guard_denies` 計數，誤擋率與命中率同一觀測體系）。新增 `skills/kunsu-inbox/scripts/pretooluse_git_guard.py`（PreToolUse matcher Bash，機器層級掛載 `~/.claude/settings.json` 不進 repo）：raw registry＋git root 身分判定（含指令中 `git -C` 路徑，從外部 cwd 指向軍師 repo 亦攔）、deny 訊息內嵌正確做法（逐檔列名、歸檔改用 archive-handoff.sh）、具體檔案路徑與非信箱目錄放行（`git add skills` 不攔——範圍嚴格依 ADR Decision 1）、fail-open（registry 不可讀、hook 自身錯誤一律放行）。kunsu 首個行為強制機制正式成立，判準四要件（機械可判、規則已明文、可逆、零能力限縮）為後續任何強制點提案的把關基準。16 項 pytest（純函式三形狀判定＋端到端 subprocess deny／allow／逃生門／損毀 registry fail-open，registry 與統計檔全程 env 隔離）。
+
 ### 尚未實作／後續評估
 - ADR 008 open questions 留待用量評估——歸檔 `status` 值域升級（現為單一 `archived`）、「軍師已讀」輕量標記、上報量成長後的整理慣例。
 - applications 的 HOME dataview 補齊、add-project reports 遷移不含 HOME dataview 附加（已知落差，見實作計畫 Scope Boundaries）。
@@ -154,8 +157,8 @@ install.sh             → 部署至 ~/.claude/skills/（預設 copy、--link �
 - add-project 內建「整句 `roles` → 代碼」自動遷移偵測（ADR 007 Open Questions；本次已手動遷 ivm 三筆＋ebook-store-nginx，工具內建供其他既有軍師升級待評估）。
 - 角色說明欄留空時關聯專案表的呈現規格（ADR 007 Open Questions；顯示「無說明」佔位 vs 留空欄，待範本落地時定）。
 - 跨 repo solutions 檢索外環（全域 CLAUDE.md 慣例薄段＋ce-learnings-researcher 間接觸及）——等跨 repo 檢索實痛出現再做，落點建議全域 CLAUDE.md 直加（2026-07-24 計畫 Scope Boundaries）。
-- [ADR 017 candidate](docs/adr/2026-08-29-adr-candidate-017-pretooluse-git-add-guard.md)（PreToolUse git add 守門）待使用者審定，accepted 後才實作 hook。
 - 沙盤與 SessionStart hook 對 `HISTORY_WARN:` 的顯示（現僅 `/kunsu-inbox` CLI 呈現；`kunsu_scan.py` 對未知前綴靜默略過，無誤動作風險）。
+- git add 守門的誤擋率觀察期（ADR 017 開放問題 3）：以統計檔 `guard_denies`／`GUARD_DENY` 事件累積數據，據以定版或撤除。
 - 軍師範本 kunsu-concepts「done 收尾」詞條補歸檔腳本指路句＋三 live 軍師遷移（母體 CONCEPTS 已補；範本改動牽動 live 遷移確認 commit，另批執行）。
 
 ### 相關資產（唯讀參考）

@@ -1,6 +1,6 @@
 ---
 name: kunsu-inbox
-version: 0.9.0
+version: 0.10.0
 description: |
   查詢跨 repo 協作信箱：列出軍師（規劃協調中心）中待接手的交接文件，或回報新抵達的回覆。
   觸發語：/kunsu-inbox、檢查信箱、有沒有待接手的交接、有沒有新的 handoff、
@@ -397,6 +397,50 @@ context——長駐 session 按 `/clear` 即攤開信箱，不必再手動觸發
 
 **解除**：自 `~/.claude/settings.json` 移除上述 `SessionStart` 條目即完全停用，
 無其他殘留。
+
+---
+
+## PreToolUse git add 守門（ADR 017，選用）
+
+`scripts/pretooluse_git_guard.py`：軍師 repo 內攔截寬範圍 `git add` 的 PreToolUse
+hook——kunsu 首個行為強制機制（ADR 017 accepted，2026-08-29）。攔截判準凍結為
+三形狀（增列須 ADR 修訂）：`-A`／`--all`、`.`／`:/`、涵蓋信箱路徑
+（`docs/handoffs`、`docs/applications`、`docs/reports`——含其祖先與子目錄）的
+整目錄參數。deny 訊息內嵌正確做法（逐檔列名、歸檔改用 `archive-handoff.sh`）；
+具體檔案路徑、非信箱目錄、非軍師 repo 一律放行。
+
+- **身分判定**：raw registry＋git root 快速比對（含指令中 `git -C <path>` 的
+  路徑），比照 SessionStart hook；registry 不可讀時放行。
+- **逃生門**：指令前綴 `KUNSU_ADD_GUARD_OFF=1`（或程序環境同名變數）單次
+  放行——打字成本即摩擦，指令史留痕可稽。
+- **觀測**：deny 事件記入掃描統計檔（`GUARD_DENY` 事件＋`guard_denies` 計數，
+  見「掃描統計」節），誤擋率與命中率有數據可查。
+- **fail-open**：hook 自身任何錯誤一律放行，絕不阻斷正常工作。已知限制（威脅
+  模型是無意誤用非惡意繞過）：指令切段為樸素字串分割、不模擬 `cd` 後的 shell
+  狀態。
+
+**掛載**（機器層級設定，不進任何 git repo）——`~/.claude/settings.json` 的
+`hooks.PreToolUse`：
+
+```json
+{
+  "matcher": "Bash",
+  "hooks": [
+    {
+      "type": "command",
+      "command": "python3 \"$HOME/.claude/skills/kunsu-inbox/scripts/pretooluse_git_guard.py\"",
+      "timeout": 5
+    }
+  ]
+}
+```
+
+**解除**：自 `~/.claude/settings.json` 移除上述 `PreToolUse` 條目即完全停用。
+
+> **掛載順序**：先 `install.sh` 部署、後掛載。順序顛倒時腳本檔不存在，hook 以
+> 錯誤結束——harness 對 PreToolUse hook 錯誤是 fail-closed，**所有 Bash 指令**
+> 都會被擋（2026-08-29 實測），與腳本內部的 fail-open 是兩回事；此時以非 Bash
+> 途徑補上腳本檔即解。
 
 ---
 
