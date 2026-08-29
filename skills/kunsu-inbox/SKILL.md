@@ -1,6 +1,6 @@
 ---
 name: kunsu-inbox
-version: 0.8.0
+version: 0.9.0
 description: |
   查詢跨 repo 協作信箱：列出軍師（規劃協調中心）中待接手的交接文件，或回報新抵達的回覆。
   觸發語：/kunsu-inbox、檢查信箱、有沒有待接手的交接、有沒有新的 handoff、
@@ -257,6 +257,7 @@ bash ~/.claude/skills/kunsu-inbox/scripts/scan-reports.sh "{CURRENT_ROOT}"
 - 每行 `NEW_APPLICATION:<路徑>` → 新申請路徑清單
 - 每行 `NEW_REPORT:<路徑>` → 新上報路徑清單
 - 每行 `TRIPWIRE:<XY> <路徑>`（或 rename 形式 `TRIPWIRE:<XY> <src> -> <dst>`，路徑欄為雙側複合字串）→ 意外變更清單
+- 每行 `HISTORY_WARN:<類型> <內容>`（僅 `scan-replies.sh` 產生）→ 歷史夾帶警示清單（advisory，呈現方式見 4b-5）
 
 **4b-3. tripwire 判斷（任一腳本 exit code 2）：**
 
@@ -299,6 +300,43 @@ Edit 與 git mv 之間，頂層 ` M` 中間態亦會觸發，續行完成歸檔�
 ```
 
 > **「未 commit 即未處理」** 的前提：軍師的慣例是彙整回覆後才 commit，因此 uncommitted 回覆視為尚未處理的標記。若提前 commit，已彙整者在此不再顯示。
+
+**4b-5. 歷史夾帶警示（`HISTORY_WARN:`，advisory）：**
+
+`scan-replies.sh` 除掃描工作樹外，會逐 commit 檢視上次掃描後的新 commit（基線記
+於掃描統計檔，見下節），偵測已 commit 歷史中破壞「未 commit 即未處理」訊號的形
+狀。輸出含 `HISTORY_WARN:` 行時（tripwire 與否皆可能出現），於彙整結果末尾附加：
+
+```
+⚠ 歷史夾帶警示（{J} 筆，advisory——不中止彙整、不影響 exit code）：
+{每行原樣列出}
+```
+
+- `SMUGGLED_REPLY`：某「docs: 歸檔」開頭的 commit **新增**了 `replies/` 頂層回覆
+  檔。歸檔 commit 只該搬移（rename 至 `archive/`）、不該新增——頂層新增即把未讀
+  回覆靜默轉為已處理，該批回覆自此從掃描視野消失且雙方皆無錯誤訊號。請逐份確認
+  列出的回覆是否確實已閱讀分流；未處理者以 `git reset` 還原為未 commit 重新入列，
+  或當場補閱讀處理。
+- `BATCH_REPLY_ADD`：任意單一 commit 新增 ≥6 份頂層回覆（啟發式）。批次處理合
+  法，但請確認非 `git add -A` 之類的整批掃入。
+- 每筆警示只在事發後的**第一次掃描**出現一次（基線 commit 前進即不重報）；回顧
+  歷史警示請查掃描統計檔的事件明細。
+
+---
+
+### 掃描統計（狀態訊號脆弱度觀測）
+
+`scan-replies.sh` 每次執行時把觀測寫入 `~/.claude/kunsu-scan-stats.json`（機器層
+級、不進任何 repo；環境變數 `KUNSU_SCAN_STATS_FILE` 可覆寫路徑，供測試隔離）：
+各軍師的掃描次數（`total_runs`）、tripwire 次數（`runs_with_tripwire`）、歷史夾
+帶警示次數（`runs_with_history_warn`）、歷史檢視基線（`last_checked_commit`）與
+事件明細（`events`，含時間戳，每軍師保留最近 500 筆；登記路徑已不存在的軍師條目
+於寫入時自動清除）。
+
+用途：給「未 commit 即未處理」狀態訊號的**脆弱度累積數據**——警示頻率高到不可
+接受時，才有依據啟動狀態載體重設計（連同回覆檔「單一作者」原則重評，屬 ADR 層
+級）的討論；頻率趨零則證明現行輕量防護已足。統計寫入任何失敗一律 fail-open
+（單行 stderr 降級），不影響掃描結果與 exit code；python3 不可用時整段靜默跳過。
 
 ---
 
@@ -364,7 +402,7 @@ context——長駐 session 按 `/clear` 即攤開信箱，不必再手動觸發
 
 ## 依賴聲明
 
-本 skill 依賴同 toolkit 內建的 `/handoff` skill（v0.17.1，原始碼位於本 repo `skills/handoff/`）所定義的下列慣例。兩者共同發版、慣例定義以本 repo 為準；更新 handoff 的以下行為時需同步核查本 skill（v0.10.0 的沉澱訊號查核為 done 流程內部指引、v0.11.0 的派發即推播／回覆即推播為 add／reply 流程收尾通知、v0.12.0 的反向路由查核與 todo 殘項清點為 done 流程內部指引、v0.13.0 的矛盾回報指引為 reply 流程內部指引、v0.14.0 的更正交接與 `corrected_by` 為 add 流程內部慣例（corrected_by 為 display-only frontmatter 欄位；其 Edit 中間態頂層屬既有 catch-all tripwire、archive 內屬既有靜默略過分支，皆無新豁免）、v0.15.0 的斷言層級紀律與 done 斷言自查為 add／done 流程內部指引、v0.16.0 的產檔腳本 stderr 指路行不改變產出檔內容與 stdout 路徑契約、v0.17.0 的 session 命名慣例 slot 變體（`kc --slot`，推播精確比對納入 `<慣例名>.<後綴>`、多重命中仍降級）為 add／reply 推播匹配規則、v0.17.1 的產檔腳本專案根定位「往上找到家目錄即停」為腳本內部防呆（不改變產出檔內容與 stdout 路徑契約）——皆不涉掃描慣例、無豁免需求；回覆即推播不改變「未 commit 即新回覆」訊號）：
+本 skill 依賴同 toolkit 內建的 `/handoff` skill（v0.18.0，原始碼位於本 repo `skills/handoff/`）所定義的下列慣例。兩者共同發版、慣例定義以本 repo 為準；更新 handoff 的以下行為時需同步核查本 skill（v0.10.0 的沉澱訊號查核為 done 流程內部指引、v0.11.0 的派發即推播／回覆即推播為 add／reply 流程收尾通知、v0.12.0 的反向路由查核與 todo 殘項清點為 done 流程內部指引、v0.13.0 的矛盾回報指引為 reply 流程內部指引、v0.14.0 的更正交接與 `corrected_by` 為 add 流程內部慣例（corrected_by 為 display-only frontmatter 欄位；其 Edit 中間態頂層屬既有 catch-all tripwire、archive 內屬既有靜默略過分支，皆無新豁免）、v0.15.0 的斷言層級紀律與 done 斷言自查為 add／done 流程內部指引、v0.16.0 的產檔腳本 stderr 指路行不改變產出檔內容與 stdout 路徑契約、v0.17.0 的 session 命名慣例 slot 變體（`kc --slot`，推播精確比對納入 `<慣例名>.<後綴>`、多重命中仍降級）為 add／reply 推播匹配規則、v0.17.1 的產檔腳本專案根定位「往上找到家目錄即停」為腳本內部防呆（不改變產出檔內容與 stdout 路徑契約）、v0.18.0 的歸檔腳本 `archive-handoff.sh` 為 done 步驟 5–7 的腳本化執行（其 rename 產物即本 skill 掃描豁免的既有兩形狀，`git add` 僅限具體路徑與確認 commit 協議零改動，無新豁免需求）——皆不涉掃描慣例；回覆即推播不改變「未 commit 即新回覆」訊號）：
 
 | 項目 | 慣例 |
 |------|------|

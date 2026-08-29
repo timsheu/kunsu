@@ -1,6 +1,6 @@
 ---
 name: handoff
-version: 0.17.1
+version: 0.18.0
 description: |
   把一個需要交給「另一個 session／另一個角色（如後台、前端、DevOps）」研究或
   接手的議題，寫成一份獨立交接文件，落在當前專案的 docs/handoffs/。每份交接一個
@@ -463,6 +463,23 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
      回報，續行交接收尾（交接本體仍未動，整段可重跑；已 Edit 未搬移的失敗筆
      會在重跑的步驟 3 以孤兒身分再次列為候選，補歸檔即收斂）。
 
+   > **步驟 5–7 以歸檔腳本執行**（建議路徑，含手動等效執行時同樣適用）：
+   >
+   > ```bash
+   > bash ~/.claude/skills/handoff/scripts/archive-handoff.sh "<檔名或 slug>" ["<檔名>"…]
+   > ```
+   >
+   > 腳本一次完成步驟 5（status Edit）、6（untracked 前置 `git add`）、7（本體與
+   > 回覆成對 `git mv`），並額外 `git add` 歸檔目的地把 Edit 內容帶入暫存
+   > （`git mv` 不會暫存 working tree 修改）。所有 `git add` 僅限本流程具體路徑、
+   > 絕不 `-A`；執行後印出待確認的 commit 指令但**不 commit**（步驟 9 經使用者
+   > 確認後執行；含 todo 收尾時依步驟 9 擴充訊息與 add 範圍）。多份交接可並列
+   > 傳入一次收尾；已在 `archive/` 的傳入項自動略過，中途失敗不回滾、重跑即續。
+   > 歸檔的 git 編排細節（pathspec rename 兩側、add 範圍）該被計算而非被記憶——
+   > 2026-08-29 手動歸檔曾以 `git add -A` 夾帶 16 份未讀回覆、靜默清除「未 commit
+   > 即未處理」訊號。腳本失敗或不可用時才依步驟 5–7 字面手動執行，查核與確認
+   > commit 義務不因手動而豁免。
+
 5. 用 Edit 把交接文件本體 frontmatter `status` 改為 `done`（這是發起方對自己文件
    的生命週期狀態更新，不是接手方回填內容，不違反「本體不編輯」的規則）。
 
@@ -500,7 +517,9 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
    `docs/todos/<新slug>.md`——失敗筆的 archive 路徑不存在，列入
    `git add` 會以 pathspec 錯誤中斷；`git mv` 不會暫存 working tree 的內容
    修改，porcelain 呈現 `RM`，步驟 5 的 `status: done` 與步驟 4 的 todo Edit
-   修改靠這一步 add 帶入 commit）**加上步驟 8 修改的所有檔案路徑**；訊息
+   修改靠這一步 add 帶入 commit）**加上步驟 8 修改的所有檔案路徑**（步驟 5–7
+   經歸檔腳本執行時，本體與回覆的歸檔路徑已暫存，此處補齊其餘路徑即可；對已
+   暫存路徑重複 `git add` 無害）；訊息
    `docs: 歸檔交接 <檔名>`，含 todo 一併收尾時改用
    `docs: 歸檔交接 <檔名>；一併收尾 todo <slug>[、<slug>…]`，殘項清點有
    轉出時再附 `；轉出殘項 todo <slug>[、<slug>…]`（保留不歸檔的筆已自

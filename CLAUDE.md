@@ -22,9 +22,9 @@ docs/
   solutions/           → 可重用學習與解法（/ce-compound 產出，YAML frontmatter 依 module/tags/problem_type 可搜尋）
   playbooks/           → 操作教學（端到端工作流程、軍師沙盤導覽；手工維護，自 README 拆出的教學唯一落點）
 skills/                → skill 原始碼
-  handoff/             → 通用交接原語（v0.17.1，2026-07-06 自部署目錄併入，見 ADR 003）
-    SKILL.md           → add／reply／list／done 子指令（add 含引用檔名權威慣例、斷言層級紀律與更正交接子節（corrected_by 補記）；done 回報含斷言自查兩態附句；reply 含 kunsu 語境分支、verify 驗收方式選填欄位、逐項回答附證據指引、矛盾回報指引與暫離回報最小 partial 回覆；done 含收尾口語觸發、發起方守門、歸檔前逐項驗收查核、沉澱訊號查核、反向路由查核與來源 todo 查核一併收尾（todo 收尾含殘項清點）；add／done／本地 reply 尾端確認 commit）
-    scripts/           → new-handoff.sh、new-handoff-reply.sh
+  handoff/             → 通用交接原語（v0.18.0，2026-07-06 自部署目錄併入，見 ADR 003）
+    SKILL.md           → add／reply／list／done 子指令（add 含引用檔名權威慣例、斷言層級紀律與更正交接子節（corrected_by 補記）；done 回報含斷言自查兩態附句；reply 含 kunsu 語境分支、verify 驗收方式選填欄位、逐項回答附證據指引、矛盾回報指引與暫離回報最小 partial 回覆；done 含收尾口語觸發、發起方守門、歸檔前逐項驗收查核、沉澱訊號查核、反向路由查核與來源 todo 查核一併收尾（todo 收尾含殘項清點）；done 步驟 5–7 歸檔執行腳本化（archive-handoff.sh）；add／done／本地 reply 尾端確認 commit）
+    scripts/           → new-handoff.sh、new-handoff-reply.sh、archive-handoff.sh（done 歸檔執行：status Edit→成對 git mv→僅具體路徑暫存，不 commit）
   todo/                → CE 副作用 TODO 清單管理原語（v0.2.1，2026-07-17 自部署目錄併入，見 ADR 013）
     SKILL.md           → add／list／done／rm 子指令，管理 docs/todos/ 一檔一項技術債（done 含殘項清點；done／rm 含 untracked 前置檢查）
     scripts/           → new-todo.sh
@@ -36,7 +36,7 @@ skills/                → skill 原始碼
     assets/solutions/  → 兩篇種子沉澱文件（自母本通用化）
   kunsu-inbox/         → 跨 session 傳令自動化
     SKILL.md           → 模式偵測（獨立雙判斷）＋子 repo／軍師雙模式（軍師模式含收尾與分流提示行）
-    scripts/scan-replies.sh → 未 commit 回覆掃描＋tripwire（done 授權歸檔豁免、雙側核驗）
+    scripts/scan-replies.sh → 未 commit 回覆掃描＋tripwire（done 授權歸檔豁免、雙側核驗）＋歷史夾帶偵測與掃描統計（advisory；狀態檔 ~/.claude/kunsu-scan-stats.json）
     scripts/scan-applications.sh → 申請信箱掃描＋tripwire（雙側核驗授權歸檔）
     scripts/scan-reports.sh → 上報信箱掃描＋tripwire（結構同 scan-applications.sh）
     scripts/session_hook.py → SessionStart hook：session 啟動（含 /clear）自動注入信箱摘要（ADR 014，複用沙盤分類模組；含 handoff skill 版號變動提示——狀態檔 ~/.claude/kunsu-hook-state.json）
@@ -143,6 +143,8 @@ install.sh             → 部署至 ~/.claude/skills/（預設 copy、--link �
 
 - **產檔腳本專案根定位家目錄止步與 init-docs 標記檔必建**（handoff v0.17.1／todo v0.2.1／全域 idea v0.1.2，2026-08-21）：源自使用者回報「add todo 時往上找專案資料夾，很常錯誤找到家目錄」。根因：`new-todo.sh`／`new-handoff.sh`／`new-handoff-reply.sh`／`new-idea.sh` 以「從 cwd 往上找最近的 CLAUDE.md／AGENTS.md」定位專案根，而家目錄放著 Codex 全域規範 `~/AGENTS.md`，專案沒有標記檔時必然一路撞到家目錄、檔案寫進 `~/docs/`。兩層修補：腳本端四支產檔腳本的往上迴圈加「走到 `$HOME` 即停」守門（`while [[ "$dir" != "/" && "$dir" != "${HOME:-}" ]]`），家目錄與其上層不再被視為專案根，退回 git 根／cwd 的既有 fallback 不變，產出檔內容與 stdout 路徑契約零改動；源頭端全域 `/init-docs` 指令（`~/.claude/commands/init-docs.prompt.md`，不在本 repo）改寫——新增步驟 0 無條件先寫最小 `CLAUDE.md` 作專案根標記（再以完整版覆寫，確認清單中不可取消）、步驟 6 以與腳本相同的往上迴圈驗證解析結果等於 `pwd`，並修正其子文件路徑仍寫 `.claude/*.md` 的既有漂移（對齊 `project-docs.md` 的 `docs/modules/`／`docs/playbooks/`）。kunsu-inbox 依賴聲明同步 v0.17.1。暫存目錄 dogfooding：家目錄底下無標記無 git 退回 cwd、有 git 退回 git 根、有標記取標記、家目錄外不受影響。
 
+- **done 歸檔腳本化、歷史夾帶偵測與掃描統計**（handoff v0.18.0／kunsu-inbox v0.9.0，2026-08-29）：源自 ebook 軍師機制失效分析（`ebook/docs/2026-08-29-軍師機制失效分析-手動執行等效步驟使skill指引靜默失效.md`）——單一長時 session 23 次流程動作 0 次 invoke skill，手動歸檔以 `git add -A` 夾帶 16 份未讀回覆進「歸檔交接」commit，「未 commit 即未處理」訊號被靜默清除且三道提醒式防護（文件規則、stderr 指路行 14 次觸發 0 次兌現、版號變動提示）全數失效；獨立核對確認事實（commit 統計 14／4／5、reflog `5a7883e` 含 19 份回覆新增），並指出其 2.3 自述的內在矛盾——效率敘事解釋不了第 1 次繞過（0/23 自始，屬 never-engaged 而非熟練後 drift），故修法取動機無關（motive-independent）路線。三件落地：**甲、歸檔腳本** `archive-handoff.sh`（done 步驟 5–7 腳本化：frontmatter status Edit（python3 只動 frontmatter 區塊）→ untracked 前置 `git add` → 本體與回覆成對 `git mv` → `git add` 歸檔目的地帶入 Edit 內容；`git add` 僅限具體路徑絕不 `-A`、暫存區含 docs/handoffs/／docs/todos/ 外路徑時警告、stdout 印待確認 commit 指令不自動 commit（ADR 009 零改動）、多份並列一次收尾、已在 archive/ 自動略過供失敗重跑；stderr 印六道查核指路。依據：本 session 產檔腳本被呼叫 14/14 而 skill 0/23——腳本是手動路徑上唯一被實際使用的載體（v0.16.0 觸及率觀察的實證），把出錯的 git 編排從記憶變計算，rename 產物即掃描豁免既有兩形狀）；**乙、歷史夾帶偵測與統計**（`scan-replies.sh` 逐 commit 檢視基線後新 commit：「docs: 歸檔」開頭 commit 新增 replies/ 頂層回覆＝`HISTORY_WARN:SMUGGLED_REPLY`（事故形狀，涵蓋任意手段的後果面）、任意單 commit 新增 ≥6 份頂層回覆＝`BATCH_REPLY_ADD` 啟發式；advisory 不改 exit code、基線前進不重報；統計寫 `~/.claude/kunsu-scan-stats.json`（機器層級，`KUNSU_SCAN_STATS_FILE` 可覆寫供測試隔離，路徑失效條目自清、events 每軍師上限 500）——per 軍師 total_runs／tripwire／history_warn 計數與事件明細，**給「未 commit 即未處理」訊號脆弱度累積數據**，供日後裁決狀態載體重設計（ADR 層級）是否需要啟動；任何失敗 fail-open，python3 缺失整段跳過；沙盤測試新增 conftest autouse fixture 隔離統計檔，比照 hook 狀態檔教訓）；**丙、ADR Candidate 017**（PreToolUse 攔軍師 repo `git add -A`／`.`／整目錄 add，deny 訊息內嵌正確做法——kunsu 首次跨「提醒→阻止」線，判準（機械可判、規則已明文、可逆、零能力限縮）與逃生門、黑名單治理列為開放問題，**未經使用者審定不實作**）。kunsu-inbox SKILL 新增 4b-5 歷史夾帶警示呈現與掃描統計節；`kunsu_scan.py`／session hook 僅解析既有前綴、HISTORY_WARN 對其安全靜默（沙盤顯示列後續評估）。暫存目錄 dogfooding 44 項斷言全過（歸檔全鏈 R／A／RM 形狀與掃描豁免無回歸、夾帶偵測六場景、基線 reset 兩態、統計損壞重建與自清；附帶抓出 bash 3.2 的 `$var` 緊鄰全形字元誤併變數名與 `set -u` 空陣列展開兩類相容性缺陷）；155 項 pytest 全過（137 沙盤＋18 hook）。
+
 ### 尚未實作／後續評估
 - ADR 008 open questions 留待用量評估——歸檔 `status` 值域升級（現為單一 `archived`）、「軍師已讀」輕量標記、上報量成長後的整理慣例。
 - applications 的 HOME dataview 補齊、add-project reports 遷移不含 HOME dataview 附加（已知落差，見實作計畫 Scope Boundaries）。
@@ -152,6 +154,9 @@ install.sh             → 部署至 ~/.claude/skills/（預設 copy、--link �
 - add-project 內建「整句 `roles` → 代碼」自動遷移偵測（ADR 007 Open Questions；本次已手動遷 ivm 三筆＋ebook-store-nginx，工具內建供其他既有軍師升級待評估）。
 - 角色說明欄留空時關聯專案表的呈現規格（ADR 007 Open Questions；顯示「無說明」佔位 vs 留空欄，待範本落地時定）。
 - 跨 repo solutions 檢索外環（全域 CLAUDE.md 慣例薄段＋ce-learnings-researcher 間接觸及）——等跨 repo 檢索實痛出現再做，落點建議全域 CLAUDE.md 直加（2026-07-24 計畫 Scope Boundaries）。
+- [ADR 017 candidate](docs/adr/2026-08-29-adr-candidate-017-pretooluse-git-add-guard.md)（PreToolUse git add 守門）待使用者審定，accepted 後才實作 hook。
+- 沙盤與 SessionStart hook 對 `HISTORY_WARN:` 的顯示（現僅 `/kunsu-inbox` CLI 呈現；`kunsu_scan.py` 對未知前綴靜默略過，無誤動作風險）。
+- 軍師範本 kunsu-concepts「done 收尾」詞條補歸檔腳本指路句＋三 live 軍師遷移（母體 CONCEPTS 已補；範本改動牽動 live 遷移確認 commit，另批執行）。
 
 ### 相關資產（唯讀參考）
 
