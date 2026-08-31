@@ -1,6 +1,6 @@
 ---
 name: kunsu-inbox
-version: 0.10.0
+version: 0.11.0
 description: |
   查詢跨 repo 協作信箱：列出軍師（規劃協調中心）中待接手的交接文件，或回報新抵達的回覆。
   觸發語：/kunsu-inbox、檢查信箱、有沒有待接手的交接、有沒有新的 handoff、
@@ -293,7 +293,7 @@ Edit 與 git mv 之間，頂層 ` M` 中間態亦會觸發，續行完成歸檔�
 
 收到 {K} 份新上報（未 commit，等待審閱）：
 {每行列出：  - {路徑}}
-→ 開檔審閱後依上報信箱協議四步驟歸檔（Edit status → git add → git mv → 確認 commit）。
+→ 開檔審閱後依上報信箱協議四步驟歸檔（Edit status → git add → git mv → 確認 commit；步驟（1）–（3）可用 `archive-report.sh` 一次完成並印出帶 pathspec 的待確認 commit 指令）。
 → 審閱時分流：上報中指向軍師的行動項落 todo 或轉新交接（僅提示，不自動執行）。
 
 （各段為零時改列：目前沒有未 commit 的新回覆。／目前沒有待審申請。／目前沒有待閱上報。）
@@ -319,6 +319,12 @@ Edit 與 git mv 之間，頂層 ` M` 中間態亦會觸發，續行完成歸檔�
   或當場補閱讀處理。
 - `BATCH_REPLY_ADD`：任意單一 commit 新增 ≥6 份頂層回覆（啟發式）。批次處理合
   法，但請確認非 `git add -A` 之類的整批掃入。
+- `MISDECLARED_ARCHIVE_ADD`：訊息不以白名單前綴（`docs: 歸檔`、`docs: 審核申請`）
+  開頭的 commit **新增**了任一信箱 `archive/`（handoffs／reports／applications）
+  檔案——commit 內容疑似超出訊息宣告範圍（ADR 018 的事故形狀：無 pathspec 的
+  commit 把前一流程的歸檔暫存一併吞入）。請核對該 commit 是否夾帶：確屬夾帶時以
+  `git reset --soft` 拆分重 commit（帶 pathspec），確屬正當時忽略即可（advisory
+  不阻斷；新增正當歸檔訊息形狀時白名單須經 ADR 018 修訂擴列）。
 - 每筆警示只在事發後的**第一次掃描**出現一次（基線 commit 前進即不重報）；回顧
   歷史警示請查掃描統計檔的事件明細。
 
@@ -330,8 +336,13 @@ Edit 與 git mv 之間，頂層 ` M` 中間態亦會觸發，續行完成歸檔�
 級、不進任何 repo；環境變數 `KUNSU_SCAN_STATS_FILE` 可覆寫路徑，供測試隔離）：
 各軍師的掃描次數（`total_runs`）、tripwire 次數（`runs_with_tripwire`）、歷史夾
 帶警示次數（`runs_with_history_warn`）、歷史檢視基線（`last_checked_commit`）與
-事件明細（`events`，含時間戳，每軍師保留最近 500 筆；登記路徑已不存在的軍師條目
-於寫入時自動清除）。
+事件明細（`events`，含時間戳，每軍師保留最近 500 筆；型別含 `SMUGGLED_REPLY`／
+`BATCH_REPLY_ADD`／`MISDECLARED_ARCHIVE_ADD`／`TRUNCATED`——rev-list 滿 200 筆
+時聲明該輪數據不完整——／`TRIPWIRE`／`BASELINE_RESET`／`GUARD_DENY`；登記路徑
+已不存在的軍師條目於寫入時自動清除）。`MISDECLARED_ARCHIVE_ADD` 的事件計數同時是
+ADR 018 開放問題（ADR 017 擴 `git commit` 守門）的啟動依據——僅計上線後、經
+人工核對排除誤報的事件（活習慣複合訊息實測約一成誤報，detail 帶完整訊息供
+辨識），警示呈現以統計檔為準（一次性 stdout 警示可能被 hook／沙盤消耗）。
 
 用途：給「未 commit 即未處理」狀態訊號的**脆弱度累積數據**——警示頻率高到不可
 接受時，才有依據啟動狀態載體重設計（連同回覆檔「單一作者」原則重評，屬 ADR 層
@@ -446,7 +457,7 @@ hook——kunsu 首個行為強制機制（ADR 017 accepted，2026-08-29）。�
 
 ## 依賴聲明
 
-本 skill 依賴同 toolkit 內建的 `/handoff` skill（v0.18.0，原始碼位於本 repo `skills/handoff/`）所定義的下列慣例。兩者共同發版、慣例定義以本 repo 為準；更新 handoff 的以下行為時需同步核查本 skill（v0.10.0 的沉澱訊號查核為 done 流程內部指引、v0.11.0 的派發即推播／回覆即推播為 add／reply 流程收尾通知、v0.12.0 的反向路由查核與 todo 殘項清點為 done 流程內部指引、v0.13.0 的矛盾回報指引為 reply 流程內部指引、v0.14.0 的更正交接與 `corrected_by` 為 add 流程內部慣例（corrected_by 為 display-only frontmatter 欄位；其 Edit 中間態頂層屬既有 catch-all tripwire、archive 內屬既有靜默略過分支，皆無新豁免）、v0.15.0 的斷言層級紀律與 done 斷言自查為 add／done 流程內部指引、v0.16.0 的產檔腳本 stderr 指路行不改變產出檔內容與 stdout 路徑契約、v0.17.0 的 session 命名慣例 slot 變體（`kc --slot`，推播精確比對納入 `<慣例名>.<後綴>`、多重命中仍降級）為 add／reply 推播匹配規則、v0.17.1 的產檔腳本專案根定位「往上找到家目錄即停」為腳本內部防呆（不改變產出檔內容與 stdout 路徑契約）、v0.18.0 的歸檔腳本 `archive-handoff.sh` 為 done 步驟 5–7 的腳本化執行（其 rename 產物即本 skill 掃描豁免的既有兩形狀，`git add` 僅限具體路徑與確認 commit 協議零改動，無新豁免需求）——皆不涉掃描慣例；回覆即推播不改變「未 commit 即新回覆」訊號）：
+本 skill 依賴同 toolkit 內建的 `/handoff` skill（v0.19.0，原始碼位於本 repo `skills/handoff/`）所定義的下列慣例。兩者共同發版、慣例定義以本 repo 為準；更新 handoff 的以下行為時需同步核查本 skill（v0.10.0 的沉澱訊號查核為 done 流程內部指引、v0.11.0 的派發即推播／回覆即推播為 add／reply 流程收尾通知、v0.12.0 的反向路由查核與 todo 殘項清點為 done 流程內部指引、v0.13.0 的矛盾回報指引為 reply 流程內部指引、v0.14.0 的更正交接與 `corrected_by` 為 add 流程內部慣例（corrected_by 為 display-only frontmatter 欄位；其 Edit 中間態頂層屬既有 catch-all tripwire、archive 內屬既有靜默略過分支，皆無新豁免）、v0.15.0 的斷言層級紀律與 done 斷言自查為 add／done 流程內部指引、v0.16.0 的產檔腳本 stderr 指路行不改變產出檔內容與 stdout 路徑契約、v0.17.0 的 session 命名慣例 slot 變體（`kc --slot`，推播精確比對納入 `<慣例名>.<後綴>`、多重命中仍降級）為 add／reply 推播匹配規則、v0.17.1 的產檔腳本專案根定位「往上找到家目錄即停」為腳本內部防呆（不改變產出檔內容與 stdout 路徑契約）、v0.18.0 的歸檔腳本 `archive-handoff.sh` 為 done 步驟 5–7 的腳本化執行（其 rename 產物即本 skill 掃描豁免的既有兩形狀，`git add` 僅限具體路徑與確認 commit 協議零改動，無新豁免需求）、v0.19.0 的確認 commit 宣告範圍契約（ADR 018——定型指令改帶兩形 pathspec、add 與 commit 路徑集合一致，不改變掃描豁免形狀與「未 commit 即未處理」訊號，無新豁免需求）——皆不涉掃描慣例；回覆即推播不改變「未 commit 即新回覆」訊號）：
 
 | 項目 | 慣例 |
 |------|------|
@@ -457,7 +468,7 @@ hook——kunsu 首個行為強制機制（ADR 017 accepted，2026-08-29）。�
 | 信箱目錄 | `docs/handoffs/replies/`（一律在軍師 repo 內）|
 | `in_reply_to` 比對方式 | 精確字串比對，含後綴 |
 | done 歸檔搬移 | 頂層交接→`archive/`、其回覆→`archive/replies/` 成對搬移，即 `scan-replies.sh` 授權豁免的兩個 rename 形狀（可攜帶 `status: done` 修改，porcelain 呈現 `RM`）；v0.8.0 起 done 亦可能一併搬移來源 todo（`docs/todos/`→`docs/todos/archive/`，不在本 skill 掃描範圍，無豁免需求）|
-| 流程尾端確認 commit | add／done／reply（本地語境）經 AskUserQuestion 確認後 commit（ADR 009）；kunsu 語境 reply 不 commit——未 commit 即本 skill 的新回覆偵測訊號 |
+| 流程尾端確認 commit | add／done／reply（本地語境）經 AskUserQuestion 確認後 commit（ADR 009）；commit 帶與 add 同一組 pathspec（宣告範圍契約，ADR 018）；kunsu 語境 reply 不 commit——未 commit 即本 skill 的新回覆偵測訊號 |
 
 另依賴同 toolkit 內建的 `/kunsu-apply` skill 所定義的申請信箱目錄慣例
 （`docs/applications/` 頂層投遞、`archive/` 歸檔——本 skill 的掃描只看 git 狀態

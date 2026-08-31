@@ -1,6 +1,6 @@
 ---
 name: kunsu-init
-version: 0.6.1
+version: 0.7.0
 description: |
   為多 repo AI 協作場景 scaffold 一個「軍師」（規劃協調中心）：以訪談收集子專案清單，
   自動查證路徑並讀取技術棧，填入固定不變量（5 條 Invariants、回覆信箱、申請信箱
@@ -603,7 +603,7 @@ bash "$CLAUDE_SKILL_DIR/scripts/registry-merge.sh" \
 
 1. **核對**：`git status --porcelain` 確認本次審核產出的具體路徑（軍師 `CLAUDE.md`、`docs/applications/archive/<各歸檔檔名>`）確有待提交變更。無變更（使用者已自行 commit）→ 回報「相關檔案已提交，無需操作」，**不產生空 commit**。
 2. **確認**：AskUserQuestion「是否 commit 本次審核產出？（訊息：`docs: 審核申請 <子專案顯示名>（核准）`，多筆審核時併列於同一訊息）」。
-3. **確認後執行**：`git add` 上述具體路徑（**不含** `~/.claude/kunsu-registry.json`——registry 為 repo 外全域檔案，不屬任何 repo 的版控範圍；亦不用 `git add -A`）→ `git commit`。**絕不 push**。
+3. **確認後執行**：`git add -- <上述具體路徑> && git commit -m "<訊息>" -- <同一組路徑>`（**不含** `~/.claude/kunsu-registry.json`——registry 為 repo 外全域檔案，不屬任何 repo 的版控範圍；亦不用 `git add -A`；`-m` 必在 `--` 之前，commit 收斂宣告範圍、index 殘留不被夾帶，pathspec 兩形規則比照 handoff「確認 commit（協議步驟）」，ADR 018——已 commit 申請的歸檔 rename 成對補列來源路徑、untracked 來源僅列目的地）。**絕不 push**。
 4. **取消時**：登記與歸檔結果保留、不回退任何操作，回報可稍後手動執行的完整 `git add`＋`git commit` 指令。（歸檔搬移已被掃描規則豁免，未 commit 期間不會誤觸 tripwire。）
 
 ---
@@ -756,7 +756,7 @@ bash "$CLAUDE_SKILL_DIR/scripts/registry-remove.sh" \
 
 1. **核對**：`git status --porcelain` 確認 `<CURRENT_REPO_ROOT>/CLAUDE.md` 確有待提交變更。**無變更**（如⑤-a 判定「無對應列」而略過編輯，CLAUDE.md 本就無異動）→ 回報「CLAUDE.md 無異動，無需 commit」，**不產生空 commit**。
 2. **確認**：`AskUserQuestion`「是否 commit 本次移除產出？（訊息：`docs: 移除子專案登記 <顯示名稱>`）」。
-3. **確認後執行**：`git add <CURRENT_REPO_ROOT>/CLAUDE.md`（**不含** `~/.claude/kunsu-registry.json`）→ `git commit`。**絕不 push**。
+3. **確認後執行**：`git add -- <CURRENT_REPO_ROOT>/CLAUDE.md && git commit -m "<訊息>" -- <CURRENT_REPO_ROOT>/CLAUDE.md`（**不含** `~/.claude/kunsu-registry.json`；`-m` 在 `--` 之前，commit 收斂宣告範圍，ADR 018）。**絕不 push**。
 4. **取消時**：保留產出（CLAUDE.md 變更留在 working tree 未 commit；registry 已完成移除，不可逆），回報可稍後手動執行的 `git add`＋`git commit` 指令。
 
    **若使用者想完全放棄本次移除，明確提醒：不可先執行 `git checkout CLAUDE.md` 再重跑 `add-project`**——CLAUDE.md 還原後，`add-project` 的重複登記預檢會判定該子專案「已登記」，若使用者在該分支回答角色代碼不需異動，`add-project` 不會呼叫 `registry-merge.sh`，導致 registry 停留在已移除狀態、與還原後的 CLAUDE.md 重新產生漂移。正確作法二擇一：

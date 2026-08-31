@@ -1,6 +1,6 @@
 ---
 name: handoff
-version: 0.18.0
+version: 0.19.0
 description: |
   把一個需要交給「另一個 session／另一個角色（如後台、前端、DevOps）」研究或
   接手的議題，寫成一份獨立交接文件，落在當前專案的 docs/handoffs/。每份交接一個
@@ -85,8 +85,17 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
    待提交變更）。無變更（使用者已自行 commit）→ 回報「相關檔案已提交，
    無需操作」，**不產生空 commit**。
 2. **確認**：AskUserQuestion「是否 commit 本次產出？（訊息：`<固定格式訊息>`）」。
-3. **確認後執行**：`git add <僅本流程產出的具體路徑>`（不用 `git add -A`、不整目錄
-   打包）→ `git commit -m "<固定格式訊息>"`。**絕不 push**。
+3. **確認後執行**：`git add -- <僅本流程產出的具體路徑> && git commit -m "<固定格式訊息>" -- <同一組路徑>`
+   （不用 `git add -A`、不整目錄打包；add 與 commit 的路徑集合一致，`-m` 必在
+   `--` 之前——`--` 之後的一切都被解析為 pathspec）。**絕不 push**。
+   - **commit 收斂宣告範圍、不收斂 index**（ADR 018）：帶 pathspec 的 commit 只
+     提交指名路徑，index 裡前一流程的暫存殘留不會被夾帶。index 已有前一流程的
+     暫存內容時，先收斂該 commit、再開始新流程的 `git add`。
+   - **pathspec 兩形**（依 `git mv` 前來源是否存在於 HEAD）：存在於 HEAD 的
+     檔案，歸檔 rename **成對列出來源與目的地**（只列單邊會把 rename 拆半）；
+     不存在於 HEAD 的來源（porcelain `??`，或已 add 未 commit 的 `A `）
+     **僅列目的地**——該來源路徑不在 git 歷史，成對會以 pathspec 不匹配失敗。
+   - 多指令一律以 `&&` 串接（任一步失敗即中斷可見），不用 `;` 或分行接續。
 4. **取消時**：保留全部產出、不回退任何操作，回報可稍後手動執行的完整
    `git add`＋`git commit` 指令。
 
@@ -160,8 +169,8 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
    可如何使用（例如「請在後台 session 開啟此檔研究，完成後執行
    `/handoff reply <slug>` 建立回覆檔案，不要編輯此檔案本體」）。
 
-5. **確認 commit**：執行「確認 commit（協議步驟）」——`git add` 對象為本次建立的
-   交接檔，訊息 `docs: 建立交接 <檔名>`。（未 commit 的頂層新交接檔會在軍師 repo
+5. **確認 commit**：執行「確認 commit（協議步驟）」——add 與 commit pathspec
+   對象為本次建立的交接檔，訊息 `docs: 建立交接 <檔名>`。（未 commit 的頂層新交接檔會在軍師 repo
    的下一次 `/kunsu-inbox` 觸發 tripwire，此步驟即為收斂點。）
 
 6. **派發即推播**（僅 kunsu 語境——當前 repo 為 `~/.claude/kunsu-registry.json`
@@ -218,8 +227,8 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
    YAML 列表累加，保留全部更正歷史）。原本體已歸檔（`archive/` 內）時同樣
    適用——這是發起方對自己文件的生命週期標記，位置無關。此欄位僅供 display
    與追溯，不進任何掃描、tripwire 或分類邏輯。
-3. 確認 commit 的 `git add` 範圍**包括更正交接檔與原本體路徑**（含 archive 內
-   路徑），訊息沿 add 格式加註記（見指令格式段表格）。
+3. 確認 commit 的 `git add` 與 commit pathspec 範圍**包括更正交接檔與原本體
+   路徑**（含 archive 內路徑），訊息沿 add 格式加註記（見指令格式段表格）。
 4. 原本體在**頂層**時，步驟 2 的 Edit 至確認 commit 之間不執行 `/kunsu-inbox`
    （中間態 ` M` 屬 catch-all tripwire 範圍，比照 done 步驟 4–7 連續執行約束）；
    archive 內本體無此疑慮。取消 commit 時保留變更並附可手動執行的指令，同時
@@ -296,7 +305,7 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
 5. **語境判定與確認 commit**：取回覆檔的**絕對路徑**，與
    `git rev-parse --show-toplevel`（當前 repo 根）比對——
    - **本地語境**（回覆檔位於當前 repo 之下）→ 執行「確認 commit（協議步驟）」：
-     `git add` 對象為本次建立的回覆檔，訊息 `docs: 回覆交接 <檔名>`。
+     add 與 commit pathspec 對象為本次建立的回覆檔，訊息 `docs: 回覆交接 <檔名>`。
    - **kunsu 語境**（回覆檔位於另一 repo，即軍師的回覆信箱）→ **不 commit**，
      並向使用者一句話說明：未 commit 正是軍師信箱的「新回覆」訊號
      （`scan-replies.sh` 據此偵測新回覆），由軍師彙整後 commit 收斂。
@@ -472,8 +481,8 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
    > 腳本一次完成步驟 5（status Edit）、6（untracked 前置 `git add`）、7（本體與
    > 回覆成對 `git mv`），並額外 `git add` 歸檔目的地把 Edit 內容帶入暫存
    > （`git mv` 不會暫存 working tree 修改）。所有 `git add` 僅限本流程具體路徑、
-   > 絕不 `-A`；執行後印出待確認的 commit 指令但**不 commit**（步驟 9 經使用者
-   > 確認後執行；含 todo 收尾時依步驟 9 擴充訊息與 add 範圍）。多份交接可並列
+   > 絕不 `-A`；執行後印出帶兩形 pathspec 的待確認 commit 指令但**不 commit**
+   > （步驟 9 經使用者確認後執行；含 todo 收尾時依步驟 9 擴充訊息與 add 範圍）。多份交接可並列
    > 傳入一次收尾；已在 `archive/` 的傳入項自動略過，中途失敗不回滾、重跑即續。
    > 歸檔的 git 編排細節（pathspec rename 兩側、add 範圍）該被計算而非被記憶——
    > 2026-08-29 手動歸檔曾以 `git add -A` 夾帶 16 份未讀回覆、靜默清除「未 commit
@@ -519,7 +528,8 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
    修改，porcelain 呈現 `RM`，步驟 5 的 `status: done` 與步驟 4 的 todo Edit
    修改靠這一步 add 帶入 commit）**加上步驟 8 修改的所有檔案路徑**（步驟 5–7
    經歸檔腳本執行時，本體與回覆的歸檔路徑已暫存，此處補齊其餘路徑即可；對已
-   暫存路徑重複 `git add` 無害）；訊息
+   暫存路徑重複 `git add` 無害）；commit pathspec 為同一組路徑，並依協議兩形
+   對已 commit 檔案的 rename 補列來源路徑（歸檔腳本印出的指令已帶好）；訊息
    `docs: 歸檔交接 <檔名>`，含 todo 一併收尾時改用
    `docs: 歸檔交接 <檔名>；一併收尾 todo <slug>[、<slug>…]`，殘項清點有
    轉出時再附 `；轉出殘項 todo <slug>[、<slug>…]`（保留不歸檔的筆已自

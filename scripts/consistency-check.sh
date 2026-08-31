@@ -18,6 +18,8 @@
 #   G. 已修正漂移的防回歸——kunsu-init 不得再現「六步驟」
 #   H. live 軍師同步抽查（WARN 級，經 ~/.claude/kunsu-registry.json 動態發現，
 #      registry 不存在時靜默略過）——各軍師 CLAUDE.md 含最近一波遷移標記
+#   I. 確認 commit 宣告範圍定型（ADR 018）——四載體（handoff SKILL、範本、兩支
+#      歸檔腳本 echo）的定型指令均為 -m 在 -- 之前的 pathspec 形，防回退錯序
 
 set -u
 cd "$(dirname "$0")/.." || exit 1
@@ -113,15 +115,26 @@ else
   ng "G  kunsu-init 出現「六步驟」${g1} 處（2026-08-12 稽核已去計數化，疑似回歸）"
 fi
 
+# --- I. 確認 commit 宣告範圍定型（ADR 018）---
+i1="$(grep -cF 'git commit -m "<固定格式訊息>" -- ' skills/handoff/SKILL.md || true)"
+i2="$(grep -cF 'git commit -m "docs: 歸檔上報 <檔名>" -- ' skills/kunsu-init/assets/templates/kunsu-claude.md || true)"
+i3="$(grep -cF 'git commit -m \"$msg\" --' skills/handoff/scripts/archive-handoff.sh || true)"
+i4="$(grep -cF 'git commit -m \"$msg\" --' skills/kunsu-inbox/scripts/archive-report.sh || true)"
+if [[ "${i1}" -ge 1 && "${i2}" -ge 1 && "${i3}" -ge 1 && "${i4}" -ge 1 ]]; then
+  ok "I  確認 commit 定型四載體均為 pathspec 形（-m 在 -- 之前）"
+else
+  ng "I  確認 commit 定型載體缺 pathspec 形（SKILL=${i1} 範本=${i2} archive-handoff=${i3} archive-report=${i4}；-- 之後一切都被解析為 pathspec，-m 誤置其後必以 pathspec 錯誤失敗）"
+fi
+
 # --- H. live 軍師同步抽查（WARN 級）---
 REG="${HOME}/.claude/kunsu-registry.json"
 if [[ -f "${REG}" ]] && command -v python3 >/dev/null; then
   while IFS= read -r kroot; do
     [[ -z "${kroot}" || ! -f "${kroot}/CLAUDE.md" ]] && continue
-    if grep -q '規劃前既有盤點' "${kroot}/CLAUDE.md" && grep -q '勿自標' "${kroot}/CLAUDE.md" && grep -q 'corrected_by' "${kroot}/CLAUDE.md" && grep -q '副官' "${kroot}/CLAUDE.md" && grep -q '不豁免' "${kroot}/CLAUDE.md" && grep -q '不豁免' "${kroot}/CONCEPTS.md" 2>/dev/null && grep -q 'archive-handoff' "${kroot}/CONCEPTS.md" 2>/dev/null; then
+    if grep -q '規劃前既有盤點' "${kroot}/CLAUDE.md" && grep -q '勿自標' "${kroot}/CLAUDE.md" && grep -q 'corrected_by' "${kroot}/CLAUDE.md" && grep -q '副官' "${kroot}/CLAUDE.md" && grep -q '不豁免' "${kroot}/CLAUDE.md" && grep -q '宣告範圍' "${kroot}/CLAUDE.md" && grep -q '不豁免' "${kroot}/CONCEPTS.md" 2>/dev/null && grep -q 'archive-handoff' "${kroot}/CONCEPTS.md" 2>/dev/null; then
       ok "H  live 軍師遷移標記齊全：${kroot}"
     else
-      wn "H  live 軍師疑似漏遷移（缺 規劃前既有盤點／勿自標／corrected_by／副官／不豁免（CLAUDE 與 CONCEPTS 各自）／archive-handoff（CONCEPTS） 之一）：${kroot}"
+      wn "H  live 軍師疑似漏遷移（缺 規劃前既有盤點／勿自標／corrected_by／副官／不豁免（CLAUDE 與 CONCEPTS 各自）／宣告範圍（CLAUDE）／archive-handoff（CONCEPTS） 之一）：${kroot}"
     fi
   done < <(python3 -c "
 import json

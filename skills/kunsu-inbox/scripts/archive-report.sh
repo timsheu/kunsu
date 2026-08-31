@@ -1,30 +1,31 @@
 #!/usr/bin/env bash
-# archive-handoff.sh — /handoff done 步驟 5–7 的腳本化執行：
-#   status Edit → untracked 前置 git add → 本體與回覆成對 git mv → git add 歸檔目的地
+# archive-report.sh — 上報歸檔四步驟（1）–（3）的腳本化執行：
+#   status Edit（submitted→archived）→ untracked 前置 git add → git mv 至 archive/
+#   → git add 歸檔目的地
 #
 # 用法：
-#   archive-handoff.sh "<交接檔名、slug 片段或路徑>" [更多交接…]
+#   archive-report.sh "<上報檔名、slug 片段或路徑>" [更多上報…]
 #
 # 行為：
-#   1. 逐一解析參數為 docs/handoffs/ 頂層交接檔——支援完整檔名、絕對／相對路徑、
+#   1. 逐一解析參數為 docs/reports/ 頂層上報檔——支援完整檔名、絕對／相對路徑、
 #      足以唯一比對的檔名片段；已在 archive/ 者略過（供中途失敗後重跑），找不到或
 #      多重比對時報錯並列出候選
-#   2. 對每份交接依序：frontmatter status 改 done（python3，只動 frontmatter 區塊）
-#      → untracked 者先 git add（untracked 檔直接 git mv 會失敗）→ git mv 本體至
-#      archive/、對應回覆（<stem>-reply-*.md）至 archive/replies/ → git add 歸檔後
-#      本體路徑（git mv 不會暫存 working tree 的內容修改，status Edit 靠這步帶入）
+#   2. 對每份上報依序：frontmatter status 改 archived（python3，只動 frontmatter
+#      區塊；已是 archived 的頂層殘留冪等重做、續行搬移）→ untracked 者先 git add
+#      （untracked 檔直接 git mv 會失敗）→ git mv 至 archive/ → git add 歸檔後
+#      目的地路徑（git mv 不會暫存 working tree 的內容修改，status Edit 靠這步帶入）
 #   3. 所有 git add 僅限本流程產出的具體路徑，絕不 -A、不整目錄打包
 #   4. 不 commit：stdout 印出一行帶兩形 pathspec 的待確認 git commit 指令
 #      （ADR 009 經使用者確認後執行；ADR 018 宣告範圍契約——tracked rename 成對
-#      列 src＋dst、untracked 來源僅列 dst；todo 一併收尾／轉出時依 SKILL done
-#      步驟 9 擴充訊息與 add／pathspec 範圍）
-#   5. 暫存區含 docs/handoffs/、docs/todos/ 之外的路徑時警告——不在本次 commit
-#      宣告範圍內不會被帶入，列出供人工裁決是否另行處理
+#      列 src＋dst、untracked 來源（上報常態）僅列 dst）
+#   5. 暫存區含 docs/reports/ 之外的路徑時警告——不在本次 commit 宣告範圍內
+#      不會被帶入，列出供人工裁決是否另行處理（上報歸檔無 todo 聯動，排除清單
+#      僅 docs/reports/ 單一前綴，不比照 archive-handoff.sh 放寬）
 #   6. 中途失敗不回滾：已完成的搬移保留，git status 檢視現況後重跑即續
 #
-# 來源事故（2026-08-29 ebook 軍師）：手動歸檔以 git add -A 夾帶 16 份未讀回覆，
-# 靜默清除「未 commit 即未處理」狀態訊號。歸檔的 git 編排細節（pathspec rename
-# 兩側、add 範圍）是該被計算而非被記憶的約束，故收進腳本。
+# 來源事故（2026-08-31 ebook 軍師）：上報歸檔的 git mv 先留 index 殘留，隨後
+# 「建立交接」的無 pathspec commit 把殘留一併吞入，同一 session 重犯兩次——
+# 上報歸檔是 v0.18.0 歸檔腳本化未覆蓋的流程，git 編排自此同樣該被計算而非被記憶。
 
 set -euo pipefail
 
@@ -32,22 +33,23 @@ MUTATION_STARTED=0
 on_err() {
   if [[ "$MUTATION_STARTED" -eq 1 ]]; then
     echo "✗ 歸檔中途失敗：已完成的搬移不回滾。請以 git status 檢視現況後重跑本腳本（已在 archive/ 的傳入項會自動略過）。" >&2
+    echo "ℹ 完成前 /kunsu-inbox 對中間態會誤報：已 commit 上報 Edit 後的 \` M\` 觸發 tripwire、untracked 上報仍列為新上報——補跑收斂即回復，不是外部入侵。" >&2
   fi
 }
 trap on_err ERR
 
 if [[ $# -lt 1 ]]; then
-  echo "錯誤：缺少交接檔參數" >&2
-  echo "用法：archive-handoff.sh \"<交接檔名、slug 片段或路徑>\" [更多交接…]" >&2
+  echo "錯誤：缺少上報檔參數" >&2
+  echo "用法：archive-report.sh \"<上報檔名、slug 片段或路徑>\" [更多上報…]" >&2
   exit 1
 fi
 
 command -v python3 >/dev/null 2>&1 || {
-  echo "錯誤：需要 python3（frontmatter status 編輯）；不可用時請依 SKILL done 步驟 5–7 手動執行" >&2
+  echo "錯誤：需要 python3（frontmatter status 編輯）；不可用時請依軍師 CLAUDE.md 上報信箱協議四步驟手動執行" >&2
   exit 1
 }
 
-# 定位專案根：與 new-handoff.sh 同一套——優先往上找最近的 CLAUDE.md/AGENTS.md
+# 定位專案根：與 archive-handoff.sh 同一套——優先往上找最近的 CLAUDE.md/AGENTS.md
 #（走到家目錄即停，不把家目錄當專案根），其次 git 根，最後當前目錄
 ROOT=""
 dir="$(pwd)"
@@ -64,7 +66,7 @@ fi
 
 shopt -s nullglob
 
-H_DIR=""          # 全部交接檔必須同屬一個 docs/handoffs/（單一 commit 訊息）
+R_DIR=""          # 全部上報檔必須同屬一個 docs/reports/（單一 commit 訊息）
 FILES=()          # 解析成功、待歸檔的絕對路徑
 SKIPPED=()        # 已在 archive/ 的略過項（檔名）
 
@@ -82,49 +84,49 @@ resolve_arg() {
       echo "錯誤：找不到檔案「${arg}」" >&2
       return 1
     fi
-    if [[ "$abs" == */docs/handoffs/archive/* ]]; then
+    if [[ "$abs" == */docs/reports/archive/* ]]; then
       resolved_archived="$abs"
       return 0
     fi
-    local rel="${abs##*/docs/handoffs/}"
-    if [[ "$abs" != */docs/handoffs/*.md || "$rel" == */* ]]; then
-      echo "錯誤：「${arg}」不是 docs/handoffs/ 頂層交接檔" >&2
+    local rel="${abs##*/docs/reports/}"
+    if [[ "$abs" != */docs/reports/*.md || "$rel" == */* ]]; then
+      echo "錯誤：「${arg}」不是 docs/reports/ 頂層上報檔" >&2
       return 1
     fi
     resolved="$abs"
     return 0
   fi
 
-  # 檔名／片段形式：在專案根的 docs/handoffs/ 頂層搜尋
-  local hd="$ROOT/docs/handoffs"
-  if [[ ! -d "$hd" ]]; then
-    echo "錯誤：$hd 不存在（請於軍師／發起方 repo 內執行，或改傳交接檔路徑）" >&2
+  # 檔名／片段形式：在專案根的 docs/reports/ 頂層搜尋
+  local rd="$ROOT/docs/reports"
+  if [[ ! -d "$rd" ]]; then
+    echo "錯誤：$rd 不存在（請於軍師 repo 內執行，或改傳上報檔路徑）" >&2
     return 1
   fi
   local name="${arg%.md}"
-  if [[ -f "$hd/$name.md" ]]; then
-    resolved="$hd/$name.md"
+  if [[ -f "$rd/$name.md" ]]; then
+    resolved="$rd/$name.md"
     return 0
   fi
   local hits=()
   local f
-  for f in "$hd"/*"$name"*.md; do
+  for f in "$rd"/*"$name"*.md; do
     hits+=("$f")
   done
   if [[ ${#hits[@]} -eq 1 ]]; then
     resolved="${hits[0]}"
     return 0
   elif [[ ${#hits[@]} -gt 1 ]]; then
-    echo "錯誤：「${arg}」比對到多份交接，請給更精確的片段或完整檔名：" >&2
+    echo "錯誤：「${arg}」比對到多份上報，請給更精確的片段或完整檔名：" >&2
     for f in "${hits[@]}"; do echo "  - $(basename "$f")" >&2; done
     return 1
   fi
   # 頂層零命中 → 查 archive/（重跑場景：前次已搬移成功）
-  for f in "$hd/archive/"*"$name"*.md; do
+  for f in "$rd/archive/"*"$name"*.md; do
     resolved_archived="$f"
     return 0
   done
-  echo "錯誤：docs/handoffs/ 頂層與 archive/ 均找不到「${arg}」" >&2
+  echo "錯誤：docs/reports/ 頂層與 archive/ 均找不到「${arg}」" >&2
   return 1
 }
 
@@ -135,10 +137,10 @@ for arg in "$@"; do
     continue
   fi
   fdir="$(dirname "$resolved")"
-  if [[ -z "$H_DIR" ]]; then
-    H_DIR="$fdir"
-  elif [[ "$H_DIR" != "$fdir" ]]; then
-    echo "錯誤：交接檔分屬不同 docs/handoffs/（${H_DIR} 與 ${fdir}），請分批執行" >&2
+  if [[ -z "$R_DIR" ]]; then
+    R_DIR="$fdir"
+  elif [[ "$R_DIR" != "$fdir" ]]; then
+    echo "錯誤：上報檔分屬不同 docs/reports/（${R_DIR} 與 ${fdir}），請分批執行" >&2
     exit 1
   fi
   FILES+=("$resolved")
@@ -155,22 +157,23 @@ if [[ ${#FILES[@]} -eq 0 ]]; then
   exit 0
 fi
 
-GITROOT="$(git -C "$H_DIR" rev-parse --show-toplevel 2>/dev/null)" || {
-  echo "錯誤：$H_DIR 不在 git 儲存庫內" >&2
+GITROOT="$(git -C "$R_DIR" rev-parse --show-toplevel 2>/dev/null)" || {
+  echo "錯誤：$R_DIR 不在 git 儲存庫內" >&2
   exit 1
 }
 
-ARCHIVE_DIR="$H_DIR/archive"
-mkdir -p "$ARCHIVE_DIR/replies"
+ARCHIVE_DIR="$R_DIR/archive"
+mkdir -p "$ARCHIVE_DIR"
 
 names=()
 PATHSPECS=()
 MUTATION_STARTED=1
 for f in "${FILES[@]}"; do
   base="$(basename "$f")"
-  stem="$(basename "$f" .md)"
 
-  # frontmatter status → done（只動 frontmatter 區塊，內文一字不碰——Invariant #5）
+  # frontmatter status → archived（只動 frontmatter 區塊；已是 archived 的頂層
+  # 殘留冪等重做、續行搬移——與 add-project 對申請殘留的互動補完是刻意差異：
+  # 腳本情境使用者已下達歸檔意圖）
   python3 - "$f" <<'PYEOF'
 import re
 import sys
@@ -184,7 +187,7 @@ if not m:
 fm = m.group(1)
 if re.search(r"(?m)^status:", fm) is None:
     sys.exit(f"frontmatter 無 status 欄位：{path}")
-fm2 = re.sub(r"(?m)^status:.*$", "status: done", fm, count=1)
+fm2 = re.sub(r"(?m)^status:.*$", "status: archived", fm, count=1)
 with open(path, "w", encoding="utf-8") as fh:
     fh.write(text[: m.start(1)] + fm2 + text[m.end(1) :])
 PYEOF
@@ -207,52 +210,30 @@ PYEOF
   # status Edit 靠這一步帶入暫存
   git -C "$GITROOT" add -- "$ARCHIVE_DIR/$base"
   # commit pathspec 兩形（ADR 018）：tracked rename 成對列 src＋dst（只列單邊會把
-  # rename 拆半）；untracked 來源（A 形狀）僅列 dst——src 從未入 git，成對必敗
+  # rename 拆半）；untracked 來源（上報常態、A 形狀）僅列 dst——src 從未入 git
   if [[ "$body_tracked" -eq 1 ]]; then
     PATHSPECS+=("$f")
   fi
   PATHSPECS+=("$ARCHIVE_DIR/$base")
 
-  rcount=0
-  for r in "$H_DIR/replies/$stem-reply-"*.md; do
-    rst="$(git -C "$GITROOT" status --porcelain -- "$r" | head -1)"
-    if [[ "${rst:0:2}" == "??" ]]; then
-      git -C "$GITROOT" add -- "$r"
-    fi
-    rrel="${r#"$GITROOT"/}"
-    reply_tracked=0
-    if git -C "$GITROOT" cat-file -e "HEAD:$rrel" 2>/dev/null; then
-      reply_tracked=1
-    fi
-    git -C "$GITROOT" mv "$r" "$ARCHIVE_DIR/replies/$(basename "$r")"
-    if [[ "$reply_tracked" -eq 1 ]]; then
-      PATHSPECS+=("$r")
-    fi
-    PATHSPECS+=("$ARCHIVE_DIR/replies/$(basename "$r")")
-    rcount=$((rcount + 1))
-  done
-
-  echo "✓ 歸檔 ${base}（回覆 ${rcount} 份）" >&2
+  echo "✓ 歸檔 ${base}" >&2
   names+=("$base")
 done
 
 # 暫存區範圍核對：pathspec commit 只收斂宣告範圍，範圍外暫存不會被帶入——
-# 仍列出供人工裁決是否另行處理，不擅自 unstage（前綴以 H_DIR 相對 GITROOT 計算，
+# 仍列出供人工裁決是否另行處理，不擅自 unstage（前綴以 R_DIR 相對 GITROOT 計算，
 # 專案根深於 git 根的 monorepo 佈局下才不會把自己剛暫存的歸檔檔誤報為外部路徑）
-h_rel="${H_DIR#"$GITROOT"/}"
-todo_rel="$(dirname "$H_DIR")/todos"
-todo_rel="${todo_rel#"$GITROOT"/}"
-outside="$(git -C "$GITROOT" diff --cached --name-only | grep -v "^${h_rel}/" | grep -v "^${todo_rel}/" || true)"
+mail_rel="${R_DIR#"$GITROOT"/}"
+outside="$(git -C "$GITROOT" diff --cached --name-only | grep -v "^${mail_rel}/" || true)"
 if [[ -n "$outside" ]]; then
-  echo "⚠ 暫存區含本流程（${h_rel}/、${todo_rel}/）之外的已暫存路徑——不在本次 commit 宣告範圍內、不會被帶入，請確認是否需另行處理：" >&2
+  echo "⚠ 暫存區含本流程（${mail_rel}/）之外的已暫存路徑——不在本次 commit 宣告範圍內、不會被帶入，請確認是否需另行處理：" >&2
   while IFS= read -r p; do echo "  - $p" >&2; done <<< "$outside"
 fi
 
-msg="docs: 歸檔交接 $(IFS=、; echo "${names[*]}")"
+msg="docs: 歸檔上報 $(IFS=、; echo "${names[*]}")"
 quoted=""
 for p in "${PATHSPECS[@]}"; do quoted+=" \"$p\""; done
 echo "git commit -m \"$msg\" --$quoted"
 staged_count="$(git -C "$GITROOT" diff --cached --name-only | wc -l | tr -d ' ')"
 echo "ℹ index 現含 ${staged_count} 筆暫存路徑；上列指令僅收斂 pathspec 宣告範圍（兩形：tracked rename 成對、untracked 僅目的地，ADR 018），範圍外暫存不受影響" >&2
-echo "ℹ 已暫存本流程全部路徑（僅具體路徑，未用 -A）；尚未 commit——請經使用者確認後執行上列指令（ADR 009），todo 一併收尾／轉出時依 SKILL done 步驟 9 擴充訊息與 git add／pathspec 範圍" >&2
-echo "ℹ done 收尾查核不隨腳本豁免：逐項驗收、沉澱訊號、反向路由、來源 todo、殘項清點、斷言自查——見 handoff SKILL.md done 段" >&2
+echo "ℹ 尚未 commit——請經 AskUserQuestion 確認後執行上列指令（ADR 009 上報歸檔第（4）步）；本腳本僅完成步驟（1）–（3）與目的地暫存，審閱與分流義務不因腳本而豁免" >&2

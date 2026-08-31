@@ -22,9 +22,9 @@ docs/
   solutions/           → 可重用學習與解法（/ce-compound 產出，YAML frontmatter 依 module/tags/problem_type 可搜尋）
   playbooks/           → 操作教學（端到端工作流程、軍師沙盤導覽；手工維護，自 README 拆出的教學唯一落點）
 skills/                → skill 原始碼
-  handoff/             → 通用交接原語（v0.18.0，2026-07-06 自部署目錄併入，見 ADR 003）
-    SKILL.md           → add／reply／list／done 子指令（add 含引用檔名權威慣例、斷言層級紀律與更正交接子節（corrected_by 補記）；done 回報含斷言自查兩態附句；reply 含 kunsu 語境分支、verify 驗收方式選填欄位、逐項回答附證據指引、矛盾回報指引與暫離回報最小 partial 回覆；done 含收尾口語觸發、發起方守門、歸檔前逐項驗收查核、沉澱訊號查核、反向路由查核與來源 todo 查核一併收尾（todo 收尾含殘項清點）；done 步驟 5–7 歸檔執行腳本化（archive-handoff.sh）；add／done／本地 reply 尾端確認 commit）
-    scripts/           → new-handoff.sh、new-handoff-reply.sh、archive-handoff.sh（done 歸檔執行：status Edit→成對 git mv→僅具體路徑暫存，不 commit）
+  handoff/             → 通用交接原語（v0.19.0，2026-07-06 自部署目錄併入，見 ADR 003）
+    SKILL.md           → add／reply／list／done 子指令（add 含引用檔名權威慣例、斷言層級紀律與更正交接子節（corrected_by 補記）；done 回報含斷言自查兩態附句；reply 含 kunsu 語境分支、verify 驗收方式選填欄位、逐項回答附證據指引、矛盾回報指引與暫離回報最小 partial 回覆；done 含收尾口語觸發、發起方守門、歸檔前逐項驗收查核、沉澱訊號查核、反向路由查核與來源 todo 查核一併收尾（todo 收尾含殘項清點）；done 步驟 5–7 歸檔執行腳本化（archive-handoff.sh）；add／done／本地 reply 尾端確認 commit——宣告範圍契約：帶兩形 pathspec、`&&` 串接與排序規則，ADR 018）
+    scripts/           → new-handoff.sh、new-handoff-reply.sh、archive-handoff.sh（done 歸檔執行：status Edit→成對 git mv→僅具體路徑暫存，印出帶兩形 pathspec 的待確認 commit 指令、不 commit）
   todo/                → CE 副作用 TODO 清單管理原語（v0.2.1，2026-07-17 自部署目錄併入，見 ADR 013）
     SKILL.md           → add／list／done／rm 子指令，管理 docs/todos/ 一檔一項技術債（done 含殘項清點；done／rm 含 untracked 前置檢查）
     scripts/           → new-todo.sh
@@ -36,9 +36,10 @@ skills/                → skill 原始碼
     assets/solutions/  → 兩篇種子沉澱文件（自母本通用化）
   kunsu-inbox/         → 跨 session 傳令自動化
     SKILL.md           → 模式偵測（獨立雙判斷）＋子 repo／軍師雙模式（軍師模式含收尾與分流提示行）
-    scripts/scan-replies.sh → 未 commit 回覆掃描＋tripwire（done 授權歸檔豁免、雙側核驗）＋歷史夾帶偵測與掃描統計（advisory；狀態檔 ~/.claude/kunsu-scan-stats.json）
+    scripts/scan-replies.sh → 未 commit 回覆掃描＋tripwire（done 授權歸檔豁免、雙側核驗）＋歷史夾帶偵測與掃描統計（advisory；狀態檔 ~/.claude/kunsu-scan-stats.json；含 MISDECLARED_ARCHIVE_ADD 非白名單訊息夾帶 archive 新增偵測與 TRUNCATED 截斷聲明，ADR 018）
     scripts/scan-applications.sh → 申請信箱掃描＋tripwire（雙側核驗授權歸檔）
     scripts/scan-reports.sh → 上報信箱掃描＋tripwire（結構同 scan-applications.sh）
+    scripts/archive-report.sh → 上報歸檔執行（status Edit→untracked 前置 add→git mv→add 目的地，印出帶兩形 pathspec 的待確認 commit 指令、不 commit）
     scripts/session_hook.py → SessionStart hook：session 啟動（含 /clear）自動注入信箱摘要（ADR 014，複用沙盤分類模組；含 handoff skill 版號變動提示——狀態檔 ~/.claude/kunsu-hook-state.json）
     scripts/pretooluse_git_guard.py → PreToolUse hook：軍師 repo 攔寬範圍 git add（ADR 017，凍結三形狀＋逃生門＋deny 入統計，fail-open）
     tests/             → pytest，session hook 單元測試
@@ -150,6 +151,8 @@ install.sh             → 部署至 ~/.claude/skills/（預設 copy、--link �
 
 - **範本 done 收尾指路句與三軍師第五波遷移**（kunsu-init v0.6.1，2026-08-29）：範本 kunsu-concepts「done 收尾」詞條於查核清單句後插入歸檔腳本指路句（`archive-handoff.sh` 用法、「git 編排細節該被計算而非被記憶」理由與 `-A` 夾帶事故一句、PreToolUse 守門提及）——熟練 session 的必經路徑只剩 CLAUDE.md／CONCEPTS 與腳本本身（v0.16.0 觸及率教訓），指路句使手動收尾的軍師 session 能發現腳本存在；ebook／ivm／px 三 live CONCEPTS 同句同步（四副本逐字一致，python3 批次替換前置唯一性斷言）。consistency-check H 擴充 `archive-handoff`（CONCEPTS）比對字串，防詞條單側漏遷不可見。
 
+- **確認 commit 宣告範圍契約、上報歸檔腳本化與夾帶偵測**（[ADR 018 candidate](docs/adr/2026-08-31-adr-candidate-018-commit-declared-scope-contract.md)，handoff v0.19.0／kunsu-inbox v0.11.0／kunsu-init v0.7.0，2026-08-31）：源自 ebook 軍師調查報告（`ebook/docs/2026-08-31-commit邊界失誤調查報告.md`，本 session 逐筆獨立核對屬實——reflog 物件、30 commit 檔數、守門範圍、統計檔 7 掃 0 事件證實現有偵測對此形狀全盲）——同一 session 兩次把上報歸檔的 index 殘留夾帶進「建立交接」commit，第一次修正後的記憶型對策隔日即失效；成因三疊加：commit 編排無定型、ADR 009 暫存等確認使 index 殘留為協議常態、三處權威文本教的正是無 pathspec 寫法。三件落地：**甲、定型指令 pathspec 化**——確認 commit 契約自「提交 index」改為「提交宣告範圍」，定型指令 `git add -- <路徑> && git commit -m "<訊息>" -- <同一組路徑>`（`-m` 必在 `--` 之前——`--` 後一切都被解析為 pathspec，計畫初稿曾錯序、doc review P1 conf 100 抓出並實測修正），pathspec 兩形依 mv 前 porcelain 分：tracked rename 成對列 src＋dst、untracked 來源僅列 dst（上報／申請常態——成對必以 pathspec 不匹配失敗，spec-flow 分析實測抓出、修正了 brainstorm 的單一成對規則）；排序規則（index 有前一流程暫存先收斂再開新流程）與 `&&` 串接規範一併入協議節單一權威副本，其餘副本（add／done／reply／更正交接、kunsu-init add-project／remove-project、範本上報四步驟與 home-dataview）只改字面並指回。**乙、`archive-report.sh`**（skills/kunsu-inbox/scripts/，對稱 archive-handoff.sh 裁剪）——補齊 v0.18.0 計算載體對上報歸檔（兩起事故的實際流程）的覆蓋缺口：status Edit（submitted→archived，殘留中間態冪等重跑自癒——與 add-project 互動補完為刻意差異）→untracked 前置 add→git mv→add 目的地，stdout 印兩形 pathspec 待確認指令、不自動 commit（ADR 009 零改動）、on_err 補掃描誤報預期句；archive-handoff.sh 印出指令同步 pathspec 化並加 index 筆數提示；範本第（4）步加指路句。**丙、`MISDECLARED_ARCHIVE_ADD` 偵測**——scan-replies.sh 逐 commit 迴圈新增形狀（置於 replies 零新增 continue 守門之前——事故形狀正是 replies 零新增的 commit，doc review 抓出的結構性障礙）：訊息不以白名單前綴（`docs: 歸檔`、`docs: 審核申請`——申請審核 commit 正當新增 archive 檔但不含「歸檔」，spec-flow 抓出的第一天必誤報形狀；startswith 比對防標題含詞繞過）開頭的 commit 以 diff-filter A 新增任一信箱 archive/ 檔案即警示入統計檔，另記 `TRUNCATED`（rev-list 滿 200 筆聲明該輪數據不完整）；統計是 ADR 017 擴 `git commit` 守門的啟動依據（僅計上線後事件，見後續評估）。consistency-check 新增檢查項 I（四載體 pathspec 形錨句、防 `-m` 錯序回退）＋H 鏈擴充「宣告範圍」；CONCEPTS「確認 commit」詞條同步。經 `/ce-brainstorm`（調查報告獨立核實＋五方向評估）→ 三路研究（副本清點／learnings／spec-flow 邊界分析 2 Critical＋5 決策題全數入計畫）→ `/ce-plan` → 3-persona headless doc review（9 筆：1 筆引句不存在剔除、4 safe_auto＋3 gated 全套用）；暫存目錄 dogfooding 43 項斷言全過（AE1 事故重演隔離、兩腳本兩形全鏈、偵測七場景含基線不重報、SMUGGLED_REPLY 迴歸、TRUNCATED）；171 項 pytest、consistency-check 23 項全過。三軍師第六波遷移合批（grep 恰中一次紀律；附帶收斂 ebook／ivm HOME.md 停在 ADR 009 前「三步驟」的既有漂移）。
+
 ### 尚未實作／後續評估
 - ADR 008 open questions 留待用量評估——歸檔 `status` 值域升級（現為單一 `archived`）、「軍師已讀」輕量標記、上報量成長後的整理慣例。
 - applications 的 HOME dataview 補齊、add-project reports 遷移不含 HOME dataview 附加（已知落差，見實作計畫 Scope Boundaries）。
@@ -159,8 +162,13 @@ install.sh             → 部署至 ~/.claude/skills/（預設 copy、--link �
 - add-project 內建「整句 `roles` → 代碼」自動遷移偵測（ADR 007 Open Questions；本次已手動遷 ivm 三筆＋ebook-store-nginx，工具內建供其他既有軍師升級待評估）。
 - 角色說明欄留空時關聯專案表的呈現規格（ADR 007 Open Questions；顯示「無說明」佔位 vs 留空欄，待範本落地時定）。
 - 跨 repo solutions 檢索外環（全域 CLAUDE.md 慣例薄段＋ce-learnings-researcher 間接觸及）——等跨 repo 檢索實痛出現再做，落點建議全域 CLAUDE.md 直加（2026-07-24 計畫 Scope Boundaries）。
-- 沙盤與 SessionStart hook 對 `HISTORY_WARN:` 的顯示（現僅 `/kunsu-inbox` CLI 呈現；`kunsu_scan.py` 對未知前綴靜默略過，無誤動作風險）。
+- 沙盤與 SessionStart hook 對 `HISTORY_WARN:` 的顯示（現僅 `/kunsu-inbox` CLI 呈現；`kunsu_scan.py` 對未知前綴靜默略過，無誤動作風險；`MISDECLARED_ARCHIVE_ADD` 的一次性警示可能被 hook／沙盤消耗——警示以統計檔為準，ADR 018 威脅模型明文）。
 - git add 守門的誤擋率觀察期（ADR 017 開放問題 3）：以統計檔 `guard_denies`／`GUARD_DENY` 事件累積數據，據以定版或撤除。
+- ADR 018 開放問題觀察期：以統計檔 `MISDECLARED_ARCHIVE_ADD` 事件（僅計上線後、經人工核對排除誤報——活習慣複合訊息經兩 live 軍師全歷史回放實測約 9.6% 誤報，detail 帶完整訊息供辨識；不含 2026-08-31 已知一次再犯）累積數據——出現真再犯才啟動「ADR 017 擴 `git commit` 守門」的修訂討論，零再犯不跨「提醒→阻止」線。
+- 申請歸檔腳本化——延後至申請量成長或出現實證事故（2026-08-31 計畫 Scope Boundaries）。
+- 掃描統計檔的並發防護（2026-08-31 code review 發現）：多寫入端（scan／沙盤／hook／guard）無鎖且共用固定同名 .tmp，併寫可致半截 JSON 靜默重建、基線歸零且不記事件——候選修法 mkstemp＋flock＋重建時記 STATS_RESET 事件；advisory 體系實害低，另案評估。
+- `HISTORY_WARN` 一次性與 tripwire 同輪的呈現降級（2026-08-31 code review 發現）：同輪出現時 4b-3「立即停止」使警示被略過且基線照樣前進、警示不再現，僅剩統計檔可查（ADR 018 已明文「以統計檔為準」）；候選修法為未消費 warns 時基線不前進或 pending 重報，與沙盤／hook 顯示項合場評估。
+- 歸檔腳本與統計 IO 的複製體收斂（2026-08-31 code review cleanup 級發現）：archive-report.sh 與 archive-handoff.sh 約 200 行同構（含 frontmatter python heredoc）、pretooluse_git_guard.py 的 `_log_deny` 重抄 scan-replies.sh 統計寫入且漏 stale 自清——契約再修訂時單側改動會靜默漂移；候選修法為抽參數化共用入口與 `scan_stats.py`，屬重構級另案評估。
 
 ### 相關資產（唯讀參考）
 

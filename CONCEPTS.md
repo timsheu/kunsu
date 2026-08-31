@@ -85,7 +85,7 @@
 信箱的狀態慣例：未 commit 的信箱檔案視為尚未處理的標記，處理（彙整回覆、審核申請、審閱上報）完成後才 commit；協議流程尾端以確認 commit 收斂此狀態。
 
 ### 確認 commit
-協議流程尾端經 AskUserQuestion 逐次確認後執行的收斂 commit（見 [ADR 009](docs/adr/2026-07-09-adr-candidate-009-protocol-commit-confirmation.md)）：逐次確認即構成「使用者明確要求」，與全域「不主動 commit」規範相容而非牴觸。僅涵蓋軍師側／發起側流程——範圍以各 SKILL 流程尾端明訂的「確認 commit（協議步驟）」為準，不在此重複窮舉；投遞端（`/kunsu-apply`、`/kunsu-report`、kunsu 語境 reply）維持不 commit——未 commit 即信箱新件訊號。內建防護：僅 add 本流程產出的具體路徑、固定 `docs:` 訊息格式、防空 commit、絕不 push。
+協議流程尾端經 AskUserQuestion 逐次確認後執行的收斂 commit（見 [ADR 009](docs/adr/2026-07-09-adr-candidate-009-protocol-commit-confirmation.md)）：逐次確認即構成「使用者明確要求」，與全域「不主動 commit」規範相容而非牴觸。僅涵蓋軍師側／發起側流程——範圍以各 SKILL 流程尾端明訂的「確認 commit（協議步驟）」為準，不在此重複窮舉；投遞端（`/kunsu-apply`、`/kunsu-report`、kunsu 語境 reply）維持不 commit——未 commit 即信箱新件訊號。內建防護：僅 add 本流程產出的具體路徑、commit 帶與 add 同一組 pathspec——收斂宣告範圍而非 index，前一流程的暫存殘留不被夾帶；pathspec 兩形（tracked rename 成對列來源與目的地、untracked 來源僅列目的地）以 handoff SKILL「確認 commit（協議步驟）」為準（ADR 018）——、固定 `docs:` 訊息格式、防空 commit、絕不 push。
 
 ## 申請生命週期
 

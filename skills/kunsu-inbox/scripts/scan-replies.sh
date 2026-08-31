@@ -167,6 +167,11 @@ done < <(git -C "$KUNSU_ROOT" -c core.quotepath=false status --porcelain -uall 2
 #     夾帶 16 份未讀回覆的事故形狀）。
 #   HISTORY_WARN:BATCH_REPLY_ADD — 任意單一 commit 新增 ≥6 份頂層回覆
 #     （啟發式：批次處理合法，但提示核對是否整批掃入）。
+#   HISTORY_WARN:MISDECLARED_ARCHIVE_ADD — 訊息不以白名單前綴（docs: 歸檔、
+#     docs: 審核申請）開頭的 commit 新增了任一信箱 archive/（handoffs／reports／
+#     applications）檔案——commit 內容超出訊息宣告範圍的形狀（2026-08-31 ebook
+#     軍師「建立交接」commit 兩度夾帶上報歸檔的事故形狀，ADR 018）。
+# 另記 TRUNCATED 事件（rev-list 滿 200 筆、最舊段未檢視——僅入統計檔不輸出警示）。
 # 每筆警示只在事發後的第一次掃描出現（基線 commit 前進即不重報）。
 #
 # 統計寫入 $KUNSU_SCAN_STATS_FILE（預設 ~/.claude/kunsu-scan-stats.json；機器
@@ -237,8 +242,63 @@ try:
         revs = git(
             "rev-list", "--reverse", "--max-count=200", f"{last}..{head}"
         ).stdout.split()
+        # 三信箱 archive/ 前綴與正當歸檔訊息白名單（MISDECLARED_ARCHIVE_ADD，
+        # ADR 018）——startswith 前綴比對，不採「任意位置含詞」（標題含「歸檔」的
+        # 建立交接 commit 正是事故吞噬者形狀，含詞判準會豁免它）；新增正當歸檔
+        # 訊息形狀時須同步擴列（ADR 018 修訂事項）
+        archive_prefixes = (
+            "docs/handoffs/archive/",
+            "docs/reports/archive/",
+            "docs/applications/archive/",
+        )
+        whitelist_prefixes = ("docs: 歸檔", "docs: 審核申請")
+        if len(revs) == 200:
+            # rev-list --max-count 先限量（取最新 N 筆）再反轉：滿載代表最舊段被
+            # 靜默跳過，而基線仍會前進至 HEAD——記事件聲明本輪數據不完整
+            events.append(
+                {
+                    "ts": now,
+                    "type": "TRUNCATED",
+                    "detail": f"rev-list 滿 200 筆（{last[:12]}..{head[:12]}），"
+                    "最舊段未檢視，本輪歷史偵測數據不完整",
+                }
+            )
         for sha in revs:
             subject = git("log", "-1", "--format=%s", sha).stdout.strip()
+            # 夾帶偵測（置於下方 replies 零新增 continue 之前——事故形狀「建立
+            # 交接夾帶 archive 新增」正是 replies 零新增的 commit）
+            arch_out = git(
+                "diff-tree",
+                "-r",
+                "--no-commit-id",
+                "--diff-filter=A",
+                "--name-only",
+                sha,
+                "--",
+                *archive_prefixes,
+            ).stdout
+            arch_added = [
+                p
+                for p in arch_out.splitlines()
+                if p.startswith(archive_prefixes) and p.endswith(".md")
+            ]
+            if arch_added and not subject.startswith(whitelist_prefixes):
+                shown = "、".join(arch_added[:5]) + (
+                    f"（另 {len(arch_added) - 5} 份）" if len(arch_added) > 5 else ""
+                )
+                warns.append(
+                    f"HISTORY_WARN:MISDECLARED_ARCHIVE_ADD {sha[:12]} 非歸檔訊息的 "
+                    f"commit 新增 {len(arch_added)} 份信箱 archive/ 檔案"
+                    f"（{subject[:60]}）——commit 內容疑似超出訊息宣告範圍：{shown}"
+                )
+                events.append(
+                    {
+                        "ts": now,
+                        "type": "MISDECLARED_ARCHIVE_ADD",
+                        "detail": f"{sha[:12]} {subject}：{len(arch_added)} 份——"
+                        + "、".join(arch_added),
+                    }
+                )
             name_out = git(
                 "diff-tree",
                 "-r",

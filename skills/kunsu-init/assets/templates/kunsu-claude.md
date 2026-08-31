@@ -128,7 +128,7 @@
   ---
   ```
 - **「未 commit 即未處理」慣例**：上報檔在子專案 session 以 `/kunsu-report` 投遞後為 untracked 狀態；軍師端 `/kunsu-inbox` 以 `scan-reports.sh` 偵測並回報新上報份數。軍師 commit 後代表上報已納入版控，進入待審閱狀態。
-- **歸檔（僅軍師 session）**：軍師彙整上報內容進規劃記錄後，依序四步驟歸檔——（1）以 `Edit` 更新上報檔 frontmatter `status: submitted` → `archived`；（2）`git add <檔名>`；（3）`git mv <檔名> archive/<檔名>`；（4）**確認 commit**——AskUserQuestion 確認後 commit 本次歸檔（訊息 `docs: 歸檔上報 <檔名>`；`git add` 對象為 `archive/` 目的地路徑——`git mv` 不暫存 working tree 的內容修改，`status` 更新靠這步帶入；執行前以 `git status --porcelain` 核對確有待提交變更、無則不產生空 commit；**絕不 push**；取消則保留歸檔結果並附可手動執行的指令）。步驟（1）–（3）順序不可倒置（untracked 檔案直接 `git mv` 會以「not under version control」失敗，必須先 `git add` 使其進入暫存區才能安全搬移），且必須**連續執行**、步驟（3）完成前不執行 `/kunsu-inbox`（Edit 後的中間態不在掃描豁免範圍內）。此搬移是授權操作，已被 `scan-reports.sh` 豁免，不誤觸 tripwire。
+- **歸檔（僅軍師 session）**：軍師彙整上報內容進規劃記錄後，依序四步驟歸檔——（1）以 `Edit` 更新上報檔 frontmatter `status: submitted` → `archived`；（2）`git add <檔名>`；（3）`git mv <檔名> archive/<檔名>`；（4）**確認 commit**——AskUserQuestion 確認後 commit 本次歸檔（訊息 `docs: 歸檔上報 <檔名>`；`git add` 對象為 `archive/` 目的地路徑——`git mv` 不暫存 working tree 的內容修改，`status` 更新靠這步帶入；commit 帶 pathspec：`git commit -m "docs: 歸檔上報 <檔名>" -- <目的地路徑>[ <來源路徑>]`——`-m` 必在 `--` 之前（`--` 後一切都被解析為 pathspec），已 commit 上報的歸檔 rename 成對列來源與目的地、untracked 來源（上報常態）僅列目的地；commit 收斂宣告範圍、index 殘留不被夾帶（ADR 018）；執行前以 `git status --porcelain` 核對確有待提交變更、無則不產生空 commit；**絕不 push**；取消則保留歸檔結果並附可手動執行的指令）。步驟（1）–（3）順序不可倒置（untracked 檔案直接 `git mv` 會以「not under version control」失敗，必須先 `git add` 使其進入暫存區才能安全搬移），且必須**連續執行**、步驟（3）完成前不執行 `/kunsu-inbox`（Edit 後的中間態不在掃描豁免範圍內）。步驟（1）–（3）與目的地 `git add` 可以 `bash ~/.claude/skills/kunsu-inbox/scripts/archive-report.sh "<上報檔名>"` 一次完成（多份可並列傳入，印出帶 pathspec 的待確認 commit 指令、不自動 commit）——git 編排細節該被計算而非被記憶。此搬移是授權操作，已被 `scan-reports.sh` 豁免，不誤觸 tripwire。
 
 ## 文件導航
 
