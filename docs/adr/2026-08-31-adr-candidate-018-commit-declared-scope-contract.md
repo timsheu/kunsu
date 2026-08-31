@@ -2,12 +2,15 @@
 title: ADR Candidate 018 — 確認 commit 收斂宣告範圍、不收斂 index（pathspec 契約）
 date: 2026-08-31
 type: adr
-status: candidate
+status: accepted
 ---
 
 # ADR 018：協議「確認 commit」自「提交 index」改為「提交宣告範圍」
 
-> 狀態：**Candidate**（待使用者審定）。源自 ebook 軍師調查報告
+> 狀態：**Accepted**（2026-08-31 使用者審定，六條 Decision、威脅模型顯式接受
+> 清單（含活習慣複合訊息約 9.6% 誤報）與守門擴張啟動條件（上線後經人工核對
+> 排除誤報的再犯事件才啟動）一併定案；機制已於同日隨 handoff v0.19.0／
+> kunsu-inbox v0.11.1／kunsu-init v0.7.0 落地部署）。源自 ebook 軍師調查報告
 > `2026-08-31-commit邊界失誤調查報告.md`——同一 session 內兩次「commit 內容
 > 超出訊息宣告範圍」，第一次修正後的記憶型對策未能防住隔日第二次。
 
