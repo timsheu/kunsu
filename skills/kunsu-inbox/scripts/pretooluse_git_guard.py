@@ -115,17 +115,52 @@ def _covers_mailbox(dir_path: str, repo_root: str) -> bool:
 
 
 def _extract_c_paths(command: str) -> list[str]:
-    """指令中 `git -C <path>` 的 path 清單（供軍師 repo 判定）。"""
+    """git 呼叫全域旗標 `-C <path>` 的 path 清單（供軍師 repo 判定）。
+
+    只認 git 段的 -C：其他程式的 -C（make -C、tar -C…）不收——否則在
+    非軍師 repo 內執行「make -C <軍師路徑> … && git add -A」這類合法指令
+    會被誤擋，且誤擋與真命中同記 GUARD_DENY，污染 ADR 017 觀察期統計。
+    """
     paths: list[str] = []
     for seg in _split_segments(command):
         try:
             tokens = shlex.split(seg, posix=True)
         except ValueError:
             continue
-        for i, tok in enumerate(tokens):
-            if tok == "-C" and i + 1 < len(tokens):
-                paths.append(tokens[i + 1])
+        idx = 0
+        while idx < len(tokens) and re.match(r"^[A-Za-z_][A-Za-z_0-9]*=", tokens[idx]):
+            idx += 1
+        if idx >= len(tokens) or os.path.basename(tokens[idx]) != "git":
+            continue
+        idx += 1
+        while idx < len(tokens) and tokens[idx].startswith("-"):
+            if tokens[idx] in ("-C", "-c") and idx + 1 < len(tokens):
+                if tokens[idx] == "-C":
+                    paths.append(tokens[idx + 1])
+                idx += 2
+            else:
+                idx += 1
     return paths
+
+
+def _has_guard_off_prefix(command: str) -> bool:
+    """任一指令段的**前導環境變數指定**含 KUNSU_ADD_GUARD_OFF=1 才算逃生門。
+
+    子字串比對會被 heredoc 內文／echo 訊息誤觸——守門相關文件（ADR 017、
+    SKILL.md、本檔 docstring）正文都含該字串，撰寫這些文件的指令會整條
+    靜默放行且零留痕；ADR 017 裁決的形式是「指令前綴」，以 token 級判定對齊。
+    """
+    for seg in _split_segments(command):
+        try:
+            tokens = shlex.split(seg, posix=True)
+        except ValueError:
+            continue
+        idx = 0
+        while idx < len(tokens) and re.match(r"^[A-Za-z_][A-Za-z_0-9]*=", tokens[idx]):
+            if tokens[idx] == "KUNSU_ADD_GUARD_OFF=1":
+                return True
+            idx += 1
+    return False
 
 
 def find_offending(command: str, repo_root: str, base_dir: str) -> list[str]:
@@ -239,8 +274,8 @@ def main() -> int:
         if not isinstance(command, str) or "git" not in command or "add" not in command:
             return 0
 
-        # 逃生門：指令前綴或程序環境變數
-        if "KUNSU_ADD_GUARD_OFF=1" in command or (
+        # 逃生門：指令段前導環境變數指定（token 級，非子字串）或程序環境變數
+        if _has_guard_off_prefix(command) or (
             os.environ.get("KUNSU_ADD_GUARD_OFF") == "1"
         ):
             return 0

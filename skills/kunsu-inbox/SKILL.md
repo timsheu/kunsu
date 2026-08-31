@@ -1,6 +1,6 @@
 ---
 name: kunsu-inbox
-version: 0.11.0
+version: 0.11.1
 description: |
   查詢跨 repo 協作信箱：列出軍師（規劃協調中心）中待接手的交接文件，或回報新抵達的回覆。
   觸發語：/kunsu-inbox、檢查信箱、有沒有待接手的交接、有沒有新的 handoff、

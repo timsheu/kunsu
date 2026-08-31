@@ -175,6 +175,48 @@ def test_e2e_deny_via_git_c_from_outside(hook_env, tmp_path):
     assert json.loads(out)["hookSpecificOutput"]["permissionDecision"] == "deny"
 
 
+def test_escape_prefix_token_semantics():
+    # 逃生門是「指令段前導環境變數指定」，非子字串（2026-08-31 code review）
+    assert guard._has_guard_off_prefix("KUNSU_ADD_GUARD_OFF=1 git add -A")
+    assert guard._has_guard_off_prefix("FOO=1 KUNSU_ADD_GUARD_OFF=1 git add -A")
+    assert not guard._has_guard_off_prefix("echo KUNSU_ADD_GUARD_OFF=1")
+    assert not guard._has_guard_off_prefix("逃生門採 KUNSU_ADD_GUARD_OFF=1 單次放行")
+
+
+def test_extract_c_paths_only_git_segments(kunsu_repo):
+    # 其他程式的 -C（make -C、tar -C）不得收進軍師 repo 判定候選
+    assert guard._extract_c_paths(f"make -C {kunsu_repo} build && git add -A") == []
+    assert guard._extract_c_paths(f"tar -C {kunsu_repo} -cf x.tar .") == []
+    assert guard._extract_c_paths(f"git -C {kunsu_repo} add -A") == [str(kunsu_repo)]
+
+
+def test_e2e_escape_string_in_heredoc_still_denied(hook_env):
+    # 守門文件正文含逃生門字串——heredoc 內文不得整條放行（子字串比對的舊漏洞）
+    cmd = (
+        "cat > doc.md <<'EOF'\n"
+        "逃生門：指令前綴 KUNSU_ADD_GUARD_OFF=1 單次放行\n"
+        "EOF\n"
+        "git add -A"
+    )
+    out = _run_hook(hook_env["env"], _bash_payload(cmd, str(hook_env["repo"])))
+    assert json.loads(out)["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+
+def test_e2e_allow_make_c_kunsu_from_outside(hook_env, tmp_path):
+    # 非軍師 repo 內對其他工具指向軍師路徑的合法 git add 不得誤擋、不得記 GUARD_DENY
+    other = (tmp_path / "other-make").resolve()
+    other.mkdir()
+    subprocess.run(["git", "init", "-q", str(other)], check=True)
+    out = _run_hook(
+        hook_env["env"],
+        _bash_payload(f"make -C {hook_env['repo']} build && git add -A", str(other)),
+    )
+    assert out == ""
+    assert not hook_env["stats"].exists() or "GUARD_DENY" not in hook_env[
+        "stats"
+    ].read_text(encoding="utf-8")
+
+
 def test_e2e_non_bash_tool_allowed(hook_env):
     out = _run_hook(
         hook_env["env"],
