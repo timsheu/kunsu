@@ -1,6 +1,6 @@
 ---
 name: todo
-version: 0.2.1
+version: 0.3.0
 description: |
   管理專案的 CE 副作用 TODO 清單：一檔一項技術債，存放於當前專案的 docs/todos/，
   含 Dataview 友善 frontmatter（status/date/source/severity）。用於記錄
@@ -86,29 +86,53 @@ docs/todos/  →（解決後）status 改 已解決，git mv 到 docs/todos/arch
    子項（無可辨識的子項段落時靜默通過）；有殘項時逐項回報，由使用者決定——
    一併視為已解決（續行收尾）／轉出為新 todo（使用者裁決即授權、由 session
    代建，新檔內文首行註明 `轉出自 docs/todos/archive/<原slug>.md`，填歸檔後
-   路徑）／保留（中止本次 done，維持原 status 不動）。續行時用 Edit 只改
-   frontmatter 的 `status: 未處理` → `status: 已解決`（不動內文其他部分）。
-3. 詢問或從對話取得解決依據（commit hash、solution 文件連結），用 Edit 補一行
-   在標題下方，例如：`**解決依據**：commit \`abc1234\`，見 docs/solutions/xxx.md`。
-4. **歸檔前置檢查**：先 `mkdir -p docs/todos/archive/`（目錄不存在時 `git mv`
-   會失敗）；`git status --porcelain docs/todos/<slug>.md` 狀態為
-   `??`（untracked）者先 `git add`（untracked 檔直接 `git mv` 會以
-   `not under version control` 失敗），再
-   `git mv docs/todos/<slug>.md docs/todos/archive/<slug>.md`。
+   路徑）／保留（中止本次 done，維持原 status 不動）。續行時進入步驟 3。
+3. 詢問或從對話取得解決依據（commit hash、solution 文件連結），作為步驟 4 的
+   `--basis` 參數帶入，例如 `commit abc1234，見 docs/solutions/xxx.md`。
+4. **歸檔執行（腳本化，含手動等效執行時同樣適用）**：
+
+   ```bash
+   bash ~/.claude/skills/todo/scripts/archive-todo.sh --done --basis "<解決依據>" "<slug>" ["<slug>"…]
+   ```
+
+   腳本一次完成 frontmatter `status: 未處理` → `已解決`、解決依據回填於標題下方
+   （在 `git add` 歸檔目的地**之前**寫入——mv 後才 Edit 的內容不會入暫存）、
+   `mkdir -p`、untracked 前置 `git add`、`git mv` 至 `docs/todos/archive/`、
+   `git add` 歸檔目的地，並於 stdout 印出帶兩形 pathspec 的待確認 commit 指令但
+   **不 commit**。多筆可並列一次收尾（同一 basis 套用每筆）；status 已是終態的
+   孤兒僅補歸檔、不改終態不補依據；已在 `archive/` 的傳入項自動略過供失敗重跑。
+   git 編排細節（pathspec rename 兩側、add 範圍與順序）該被計算而非被記憶——
+   2026-08-31 手動 todo 歸檔曾把 tracked rename 的 pathspec 拆半、來源刪除留在
+   index（`fc143a8`）。腳本失敗或不可用時才手動執行等效步驟：先
+   `mkdir -p docs/todos/archive/`；Edit status 與依據行；
+   `git status --porcelain` 為 `??` 者先 `git add`；再
+   `git mv docs/todos/<slug>.md docs/todos/archive/<slug>.md` 並
+   `git add docs/todos/archive/<slug>.md` 帶入 Edit 內容。
 5. 檢查是否有其他文件連結指向舊路徑（`grep -Frl "docs/todos/<slug>.md" docs/`，
-   `-F` 固定字串比對避免 `.` 誤中），逐一修正為 `docs/todos/archive/<slug>.md`。
-6. 回報歸檔結果，**不要**主動 commit。
+   `-F` 固定字串比對避免 `.` 誤中），逐一修正為 `docs/todos/archive/<slug>.md`；
+   有修正時把被修檔案 `git add -- <路徑>` 帶入暫存，並附加於步驟 4 印出指令的
+   pathspec 尾端（add 與 commit 同一組路徑）——連結修正發生在腳本印出指令之後，
+   不補 add 不補 pathspec 會留在工作樹、之後被無關 commit 夾帶。
+6. 回報歸檔結果；（含步驟 5 擴充後的）待確認 commit 指令經使用者確認後才執行
+   （ADR 009 確認制延伸至 todo 單獨收尾路徑），session **不要**主動 commit。
 
 ### rm
 
 語意是「確認不需處理／非 bug，封存但不刪除」，不是刪檔案。rm **不執行**殘項
 清點——封存語意為整檔判定不處理，檔內殘項一併封存：
 
-1. Read 指定檔案，用 Edit 把 frontmatter `status` 改成 `已封存`，並在內文補一行
-   結案原因（例如「三項假設皆不成立，logcat 實測排除」）。
-2. 同 done 步驟 4 先做歸檔前置檢查（`mkdir -p`＋untracked），再 `git mv` 到
-   `docs/todos/archive/`，並同 done 步驟 5 修正跨檔連結。
-3. 回報結果。若使用者明確要求刪除誤建立的檔案（不是要封存），才用一般 Bash
+1. Read 指定檔案確認封存判定，結案原因（例如「三項假設皆不成立，logcat 實測
+   排除」）作為 `--basis` 參數帶入。
+2. **歸檔執行（腳本化，同 done 步驟 4 的引導框）**：
+
+   ```bash
+   bash ~/.claude/skills/todo/scripts/archive-todo.sh --rm --basis "<結案原因>" "<slug>"
+   ```
+
+   腳本把 `status` 改「已封存」、結案原因回填標題下方，其餘行為同 done 步驟 4
+   （`--done` 與 `--rm` 不可混用——單次呼叫單一終態，混合收尾分次執行）。
+   完成後同 done 步驟 5 修正跨檔連結。
+3. 回報結果；待確認 commit 指令同 done 步驟 6 處理。若使用者明確要求刪除誤建立的檔案（不是要封存），才用一般 Bash
    `rm` 處理，並在動手前跟使用者確認一次。
 
 ## 檔案格式範例

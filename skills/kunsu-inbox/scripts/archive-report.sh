@@ -63,6 +63,9 @@ done
 if [[ -z "$ROOT" ]]; then
   ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 fi
+# 實體路徑正規化：symlink 佈局（如 macOS /tmp）下，邏輯路徑與 git 根的實體
+# 路徑不一致會使相對前綴剝除失效——tracked 檔被誤判 untracked、pathspec 拆半
+ROOT="$(cd "$ROOT" && pwd -P)"
 
 shopt -s nullglob
 
@@ -79,7 +82,7 @@ resolve_arg() {
   if [[ "$arg" == */* ]]; then
     # 路徑形式：直接解析為絕對路徑
     local abs
-    abs="$(cd "$(dirname "$arg")" 2>/dev/null && pwd)/$(basename "$arg")" || true
+    abs="$(cd "$(dirname "$arg")" 2>/dev/null && pwd -P)/$(basename "$arg")" || true
     if [[ -z "$abs" || ! -f "$abs" ]]; then
       echo "錯誤：找不到檔案「${arg}」" >&2
       return 1

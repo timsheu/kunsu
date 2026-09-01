@@ -167,7 +167,7 @@ done < <(git -C "$KUNSU_ROOT" -c core.quotepath=false status --porcelain -uall 2
 #     夾帶 16 份未讀回覆的事故形狀）。
 #   HISTORY_WARN:BATCH_REPLY_ADD — 任意單一 commit 新增 ≥6 份頂層回覆
 #     （啟發式：批次處理合法，但提示核對是否整批掃入）。
-#   HISTORY_WARN:MISDECLARED_ARCHIVE_ADD — 訊息不以白名單前綴（docs: 歸檔、
+#   HISTORY_WARN:MISDECLARED_ARCHIVE_ADD — 訊息不以白名單前綴（docs: 歸檔交接、docs: 歸檔上報、
 #     docs: 審核申請）開頭的 commit 新增了任一信箱 archive/（handoffs／reports／
 #     applications）檔案——commit 內容超出訊息宣告範圍的形狀（2026-08-31 ebook
 #     軍師「建立交接」commit 兩度夾帶上報歸檔的事故形狀，ADR 018）。
@@ -251,7 +251,10 @@ try:
             "docs/reports/archive/",
             "docs/applications/archive/",
         )
-        whitelist_prefixes = ("docs: 歸檔", "docs: 審核申請")
+        # 三具體前綴（2026-09-01 ADR 018 修訂）：原「docs: 歸檔」會被
+        # 「docs: 歸檔 todo …」startswith 繼承——僅宣告 todo 的 commit 對信箱
+        # archive 夾帶取得豁免，正是本偵測要抓的「內容超出訊息宣告」形狀
+        whitelist_prefixes = ("docs: 歸檔交接", "docs: 歸檔上報", "docs: 審核申請")
         if len(revs) == 200:
             # rev-list --max-count 先限量（取最新 N 筆）再反轉：滿載代表最舊段被
             # 靜默跳過，而基線仍會前進至 HEAD——記事件聲明本輪數據不完整

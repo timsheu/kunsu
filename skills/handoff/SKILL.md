@@ -1,6 +1,6 @@
 ---
 name: handoff
-version: 0.19.0
+version: 0.20.0
 description: |
   把一個需要交給「另一個 session／另一個角色（如後台、前端、DevOps）」研究或
   接手的議題，寫成一份獨立交接文件，落在當前專案的 docs/handoffs/。每份交接一個
@@ -148,13 +148,20 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
 2. **建立檔案**（內文走 stdin）：
 
    ```bash
-   echo "<整理後的內文>" | bash ~/.claude/skills/handoff/scripts/new-handoff.sh "<標題>" "<from>" "<to>" "<tag1,tag2>"
+   echo "<整理後的內文>" | bash ~/.claude/skills/handoff/scripts/new-handoff.sh "<標題>" "<from>" "<to>" "<tag1,tag2>" "<查重關鍵詞…>"
    ```
 
-   - `from`／`to`／tags 皆可省略，預設 `app`／`backend`／`[handoff]`。
+   - `from`／`to`／tags 皆可省略，預設 `app`／`backend`／`[handoff]`；第 5 參數為
+     選填的查重關鍵詞（空白分隔），省略時腳本自標題去通用詞抽取。
    - 腳本會自動定位專案根、建立 `docs/handoffs/`、以 `YYYY-MM-DD-<slug>.md` 命名
      （同日同名自動加 `-2`、`-3`…），並自動附上「回覆方式」段落（見下方範例），
      印出最終檔案路徑。
+   - **產檔後檢視 stderr 查重候選**（advisory）：腳本自動列出近 14 天發給同收件
+     角色的既有交接（時間窗清單；`to` 省略採預設值時**不過濾角色**——改列全部
+     既有交接、每列附 `to:` 並印確認提醒）與 tshehtu 跨 repo 關鍵詞命中——若既有交接／
+     文件已涵蓋本次主題，考慮撤回本檔（未 commit，rm 即可）改讀既有結論，或改發
+     更正／補充交接。降級與零命中都會顯式印出；tshehtu 索引僅含已 commit 內容，
+     時間窗外與索引盲區攔不住，查重不取代規劃前既有盤點。
 
 3. **補強內容**：現況分析與問題清單通常較長且有結構（清單、程式碼、表格），
    務必在建檔後用 Edit 補進實質內容，不要留空泛骨架——交接文件的價值全在細節。
@@ -425,10 +432,17 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
      重複提示屬可接受誤報。本查核不自動建檔、不自動編輯任何文件，是否當場
      處理由使用者決定；無命中則零輸出。查核無狀態——暫緩收尾後重跑 done
      必然重新提示，此即反向內容的遺失防線。
-3. **來源 todo 查核**：掃描本 repo `docs/todos/` 頂層 `*.md`（排除 `archive/`；
-   目錄不存在或無檔案時本步驟靜默跳過），以具體檔名做雙向比對——(a) 各 todo 檔
-   內文是否提及本交接檔名 `<slug>.md`；(b) 交接本體內文是否提及某 todo 檔名。
-   任一方向命中即列為候選。
+3. **來源 todo 查核**：執行查核腳本印出候選——
+
+   ```bash
+   bash ~/.claude/skills/handoff/scripts/archive-handoff.sh --precheck "<檔名或 slug>" ["<檔名>"…]
+   ```
+
+   腳本掃描本 repo `docs/todos/` 頂層 `*.md`（排除 `archive/`）做雙向檔名比對——
+   (a) todo 內文提及本交接檔名 `<slug>.md`、(b) 交接本體內文提及某 todo 檔名——
+   任一方向命中即列為候選（附命中方向與現況 status），零搬移零暫存；目錄不存在
+   或無檔案時印零命中行。候選以腳本輸出為準、不憑記憶另行比對；腳本不可用時
+   才依上述比對規則手動 grep。
    - 有候選 → AskUserQuestion 讓使用者確認哪些 todo 一併收尾：候選 ≤4 筆用
      multiSelect 一次呈現（label 為 todo 標題，description 註明現況 status 與
      命中方向；若步驟 2 反向路由查核命中的行動項指向該候選 todo，description
@@ -461,13 +475,23 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
      「一併收尾」清單剔除）。status 已是終態的孤兒同樣清點——提示語意改為
      「已標〈status〉但仍有未註記完成子項，歸檔前確認是否轉出」，不改動其
      終態 status。
-   - status 非終態者：Edit frontmatter `status` 改「已解決」，標題下方補一行
-     `**解決依據**：交接 docs/handoffs/archive/<交接slug>.md 收尾歸檔`（填預期
-     歸檔路徑，此時交接本體尚未搬移）；status 已是「已解決」／「已封存」者
-     僅跳過本項 Edit（不改 status、不補依據），後續兩項照常執行。
-   - `git status --porcelain` 核對該 todo 檔，`??`（untracked）者先 `git add`
-     （untracked 檔直接 `git mv` 會以 `not under version control` 失敗）。
-   - `git mv docs/todos/<todo-slug>.md docs/todos/archive/<todo-slug>.md`。
+   - **歸檔執行（腳本化）**：
+
+     ```bash
+     bash ~/.claude/skills/todo/scripts/archive-todo.sh --done --from-handoff --basis "交接 docs/handoffs/archive/<交接slug>.md 收尾歸檔" "<todo-slug>" ["<todo-slug>"…]
+     ```
+
+     腳本完成 status Edit（非終態→「已解決」）、解決依據回填（`--basis` 填預期
+     歸檔路徑，此時交接本體尚未搬移；於 `git add` 歸檔目的地**前**寫入）、
+     untracked 前置 `git add`、`git mv` 至 `docs/todos/archive/` 與 `git add`
+     歸檔目的地；status 已是「已解決」／「已封存」的孤兒僅補歸檔、不改終態
+     不補依據。`--from-handoff` 抑制其 commit 指令輸出——宣告收斂由步驟 5–7
+     歸檔腳本掃 index 聚合為單一 commit，雙指令並存會重演 index 半截殘留。
+     腳本不可用時才手動執行等效步驟（Edit status 與依據 → untracked 先
+     `git add` → `git mv` → `git add` 歸檔目的地）。
+   - 殘項清點有**轉出**的新 todo：session 代建後立即
+     `git add -- docs/todos/<新slug>.md`，且須於步驟 5–7 歸檔腳本執行前完成——
+     聚合以 index 形狀為偵測依據，未 add 的轉出檔不會進 commit 宣告範圍。
    - 任一筆失敗 → 中止剩餘 todo 操作（已完成筆不回滾），記下失敗筆於步驟 9
      回報，續行交接收尾（交接本體仍未動，整段可重跑；已 Edit 未搬移的失敗筆
      會在重跑的步驟 3 以孤兒身分再次列為候選，補歸檔即收斂）。
@@ -482,7 +506,8 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
    > 回覆成對 `git mv`），並額外 `git add` 歸檔目的地把 Edit 內容帶入暫存
    > （`git mv` 不會暫存 working tree 修改）。所有 `git add` 僅限本流程具體路徑、
    > 絕不 `-A`；執行後印出帶兩形 pathspec 的待確認 commit 指令但**不 commit**
-   > （步驟 9 經使用者確認後執行；含 todo 收尾時依步驟 9 擴充訊息與 add 範圍）。多份交接可並列
+   > （步驟 9 經使用者確認後執行；含 todo 收尾／轉出時腳本自動掃 index 三形
+   > 聚合訊息與 pathspec）。多份交接可並列
    > 傳入一次收尾；已在 `archive/` 的傳入項自動略過，中途失敗不回滾、重跑即續。
    > 歸檔的 git 編排細節（pathspec rename 兩側、add 範圍）該被計算而非被記憶——
    > 2026-08-29 手動歸檔曾以 `git add -A` 夾帶 16 份未讀回覆、靜默清除「未 commit
@@ -502,7 +527,9 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
    `docs/handoffs/archive/replies/`，讓交接文件與其回覆的歸檔位置保持成對；沒有
    回覆檔案則略過。
 
-8. 檢查是否有其他文件連結指向舊路徑（`grep -Frl "docs/handoffs/<slug>.md" docs/`，
+8. 檢查是否有其他文件連結指向舊路徑（步驟 5–7 經歸檔腳本執行時，腳本尾端已印出
+   各交接的「引用偵測」候選檔清單，以其為查找起點；手動等效為
+   `grep -Frl "docs/handoffs/<slug>.md" docs/`，
    `-F` 固定字串比對避免 `.` 誤中），逐一修正為 `docs/handoffs/archive/<slug>.md`——
    但 grep 命中**交接文件本體**（含 `archive/` 內）時不修正、僅回報供追溯
    （Invariant #5 本體內文不可變；讀者依檔名為權威識別自行定位，ADR 016）；
@@ -527,9 +554,11 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
    `git add` 會以 pathspec 錯誤中斷；`git mv` 不會暫存 working tree 的內容
    修改，porcelain 呈現 `RM`，步驟 5 的 `status: done` 與步驟 4 的 todo Edit
    修改靠這一步 add 帶入 commit）**加上步驟 8 修改的所有檔案路徑**（步驟 5–7
-   經歸檔腳本執行時，本體與回覆的歸檔路徑已暫存，此處補齊其餘路徑即可；對已
-   暫存路徑重複 `git add` 無害）；commit pathspec 為同一組路徑，並依協議兩形
-   對已 commit 檔案的 rename 補列來源路徑（歸檔腳本印出的指令已帶好）；訊息
+   經歸檔腳本執行時，本體與回覆的歸檔路徑已暫存，todo 歸檔與轉出路徑亦經步驟 4
+   暫存並由腳本聚合，此處補齊步驟 8 修改的檔案即可；對已暫存路徑重複 `git add`
+   無害）；commit pathspec 為同一組路徑，並依協議兩形
+   對已 commit 檔案的 rename 補列來源路徑（歸檔腳本印出的指令已帶好，含 todo 時
+   已一併聚合訊息註記與 pathspec）；訊息
    `docs: 歸檔交接 <檔名>`，含 todo 一併收尾時改用
    `docs: 歸檔交接 <檔名>；一併收尾 todo <slug>[、<slug>…]`，殘項清點有
    轉出時再附 `；轉出殘項 todo <slug>[、<slug>…]`（保留不歸檔的筆已自

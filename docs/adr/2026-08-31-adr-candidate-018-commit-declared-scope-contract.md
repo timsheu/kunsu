@@ -59,10 +59,15 @@ pathspec 時提交整個 index，而歸檔流程的 `git mv` 已預先在 index 
 5. **夾帶形狀 advisory 偵測**：`scan-replies.sh` 逐 commit 檢視新增
    `HISTORY_WARN:MISDECLARED_ARCHIVE_ADD`——subject 不以白名單前綴開頭的 commit
    以 diff-filter A 新增任一信箱 `archive/` 檔案即警示並入統計檔。白名單前綴
-   集合窮舉現行正當形狀：`docs: 歸檔`（done 歸檔／上報歸檔）、`docs: 審核申請`
-   （申請審核歸檔）；採 startswith 比對，不採「任意位置含詞」（標題含「歸檔」的
-   建立交接 commit——正是事故吞噬者形狀——會被含詞判準豁免）。**新增正當歸檔
-   訊息形狀時須同步擴白名單，屬本 ADR 修訂事項**。另記 `TRUNCATED` 事件
+   集合窮舉現行正當形狀：`docs: 歸檔交接`（done 歸檔）、`docs: 歸檔上報`
+   （上報歸檔）、`docs: 審核申請`（申請審核歸檔）；採 startswith 比對，不採
+   「任意位置含詞」（標題含「歸檔」的建立交接 commit——正是事故吞噬者形狀——
+   會被含詞判準豁免）。**新增正當歸檔訊息形狀時須同步擴白名單，屬本 ADR 修訂
+   事項**。（2026-09-01 修訂：原前綴 `docs: 歸檔` 收窄為 `docs: 歸檔交接`＋
+   `docs: 歸檔上報` 兩具體前綴——todo 歸檔腳本化引入的定型訊息
+   `docs: 歸檔 todo <slug>` 以 startswith 繼承了原寬前綴的豁免，使僅宣告 todo
+   的 commit 對信箱 archive 夾帶零警示；todo 歸檔不觸碰信箱 archive，其訊息
+   不應持有信箱豁免。）另記 `TRUNCATED` 事件
    （rev-list 滿 200 筆時聲明該輪數據不完整）。
 6. **語意句**：pathspec commit 提交**確認當下的工作樹內容**，非暫存快照——
    add 與確認之間若同路徑再被編輯，後續修改一併入 commit。與 ADR 009 暫存語意
