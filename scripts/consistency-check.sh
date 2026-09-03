@@ -20,6 +20,10 @@
 #      registry 不存在時靜默略過）——各軍師 CLAUDE.md 含最近一波遷移標記
 #   I. 確認 commit 宣告範圍定型（ADR 018）——四載體（handoff SKILL、範本、兩支
 #      歸檔腳本 echo）的定型指令均為 -m 在 -- 之前的 pathspec 形，防回退錯序
+#   J. 產檔查重與 todo 歸檔腳本錨點——查重零命中定型行、archive-todo 旗標與範本指路句
+#   K. reply 腳本 stderr 條款行實跑比對——在 C 項 fixture 內實跑 new-handoff-reply.sh，
+#      stderr 須含產出檔的修改檔案清單定型行（實跑比對而非比原始碼字面：echo 雙引號
+#      會把反引號當指令替換、輸出已壞而字面 grep 仍命中）
 
 set -u
 cd "$(dirname "$0")/.." || exit 1
@@ -67,7 +71,7 @@ trap 'rm -rf "${tmp}"' EXIT
 if (cd "${tmp}" && git init -q . \
     && echo "一致性檢查內文" | KUNSU_ZOEKT_URL="http://127.0.0.1:1" bash "${OLDPWD}/skills/handoff/scripts/new-handoff.sh" "一致性檢查" >/dev/null 2>&1); then
   gen="$(ls "${tmp}"/docs/handoffs/*.md 2>/dev/null | head -1)"
-  for sentence in '回覆檔 `status` 值：' '中途需切換任務時'; do
+  for sentence in '回覆檔 `status` 值：' '中途需切換任務時' '投遞前有程式碼改動時，回覆請附'; do
     a="$(grep -F "${sentence}" "${gen}" | head -1 | sed 's/^[[:space:]]*//')"
     b="$(grep -F "${sentence}" skills/handoff/SKILL.md | head -1 | sed 's/^[[:space:]]*//')"
     if [[ -n "${a}" && "${a}" == "${b}" ]]; then
@@ -76,6 +80,15 @@ if (cd "${tmp}" && git init -q . \
       ng "C  定型文字兩副本不一致或缺失：「${sentence}…」（產生器與 SKILL.md 範例段須連動修改）"
     fi
   done
+  # --- K. reply 腳本 stderr 條款行實跑比對（2026-09-01）---
+  a="$(grep -F '投遞前有程式碼改動時，回覆請附' "${gen}" | head -1 | sed 's/^[[:space:]]*//')"
+  if [[ -n "${a}" ]] \
+      && (cd "${tmp}" && echo "一致性檢查回覆" | bash "${OLDPWD}/skills/handoff/scripts/new-handoff-reply.sh" "${gen}" >/dev/null 2>"${tmp}/reply.err") \
+      && grep -qF "${a}" "${tmp}/reply.err"; then
+    ok "K  reply 腳本 stderr 條款行與產出檔定型行逐字一致（實跑比對，對引號語意免疫）"
+  else
+    ng "K  reply 腳本 stderr 條款行缺失或與定型行不一致（須以單引號 printf 輸出；雙引號 echo 會吞反引號，靜態字面比對看不見）"
+  fi
 else
   ng "C  new-handoff.sh 實跑產檔失敗，無法比對定型文字"
 fi
@@ -143,10 +156,10 @@ REG="${HOME}/.claude/kunsu-registry.json"
 if [[ -f "${REG}" ]] && command -v python3 >/dev/null; then
   while IFS= read -r kroot; do
     [[ -z "${kroot}" || ! -f "${kroot}/CLAUDE.md" ]] && continue
-    if grep -q '規劃前既有盤點' "${kroot}/CLAUDE.md" && grep -q '勿自標' "${kroot}/CLAUDE.md" && grep -q 'corrected_by' "${kroot}/CLAUDE.md" && grep -q '副官' "${kroot}/CLAUDE.md" && grep -q '不豁免' "${kroot}/CLAUDE.md" && grep -q '宣告範圍' "${kroot}/CLAUDE.md" && grep -q '不豁免' "${kroot}/CONCEPTS.md" 2>/dev/null && grep -q 'archive-handoff' "${kroot}/CONCEPTS.md" 2>/dev/null && grep -q 'archive-todo' "${kroot}/CONCEPTS.md" 2>/dev/null; then
+    if grep -q '規劃前既有盤點' "${kroot}/CLAUDE.md" && grep -q '勿自標' "${kroot}/CLAUDE.md" && grep -q 'corrected_by' "${kroot}/CLAUDE.md" && grep -q '副官' "${kroot}/CLAUDE.md" && grep -q '不豁免' "${kroot}/CLAUDE.md" && grep -q '宣告範圍' "${kroot}/CLAUDE.md" && grep -q '以原始碼為準' "${kroot}/CLAUDE.md" && grep -q '不豁免' "${kroot}/CONCEPTS.md" 2>/dev/null && grep -q 'archive-handoff' "${kroot}/CONCEPTS.md" 2>/dev/null && grep -q 'archive-todo' "${kroot}/CONCEPTS.md" 2>/dev/null; then
       ok "H  live 軍師遷移標記齊全：${kroot}"
     else
-      wn "H  live 軍師疑似漏遷移（缺 規劃前既有盤點／勿自標／corrected_by／副官／不豁免（CLAUDE 與 CONCEPTS 各自）／宣告範圍（CLAUDE）／archive-handoff／archive-todo（CONCEPTS） 之一）：${kroot}"
+      wn "H  live 軍師疑似漏遷移（缺 規劃前既有盤點／勿自標／corrected_by／副官／不豁免（CLAUDE 與 CONCEPTS 各自）／宣告範圍／以原始碼為準（CLAUDE）／archive-handoff／archive-todo（CONCEPTS） 之一）：${kroot}"
     fi
   done < <(python3 -c "
 import json

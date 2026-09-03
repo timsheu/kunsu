@@ -147,6 +147,7 @@ fi
   printf -- '---\n'
   printf -- '```\n'
   printf '\n回覆檔 `status` 值：`submitted`（預設，已完成待發起方確認）／`partial`（部分完成，後續會再回報）／`blocked`（卡關）／`done`（已結案——**由發起方經 `/handoff done` 對交接本體執行，接手方回覆請勿自標**；自標會使此交接從 `/kunsu-inbox` 與軍師沙盤消失，本體卻仍留在頂層未歸檔）。另可加選填欄位 `verify:` 標注驗收方式——`needs-deploy`（需上線測試）／`testable-now`（馬上可測）／`needs-device`（需實機測試）或自由字串，無明確驗收需求則省略。\n'
+  printf '%s\n' '' '投遞前有程式碼改動時，回覆請附主要修改檔案路徑清單（不論 `status`；暫離回報除外——branch 名即查證錨點），細節見 handoff SKILL reply 段。'
   printf '\n中途需切換任務時，請先投遞暫離回報——`status: partial`、內文附 branch 名與現況，之後回來再照常回覆。\n'
 } > "$file"
 
