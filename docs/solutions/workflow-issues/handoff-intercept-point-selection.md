@@ -1,6 +1,7 @@
 ---
 title: handoff 暫離回報與攔截點選擇——切任務無回報導致交接狀態失真
 date: "2026-07-26"
+last_updated: "2026-09-03"
 category: workflow-issues
 module: kunsu-handoff-skill
 problem_type: workflow_issue
@@ -79,6 +80,8 @@ kunsu 協議的狀態機以回覆檔（`docs/handoffs/replies/*.md`）為唯一�
 
 「回覆方式」定型文字有兩份逐字副本：`new-handoff.sh` 的 printf（產生器，接手方真正讀到的字）與 `skills/handoff/SKILL.md`「檔案格式範例」段（人讀的靜態展示）。修訂任一處必須連動；最高風險錯誤是只改範例、漏改產生器。驗證方式：暫存目錄實跑產檔＋grep 字面比對兩副本。本輪實作時發現既有斷行差異比研究預告的多一處（研究一處、實際兩處）——同步核查要對整段做，不能只看被點名的行。
 
+（2026-09-03 補記）此核查已由 `scripts/consistency-check.sh` C 項機械化（實跑產檔＋錨句逐字比對）；`new-handoff.sh` 輸出結構其後多輪演進（stderr 指路行、產檔查重、修改檔案清單條款行），副本盤點以 C 項錨句清單為權威、勿沿用本文「兩份」時點快照。另一個已實證邊界：經 shell 產生的文字，比對必須走執行期實跑——雙引號內反引號是指令替換，靜態字面比對會假 PASS，見 [assertion-level-discipline-coverage-gap.md](assertion-level-discipline-coverage-gap.md)。
+
 ## Why This Matters
 
 不遵循的影響：
@@ -118,3 +121,4 @@ echo "已在 branch feature/bulk-sync 實作完成，尚未合併，插單處理
 
 - [handoff-done-closure-gap.md](handoff-done-closure-gap.md) — 同 module 的上游教訓：補詞三步驟（本文第二層直接援引）與多副本定型文字同步紀律（本文防錯段的方法論出處）。差異：該文修理「動作在對的時機被觸發」（trigger repair），本文把攔截點前移到產出物（intercept-point shift），是設計哲學層的補充。
 - 需求文件：`docs/brainstorms/2026-07-25-handoff-pause-report-requirements.md`；實作計畫：`docs/plans/2026-07-25-001-feat-handoff-pause-report-plan.md`。
+- [assertion-level-discipline-coverage-gap.md](assertion-level-discipline-coverage-gap.md) — 攔截點模式的第四次同型應用與一般化（掛載點覆蓋、雙態措辭）；本文防錯段靜態比對法的修正性補充。

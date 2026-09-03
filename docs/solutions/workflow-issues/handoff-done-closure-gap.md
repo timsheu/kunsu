@@ -1,6 +1,7 @@
 ---
 title: handoff done 收尾閉環四斷點——觸發詞、流程步驟、輸出提示與憲章同步
 date: "2026-07-13"
+last_updated: "2026-09-03"
 category: workflow-issues
 module: kunsu-handoff-skill
 problem_type: workflow_issue
@@ -81,6 +82,8 @@ grep -n "勿自標" \
 ```
 
 尤其注意：**「範例」與「產生器」是不同副本**——文件裡的範例改了，腳本 printf 沒改，實際產出物就永遠是舊的。
+
+**機械化後繼與靜態比對邊界（2026-09-03 補記）**：定型文字副本的字面核查已由 `scripts/consistency-check.sh` C 項機械化（mktemp 假 repo 實跑產檔、錨句逐字比對），新增定型行時把錨句納入其清單即可，毋須依賴手動 grep。且手動 grep 字面比對有一個已實證的邊界：凡文字經 shell 產生（printf／echo），比對必須走執行期實跑而非原始碼靜態字面——雙引號內的反引號是指令替換語法，stderr 實際輸出是殘句、靜態字面比對卻假 PASS。見 [assertion-level-discipline-coverage-gap.md](assertion-level-discipline-coverage-gap.md)。
 
 ### (d) Live 遷移的舊句 grep 核查紀律
 
@@ -184,3 +187,4 @@ git -C /path/to/軍師 diff --stat -- CLAUDE.md   # 1 file changed，行數符�
 - [docs/adr/2026-07-09-adr-candidate-009-protocol-commit-confirmation.md](../../adr/2026-07-09-adr-candidate-009-protocol-commit-confirmation.md) — 「全域規範 vs 協議動作」的前例，done 收尾的確認 commit 協議出自此 ADR
 - [docs/solutions/best-practices/git-porcelain-scan-script-pitfalls.md](../best-practices/git-porcelain-scan-script-pitfalls.md) — 同一批掃描腳本的 git 實作層陷阱（本文覆蓋 skill 設計層，互補）
 - 母體 CLAUDE.md 開發狀態 2026-07-08 條目 — v0.3.0「回覆軍師」觸發詞補洞（同型缺口第一次發生的記錄）
+- [assertion-level-discipline-coverage-gap.md](assertion-level-discipline-coverage-gap.md) — 本文 (c)(d) 靜態 grep 比對法的修正性補充（shell 指令替換場景假 PASS）與多副本防漂移的機械化後繼
