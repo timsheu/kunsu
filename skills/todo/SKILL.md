@@ -1,6 +1,6 @@
 ---
 name: todo
-version: 0.3.0
+version: 0.4.0
 description: |
   管理專案的 CE 副作用 TODO 清單：一檔一項技術債，存放於當前專案的 docs/todos/，
   含 Dataview 友善 frontmatter（status/date/source/severity）。用於記錄
@@ -29,20 +29,37 @@ docs/todos/  →（解決後）status 改 已解決，git mv 到 docs/todos/arch
 `docs/todos/` 屬參考層（非 CE plugin 管理），與 `docs/plans`、`docs/brainstorms`
 等 plugin 原生路徑無關，不取代任何 CE 指令行為。
 
+## Agent 對應表
+
+本 skill 以能力名描述步驟；各 agent 的實際工具與慣例對應如下（七份 SKILL.md 共用同一張表，由 `scripts/consistency-check.sh` 比對逐字一致；新增 agent 只改此表，不改內文）。
+
+| 能力 | Claude Code | Codex |
+|------|-------------|-------|
+| 阻塞式確認（流程中需使用者當下裁決的提問） | AskUserQuestion 工具 | 預設無阻塞式工具（`request_user_input` 僅 plan mode；開啟 `[features] default_mode_request_user_input` 後可用即用）：印出定型指令與訊息並結束回合，下一回合收到使用者明確同意文字才執行 |
+| 跨 session 推播（向另一個長駐 session 發一次性通知） | ListAgents＋SendMessage 工具 | 無對應物：整步跳過，由 SessionStart hook 兜底 |
+| skill 目錄（本 skill 部署後所在目錄，用於定位 scripts/ 與 assets/） | `$CLAUDE_SKILL_DIR`（harness 注入；未定義時以本 SKILL.md 所在目錄推算），部署於 `~/.claude/skills/<name>/` | 無注入變數：以本 SKILL.md 所在目錄推算，部署於 `~/.agents/skills/<name>/` |
+| skill 呼叫形（使用者或指引點名某個 skill） | `/<name>` 斜線指令 | `$<name>` 顯式呼叫，或依 description 自動選用（斜線只保留給內建指令） |
+| hook 設定檔（機器層級，不進 repo） | `~/.claude/settings.json` 的 `hooks` | `~/.codex/hooks.json`（或 config.toml `[hooks]`）；改動後須於 TUI 重新信任 |
+| 子 agent（副官：派出新鮮 context 分擔查證與提取） | Agent 工具（subagent） | `spawn_agent`（custom agents 於 `~/.codex/agents/*.toml`） |
+
+未列於本表的 agent 一律採 Codex 欄行為：文字回合確認、不逕行執行；跨 session 推播整步跳過。
+
 ## 何時使用
 
-- 使用者說「記一個 todo」「新增待辦」「/todo add ...」
+- 使用者說「記一個 todo」「新增待辦」「todo add ...」（以 agent 的 skill 呼叫形點名，見 Agent 對應表）
 - ce-work/ce-plan/code-review 過程中發現一個明確不在本次範圍內、但值得記錄的問題
-- 使用者要查詢待辦現況（`/todo list`）、標記完成（`/todo done`）或封存不處理（`/todo rm`）
+- 使用者要查詢待辦現況（list 子指令）、標記完成（done 子指令）或封存不處理（rm 子指令）
 
 不要用於：已經要立刻處理的問題 → 直接修，不需要先記 todo 再處理。
 
 ## 指令格式
 
-- `/todo` 或 `/todo list` — 列出所有待辦
-- `/todo add <標題> [來源] [嚴重度]` — 新增一筆待辦
-- `/todo done <slug>` — 標記為已解決並歸檔
-- `/todo rm <slug>` — 標記為已封存（不處理／非 bug）並歸檔，**不刪除檔案**
+子指令以能力名列出，實際呼叫形依 agent 而異（見 Agent 對應表：Claude Code 為斜線指令、Codex 為 `$` 顯式呼叫或依 description 自動選用），下列一律以「todo <子指令>」表示：
+
+- `todo` 或 `todo list` — 列出所有待辦
+- `todo add <標題> [來源] [嚴重度]` — 新增一筆待辦
+- `todo done <slug>` — 標記為已解決並歸檔
+- `todo rm <slug>` — 標記為已封存（不處理／非 bug）並歸檔，**不刪除檔案**
 
 來源範例：`manual`（預設）、`ce-work`、`ce-plan`、`ce-compound`、`code-review`
 嚴重度：`low`（預設）／`medium`／`high`
@@ -53,22 +70,23 @@ docs/todos/  →（解決後）status 改 已解決，git mv 到 docs/todos/arch
 
 1. **取得內容**：標題取一句精煉的正體中文描述（不含標點符號結尾）；若使用者當下
    已提供現象/根因/相關檔案（常見於 code review、LeakCanary 報告等場景），整理成
-   內文一併帶入。完全沒有內容時用 AskUserQuestion 或直接詢問後再繼續。
+   內文一併帶入。完全沒有內容時以阻塞式確認（見 Agent 對應表）或直接詢問後再繼續。
 
 2. **建立檔案**（內文走 stdin）：
 
    ```bash
-   echo "<整理後的內文>" | bash ~/.claude/skills/todo/scripts/new-todo.sh "<標題>" "<來源>" "<嚴重度>"
+   echo "<整理後的內文>" | bash "<skill 目錄>/scripts/new-todo.sh" "<標題>" "<來源>" "<嚴重度>"
    ```
 
-   來源、嚴重度可省略，預設 `manual`／`low`。腳本會自動定位專案根、建立
+   `<skill 目錄>` 為本 skill 部署後所在目錄（定位見 Agent 對應表：以本 SKILL.md
+   所在目錄推算）。來源、嚴重度可省略，預設 `manual`／`low`。腳本會自動定位專案根、建立
    `docs/todos/`、以標題轉 slug 決定檔名（**不加日期前綴**，撞名會直接報錯，
    請換更具體的標題），並印出最終檔案路徑。
 
 3. **補強內容**：若現象/根因/相關檔案的細節較長或有結構，用 Edit 補進檔案的
    「相關檔案」「待辦方向」段落，不要留空泛骨架。
 
-4. **回報**：附上建立的檔案路徑，一句話帶出可用 `/todo list` 查看現況。**不要**
+4. **回報**：附上建立的檔案路徑，一句話帶出可執行 todo skill 的 list 子指令查看現況。**不要**
    主動 commit。
 
 ### list
@@ -92,7 +110,7 @@ docs/todos/  →（解決後）status 改 已解決，git mv 到 docs/todos/arch
 4. **歸檔執行（腳本化，含手動等效執行時同樣適用）**：
 
    ```bash
-   bash ~/.claude/skills/todo/scripts/archive-todo.sh --done --basis "<解決依據>" "<slug>" ["<slug>"…]
+   bash "<skill 目錄>/scripts/archive-todo.sh" --done --basis "<解決依據>" "<slug>" ["<slug>"…]
    ```
 
    腳本一次完成 frontmatter `status: 未處理` → `已解決`、解決依據回填於標題下方
@@ -126,7 +144,7 @@ docs/todos/  →（解決後）status 改 已解決，git mv 到 docs/todos/arch
 2. **歸檔執行（腳本化，同 done 步驟 4 的引導框）**：
 
    ```bash
-   bash ~/.claude/skills/todo/scripts/archive-todo.sh --rm --basis "<結案原因>" "<slug>"
+   bash "<skill 目錄>/scripts/archive-todo.sh" --rm --basis "<結案原因>" "<slug>"
    ```
 
    腳本把 `status` 改「已封存」、結案原因回填標題下方，其餘行為同 done 步驟 4
@@ -168,9 +186,9 @@ severity: medium
   ／「待辦方向」段落標題與內容，腳本不會再重複附加空白骨架，避免產生重複標題
   或多餘空段落。
 - 多筆待辦請逐一建檔，不要塞進同一個檔。
-- 若某筆 todo 已升級為交接文件處理，`/handoff done`（v0.8.0 起）收尾時會以雙向
+- 若某筆 todo 已升級為交接文件處理，handoff skill 的 done 子指令（v0.8.0 起）收尾時會以雙向
   檔名比對找出它，經使用者確認後代執行本 skill 的 done 收尾（status、解決依據、
-  歸檔，v0.12.0 起含殘項清點），不需事後再跑 `/todo done`；於該查核中略過或
+  歸檔，v0.12.0 起含殘項清點），不需事後再跑 todo skill 的 done 子指令；於該查核中略過或
   取消的 todo 不在此列，仍由本 skill 自行收尾。
 - `done`／`rm` 都是「搬到 archive + 改 status」，不是刪檔案；只有使用者明確要求
   刪除誤建檔案時才用一般 `rm`。

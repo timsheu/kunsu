@@ -1,6 +1,6 @@
 # kunsu
 
-**kunsu**（軍師，台語 Tâi-lô *kun-su*，"the strategist"）——運籌帷幄而不上陣。為多 repo AI 協作建立「軍師」的 scaffolding 工具組：以純 skill＋markdown 範本，為 [Claude Code](https://claude.com/claude-code) 快速建立唯讀的軍師 repo（規劃一切、不執行任何實作），並以全域反向註冊表自動化跨 session 傳令（軍師沙盤為唯一例外，詳見 [ADR 010](docs/adr/2026-07-11-adr-candidate-010-dashboard-service-exception.md)）。
+**kunsu**（軍師，台語 Tâi-lô *kun-su*，"the strategist"）——運籌帷幄而不上陣。為多 repo AI 協作建立「軍師」的 scaffolding 工具組：以純 skill＋markdown 範本，為 [Claude Code](https://claude.com/claude-code) 與 [Codex CLI](https://developers.openai.com/codex) 快速建立唯讀的軍師 repo（同一份 skill 原始碼雙部署，ADR 019）（規劃一切、不執行任何實作），並以全域反向註冊表自動化跨 session 傳令（軍師沙盤為唯一例外，詳見 [ADR 010](docs/adr/2026-07-11-adr-candidate-010-dashboard-service-exception.md)）。
 
 ## 緣起
 
@@ -14,15 +14,15 @@
 
 這套模式已在三個真實專案群跑完多輪完整功能週期。本工具組把它變成七個可安裝的 skill、一個選用的本機沙盤頁面，以及一組選用的知悉層自動化配件（見下方「知悉層自動化」）：
 
-| 交付物 | 用途 |
+| Skill（Claude Code `/<name>`、Codex `$<name>`；沙盤與 hook 除外） | 用途 |
 |--------|------|
-| `/kunsu-init` | 訪談式 scaffolding 建軍師（CLAUDE.md 五條不變量＋三信箱協議、規劃前既有盤點與副官慣例、Obsidian vault、git、註冊表登記）；含 `add-project`（申請審核制登記）與 `remove-project`（整筆移除登記）子指令 |
-| `/kunsu-apply` | 子專案端投遞「申請加入軍師」到申請信箱，路徑與技術棧自動偵測；正式登記留給軍師端審核 |
-| `/kunsu-inbox` | 跨 session 傳令：子專案列出待接手交接，軍師回報新回覆／新申請／新上報並跑 tripwire 核對，回報附收尾與分流提示（行動項落 todo、答案回填） |
-| `/kunsu-report` | 子專案端投遞「主動上報」到上報信箱；單向情報傳遞，不設軍師回覆義務 |
-| `/kunsu-list` | 唯讀列出全域註冊表全部登記，含 stale 偵測與當前位置標記 |
-| `/handoff` | 通用交接原語：`add`（斷言層級紀律——引用中介文件標「依 X 記載」、據以實作的斷言落原始碼並留查證痕跡；引用以完整檔名為權威識別；更正交接——已定案交接有誤時發更正交接並在原本體 frontmatter 補 `corrected_by` 指標）／`reply`（`verify:` 驗收方式、暫離回報、矛盾回報——發現交接與自身參照物不符時即使不影響實作也明列）／`list`／`done`（逐項驗收、沉澱訊號、反向路由、來源 todo 收尾與殘項清點、斷言自查等歸檔前查核）。單 repo 專案也能獨立使用；kunsu 語境下 `add`／`reply` 內建派發即推播／回覆即推播（[ADR 015](docs/adr/2026-08-13-adr-candidate-015-dispatch-push-notification.md)）；手動呼叫產檔腳本時 stderr 指路行提示回讀對應指引 |
-| `/todo` | CE 副作用技術債清單：一檔一項落在 `docs/todos/`，`add`／`list`／`done`（歸檔前先清點檔內未完成殘項）／`rm` |
+| `kunsu-init` | 訪談式 scaffolding 建軍師（CLAUDE.md 五條不變量＋三信箱協議、規劃前既有盤點與副官慣例、Obsidian vault、git、註冊表登記）；含 `add-project`（申請審核制登記）與 `remove-project`（整筆移除登記）子指令 |
+| `kunsu-apply` | 子專案端投遞「申請加入軍師」到申請信箱，路徑與技術棧自動偵測；正式登記留給軍師端審核 |
+| `kunsu-inbox` | 跨 session 傳令：子專案列出待接手交接，軍師回報新回覆／新申請／新上報並跑 tripwire 核對，回報附收尾與分流提示（行動項落 todo、答案回填） |
+| `kunsu-report` | 子專案端投遞「主動上報」到上報信箱；單向情報傳遞，不設軍師回覆義務 |
+| `kunsu-list` | 唯讀列出全域註冊表全部登記，含 stale 偵測與當前位置標記 |
+| `handoff` | 通用交接原語：`add`（斷言層級紀律——引用中介文件標「依 X 記載」、據以實作的斷言落原始碼並留查證痕跡；引用以完整檔名為權威識別；更正交接——已定案交接有誤時發更正交接並在原本體 frontmatter 補 `corrected_by` 指標）／`reply`（`verify:` 驗收方式、暫離回報、矛盾回報——發現交接與自身參照物不符時即使不影響實作也明列）／`list`／`done`（逐項驗收、沉澱訊號、反向路由、來源 todo 收尾與殘項清點、斷言自查等歸檔前查核）。單 repo 專案也能獨立使用；kunsu 語境下 `add`／`reply` 內建派發即推播／回覆即推播（[ADR 015](docs/adr/2026-08-13-adr-candidate-015-dispatch-push-notification.md)）；手動呼叫產檔腳本時 stderr 指路行提示回讀對應指引 |
+| `todo` | CE 副作用技術債清單：一檔一項落在 `docs/todos/`，`add`／`list`／`done`（歸檔前先清點檔內未完成殘項）／`rm` |
 | 軍師沙盤 | 本機網頁一頁彙整所有軍師與子專案的訊息狀態與待辦技術債（非 skill，見 [ADR 010](docs/adr/2026-07-11-adr-candidate-010-dashboard-service-exception.md)） |
 | SessionStart hook | session 啟動（含 `/clear`）自動攤開 kunsu 信箱摘要；toolkit 升版後另提示一行「handoff skill 已更新至 vX」使長駐 session 得知指引有變。未登記 repo 靜默、fail-open 不阻斷 session（隨 `/kunsu-inbox` 部署，掛載後生效，見 [ADR 014](docs/adr/2026-08-13-adr-candidate-014-sessionstart-hook-activation.md)） |
 | `kc` 啟動函式 | fish 函式：依註冊表以 kunsu session 命名慣例自動 `claude -n` 啟動，使推播匹配走精確比對；`--slot <後綴>` 區分同資料夾多 session（`scripts/kc.fish`） |
@@ -39,29 +39,30 @@
 
 ## 安裝
 
-需求：Claude Code、macOS 或類 Unix 環境、`python3`（registry 腳本使用，可經 Homebrew 或 Xcode Command Line Tools 取得）。
+需求：Claude Code 或 Codex CLI（兩者可並存，同一份原始碼雙部署，見 ADR 019）、macOS 或類 Unix 環境、`python3`（registry 腳本與 hook 使用，可經 Homebrew 或 Xcode Command Line Tools 取得）。
 
 ```bash
 git clone <this-repo>
 cd kunsu
-./install.sh          # 複製部署至 ~/.claude/skills/
-./install.sh --link   # 開發者模式：symlink 部署，改原始碼即時生效（repo 搬家後需重跑）
+./install.sh          # 複製部署至 ~/.claude/skills/；偵測到 ~/.codex/ 時一併部署至 ~/.agents/skills/（Codex）
+./install.sh --link   # 開發者模式：目錄 symlink 部署，改原始碼即時生效（repo 搬家後需重跑）
+./install.sh --adopt  # 既有舊版 copy 部署（無 .kunsu-origin 標記）首次升級時採納覆寫；預設對非 kunsu 產物的同名目錄整批中止
 ```
 
-新開 Claude Code session 即可使用 `/handoff`、`/todo`、`/kunsu-init`、`/kunsu-inbox`、`/kunsu-apply`、`/kunsu-report` 與 `/kunsu-list`。
+新開 agent session 即可使用 handoff、todo、kunsu-init、kunsu-inbox、kunsu-apply、kunsu-report 與 kunsu-list 七個 skill——Claude Code 以 `/<name>` 呼叫，Codex 以 `$<name>` 呼叫或依 description 自動選用；各 SKILL.md 首節「Agent 對應表」列出阻塞式確認、跨 session 推播、skill 目錄等能力在各 agent 的對應。
 
 選用配件（皆為機器層級設定，解除即完全停用）：
 
-- **SessionStart hook**：已隨 `/kunsu-inbox` 一併部署，於 `~/.claude/settings.json` 掛載後生效——掛載範例與解除方式見 `skills/kunsu-inbox/SKILL.md` 的「SessionStart hook」節。
+- **SessionStart hook 與 PreToolUse git add 守門**：已隨 kunsu-inbox skill 一併部署，於各 agent 的 hook 設定檔掛載後生效（Claude Code `~/.claude/settings.json`；Codex `~/.codex/hooks.json`，掛後須於 TUI 信任）——掛載範例、Codex 的 `project_doc_*` config 設定與解除方式見 `skills/kunsu-inbox/SKILL.md` 的「SessionStart hook」「PreToolUse git add 守門」與「Codex config 設定」三節。
 - **`kc` 啟動函式**（fish shell 限定）：`cp scripts/kc.fish ~/.config/fish/functions/`——之後以 `kc` 取代 `claude` 啟動，依註冊表自動命名 session；未登記目錄、自帶 `-n`／`--name` 與 `--resume` 一律透傳、行為同 `claude`。同一資料夾要開多個 session 分頭做不同工作時，改用 `kc --slot <後綴>` 啟動，session 名會變成 `<慣例名>.<後綴>`（例如 `ebook-android.auth`；後綴限英數、`-`、`_`），`/park`／`/unpark` 就能各持一份停車格。
 
-> 外部軟依賴：`/kunsu-init` 的 Obsidian vault 步驟會呼叫全域 `/init-obsidian-vault` skill，未安裝時自動略過；軍師的「規劃前既有盤點」使用 `/kb`（zoekt 本機索引），未安裝時降級為手動查閱。兩者缺席都不影響其餘功能。交接慣例所需的 `/handoff` 已內建（見 ADR 003）。
+> 外部軟依賴：kunsu-init 的 Obsidian vault 步驟會呼叫全域 init-obsidian-vault skill，未安裝時自動略過；軍師的「規劃前既有盤點」使用 kb skill（zoekt 本機索引），未安裝時降級為手動查閱。兩者缺席都不影響其餘功能。交接慣例所需的 handoff skill 已內建（見 ADR 003）。以下以 skill 名指稱指令；呼叫形依 agent：Claude Code `/<name>`、Codex `$<name>`（或依 description 自動選用），細節見各 SKILL.md 首節「Agent 對應表」。
 
 ## 快速開始
 
-1. **建立軍師**：在任意工作目錄對 Claude 說「幫我建一個軍師」（或 `/kunsu-init`），訪談時給齊軍師名稱、目標路徑與子專案清單，當下即完成登記。
-2. **發交接**：軍師 session 規劃拍板後以 `/handoff` 對各相關子專案產交接——派發完成當下自動推播通知目標子專案的長駐 session；子專案 session 也可按 `/clear`（hook 攤開信箱）或執行 `/kunsu-inbox` 看到待接手清單。完成後口語「回覆軍師」回報（可標注 `verify:` 驗收方式），回覆投遞當下同樣自動推播通知軍師 session。
-3. **收件與收尾**：軍師 session 收到回覆通知（或 `/clear`／`/kunsu-inbox`）後，彙整確認並以 `/handoff done` 逐項驗收、歸檔收尾。
+1. **建立軍師**：在任意工作目錄對 agent 說「幫我建一個軍師」（或執行 kunsu-init skill：Claude Code `/kunsu-init`、Codex `$kunsu-init`），訪談時給齊軍師名稱、目標路徑與子專案清單，當下即完成登記。
+2. **發交接**：軍師 session 規劃拍板後以 handoff skill 對各相關子專案產交接——Claude Code 派發完成當下自動推播通知目標子專案的長駐 session（Codex 無跨 session 推播，整步跳過）；子專案 session 也可開新對話（Claude Code `/clear`，hook 攤開信箱）或執行 kunsu-inbox skill 看到待接手清單。完成後口語「回覆軍師」回報（可標注 `verify:` 驗收方式），回覆投遞當下同樣自動推播通知軍師 session（Claude Code 側）。
+3. **收件與收尾**：軍師 session 收到回覆通知（或開新對話由 hook 攤開信箱、執行 kunsu-inbox skill）後，彙整確認並以 handoff skill 的 done 子指令逐項驗收、歸檔收尾；確認 commit 在 Claude Code 走阻塞式提問、在 Codex 走「印出定型指令後結束回合、下一回合同意才執行」。
 
 完整教學（前提、申請審核與移除、主動上報、暫離回報、技術債管理、tripwire 說明）見 **[docs/playbooks/end-to-end-workflow.md](docs/playbooks/end-to-end-workflow.md)**。
 
@@ -90,7 +91,7 @@ skills/
   kunsu-apply/         → 申請投遞 skill（SKILL.md＋new-application.sh）
   kunsu-report/        → 上報投遞 skill（SKILL.md＋new-report.sh）
   kunsu-list/          → 全域登記清單查詢 skill（SKILL.md＋registry-list.sh）
-  kunsu-dashboard/     → 軍師沙盤（kunsu dashboard），本機訊息聚合頁面（非 Claude Code skill，見 ADR 010）
+  kunsu-dashboard/     → 軍師沙盤（kunsu dashboard），本機訊息聚合頁面（非可觸發的 skill，frontmatter 以兩 agent 原生旗標停用選用，見 ADR 010／019）
 scripts/               → kc.fish（session 自動命名啟動函式，`--slot` 後綴）、consistency-check.sh（跨檔案一致性機械檢查）
 install.sh             → 部署腳本
 docs/                  → 本工具組自身的需求、ADR、實作計畫、操作教學與可重用學習

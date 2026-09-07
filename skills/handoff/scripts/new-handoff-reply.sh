@@ -148,5 +148,5 @@ BODY="$(cat || true)"
 } > "$file"
 
 echo "$file"
-echo "ℹ 本腳本僅產檔；回覆指引（逐項回答附證據、矛盾回報、暫離回報、verify 欄位）見 handoff SKILL.md reply 段——未經 /handoff skill 執行時請回讀對應步驟" >&2
+echo "ℹ 本腳本僅產檔；回覆指引（逐項回答附證據、矛盾回報、暫離回報、verify 欄位）見 handoff SKILL.md reply 段——未經 handoff skill 執行時請回讀對應步驟" >&2
 printf '%s\n' 'ℹ 投遞前有程式碼改動時，回覆請附主要修改檔案路徑清單（不論 `status`；暫離回報除外——branch 名即查證錨點），細節見 handoff SKILL reply 段。發現漏附可直接補進本回覆檔——尚未 commit、作者是你。' >&2

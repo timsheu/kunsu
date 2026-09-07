@@ -1,7 +1,8 @@
 ---
 title: Codex 參與 kunsu 協作的縮減版方案
 type: idea
-status: inbox
+status: promoted
+brainstorm: docs/brainstorms/2026-09-06-codex-agent-neutral-deployment-requirements.md
 created: 2026-09-01
 tags: [idea, codex, agent-neutral, protocol]
 ---

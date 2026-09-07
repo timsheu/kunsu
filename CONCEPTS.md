@@ -27,6 +27,10 @@
 ### 規劃前既有盤點
 軍師產出方案前的具名前置步驟：檢索自家歷史與子專案文件，確認「既有能力、做過沒、結果如何」後才開始規劃；檢索優先序為 handoffs（含回覆與 archive）→ plans → 子專案文件（跨 repo solutions 檢索為延後外環，落地後再併入優先序），命中的既有能力須作為方案基礎或述明不採用的理由。檢索工具（kb／zoekt）為軟依賴，不可用時降級為手動查閱、不阻斷派發（見 [需求文件](docs/brainstorms/2026-07-24-kunsu-pre-planning-inventory-requirements.md)）。
 
+### Agent 對應（adapter）
+讓 kunsu 在不同 AI coding agent（Claude Code、Codex）上可用的方式：一個部署目標（各 agent 的 skill 目錄——Claude Code `~/.claude/skills/`、Codex `~/.agents/skills/`——與 hook 設定檔）加一組字面對應（SKILL.md 內文只用能力名，各 SKILL 首節一張「Agent 對應表」列能力→各 agent 工具；七表由 consistency-check 比對逐字一致，新增 agent 只改表），不是程式層的 runtime interface。資料層與腳本層本就與 agent 無關，adapter 只存在於部署與指引兩層；Claude Code 是第一個 adapter，不是 kunsu 的內部假設（見 [ADR 019](docs/adr/2026-09-06-adr-candidate-019-agent-neutral-deployment.md)）。
+*Avoid:* Agent Runtime、orchestrator（原外部計畫用語，指常駐程式化方案，已否決）
+
 ## 信箱協作
 
 ### 例外授權信箱

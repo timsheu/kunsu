@@ -11,7 +11,8 @@ clear／compact／fork 等 session 啟動事件觸發時，依當前 repo 在全
 SKILL.md 步驟 4a），軍師模式複用 app/kunsu_scan.py（= 三支 scan-*.sh 包裝）。
 
 掛載與解除（機器層級設定，見 SKILL.md「SessionStart hook」節）：
-  ~/.claude/settings.json → hooks.SessionStart 指向本腳本；移除該條目即停用。
+  Claude Code ~/.claude/settings.json → hooks.SessionStart；Codex ~/.codex/hooks.json → hooks.SessionStart
+  （各指向自己部署位置的本腳本，ADR 019）；移除該條目即停用。
 
 失敗策略 fail-open：任何錯誤一律 exit 0，絕不阻斷 session 啟動。
 未登記 repo 與身分確認前的錯誤（如註冊表毀損）靜默零輸出；
@@ -77,7 +78,7 @@ def _git_root(cwd: str) -> str | None:
 def _load_raw_registry(path: Path) -> dict:
     """容錯讀取註冊表；任何錯誤回傳 {}。
 
-    hook 對註冊表錯誤保持安靜——錯誤呈現由 /kunsu-list 與軍師沙盤負責，
+    hook 對註冊表錯誤保持安靜——錯誤呈現由 kunsu-list skill 與軍師沙盤負責，
     hook 的職責是機會性提示，不是診斷面。
     """
     try:
@@ -172,9 +173,9 @@ def _sub_mode_lines(root: str, raw: dict) -> list[str]:
             section.append(f"已回覆待確認 {len(items)}：")
             section += _capped([_reply_annotated(h) for h in items])
         if result.unknown_to:
-            section.append(f"⚠ to: 不符清單 {len(result.unknown_to)} 筆（詳 /kunsu-inbox）")
+            section.append(f"⚠ to: 不符清單 {len(result.unknown_to)} 筆（詳 kunsu-inbox skill）")
         if result.errors:
-            section.append(f"⚠ frontmatter 異常 {len(result.errors)} 筆（詳 /kunsu-inbox）")
+            section.append(f"⚠ frontmatter 異常 {len(result.errors)} 筆（詳 kunsu-inbox skill）")
 
         if section:
             lines.append(f"[{role_label} @ 軍師 {kunsu_name}]")
@@ -242,7 +243,7 @@ def _handoff_version_notice() -> list[str]:
             return []  # 首次：靜默建檔不提示
         return [
             f"📌 handoff skill 已更新至 v{current}（自 v{last}），流程指引有變——"
-            "本輪 add／done 建議經 /handoff 執行或回讀 SKILL.md 對應段"
+            "本輪 add／done 建議經 handoff skill 執行或回讀 SKILL.md 對應段"
         ]
     except Exception:
         return []  # fail-open：版號提示屬告知層，任何失敗靜默跳過
@@ -279,7 +280,7 @@ def main() -> int:
         if lines:
             print("📬 kunsu 信箱")
             print("\n".join(lines))
-            print("→ 接手／查核請下 /kunsu-inbox 或直接指名檔案；本提示僅告知，不構成任何動工授權")
+            print("→ 接手／查核請執行 kunsu-inbox skill 或直接指名檔案；本提示僅告知，不構成任何動工授權")
         else:
             print("📬 kunsu 信箱：無待辦")
         return 0
@@ -287,7 +288,7 @@ def main() -> int:
         if identity_established:
             print(
                 f"📬 kunsu session hook 降級（{type(e).__name__}: {e}），"
-                "不影響 session；信箱請手動 /kunsu-inbox"
+                "不影響 session；信箱請手動執行 kunsu-inbox skill"
             )
         return 0
 

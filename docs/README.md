@@ -76,6 +76,12 @@ kunsu 專案的文件集合。專案定位與核心規範見上層 [CLAUDE.md](.
 | [adr/2026-08-13-adr-candidate-014-sessionstart-hook-activation.md](adr/2026-08-13-adr-candidate-014-sessionstart-hook-activation.md) | ADR 014（accepted）：SessionStart hook 第二階段啟用——事件驅動信箱摘要注入 |
 | [adr/2026-08-13-adr-candidate-015-dispatch-push-notification.md](adr/2026-08-13-adr-candidate-015-dispatch-push-notification.md) | ADR 015（accepted）：派發即推播／回覆即推播——對 ADR 002 推播否決的翻案（限縮於 daemon 輪詢形態） |
 | [adr/2026-08-14-adr-candidate-016-lifecycle-metadata-boundary.md](adr/2026-08-14-adr-candidate-016-lifecycle-metadata-boundary.md) | ADR 016（candidate，待審定）：Invariant #5 例外邊界重述——內文不可變、frontmatter 生命週期 metadata 由發起方維護 |
+| [adr/2026-08-29-adr-candidate-017-pretooluse-git-add-guard.md](adr/2026-08-29-adr-candidate-017-pretooluse-git-add-guard.md) | ADR 017（accepted）：軍師 repo `git add` 寬範圍守門——kunsu 首個行為強制點，四要件判準、環境變數逃生門、deny 入統計 |
+| [adr/2026-08-31-adr-candidate-018-commit-declared-scope-contract.md](adr/2026-08-31-adr-candidate-018-commit-declared-scope-contract.md) | ADR 018（accepted）：確認 commit 自「提交 index」改為「提交宣告範圍」——pathspec 兩形契約、上報歸檔腳本化、`MISDECLARED_ARCHIVE_ADD` 偵測 |
+| [adr/2026-09-06-adr-candidate-019-agent-neutral-deployment.md](adr/2026-09-06-adr-candidate-019-agent-neutral-deployment.md) | ADR 019（candidate，待審定）：kunsu 通用化——adapter＝部署目標＋字面對應、Invariant 3 擴為各 agent skill 目錄、ADR 009 第二種確認形態、ADR 001 Consequences 翻案 |
+| [brainstorms/2026-09-06-codex-agent-neutral-deployment-requirements.md](brainstorms/2026-09-06-codex-agent-neutral-deployment-requirements.md) | 需求：kunsu 通用化雙部署（R1–R19、AE1–AE8；5-persona review 13 筆） |
+| [plans/2026-09-06-001-feat-codex-agent-neutral-deployment-plan.md](plans/2026-09-06-001-feat-codex-agent-neutral-deployment-plan.md) | 實作計畫：雙部署（U1–U9；4-persona review 14 筆；U8 試點待額度重置後單輪全綠） |
+| [playbooks/codex-pilot.md](playbooks/codex-pilot.md) | 操作教學：Codex 雙端試點腳本用法、可觀測面與手動核對清單 |
 | [plans/2026-07-11-001-feat-kunsu-dashboard-plan.md](plans/2026-07-11-001-feat-kunsu-dashboard-plan.md) | 實作計畫：軍師沙盤（R1–R10、六個實作單元，已執行完畢） |
 | [plans/2026-07-12-001-feat-reply-verify-field-plan.md](plans/2026-07-12-001-feat-reply-verify-field-plan.md) | 實作計畫：回覆 verify 欄位與沙盤「部分完成」子分類（U0–U7，已執行完畢） |
 | [brainstorms/2026-07-25-handoff-pause-report-requirements.md](brainstorms/2026-07-25-handoff-pause-report-requirements.md) | 需求：handoff 暫離回報慣例 |

@@ -1,6 +1,6 @@
 ---
 name: handoff
-version: 0.21.0
+version: 0.22.0
 description: |
   把一個需要交給「另一個 session／另一個角色（如後台、前端、DevOps）」研究或
   接手的議題，寫成一份獨立交接文件，落在當前專案的 docs/handoffs/。每份交接一個
@@ -45,34 +45,51 @@ docs/handoffs/replies/  → 接手方回覆信箱（append-only，接手方新�
 
 `docs/handoffs/` 屬參考層（非 CE plugin 管理），與 `docs/plans`、`docs/brainstorms`
 等 plugin 原生路徑無關，不取代任何 CE 指令行為。若交接內容成形為正式規劃，仍走
-既有 `/ce-brainstorm`／`/ce-plan` 流程，交接文件本身只作為輸入。
+既有 ce-brainstorm／ce-plan skill 流程（呼叫形見 Agent 對應表），交接文件本身只作為輸入。
+
+## Agent 對應表
+
+本 skill 以能力名描述步驟；各 agent 的實際工具與慣例對應如下（七份 SKILL.md 共用同一張表，由 `scripts/consistency-check.sh` 比對逐字一致；新增 agent 只改此表，不改內文）。
+
+| 能力 | Claude Code | Codex |
+|------|-------------|-------|
+| 阻塞式確認（流程中需使用者當下裁決的提問） | AskUserQuestion 工具 | 預設無阻塞式工具（`request_user_input` 僅 plan mode；開啟 `[features] default_mode_request_user_input` 後可用即用）：印出定型指令與訊息並結束回合，下一回合收到使用者明確同意文字才執行 |
+| 跨 session 推播（向另一個長駐 session 發一次性通知） | ListAgents＋SendMessage 工具 | 無對應物：整步跳過，由 SessionStart hook 兜底 |
+| skill 目錄（本 skill 部署後所在目錄，用於定位 scripts/ 與 assets/） | `$CLAUDE_SKILL_DIR`（harness 注入；未定義時以本 SKILL.md 所在目錄推算），部署於 `~/.claude/skills/<name>/` | 無注入變數：以本 SKILL.md 所在目錄推算，部署於 `~/.agents/skills/<name>/` |
+| skill 呼叫形（使用者或指引點名某個 skill） | `/<name>` 斜線指令 | `$<name>` 顯式呼叫，或依 description 自動選用（斜線只保留給內建指令） |
+| hook 設定檔（機器層級，不進 repo） | `~/.claude/settings.json` 的 `hooks` | `~/.codex/hooks.json`（或 config.toml `[hooks]`）；改動後須於 TUI 重新信任 |
+| 子 agent（副官：派出新鮮 context 分擔查證與提取） | Agent 工具（subagent） | `spawn_agent`（custom agents 於 `~/.codex/agents/*.toml`） |
+
+未列於本表的 agent 一律採 Codex 欄行為：文字回合確認、不逕行執行；跨 session 推播整步跳過。
 
 ## 何時使用
 
-- 使用者說「寫一份交接文件」「交接給後台」「handoff 給另一個 session」「/handoff ...」
+- 使用者說「寫一份交接文件」「交接給後台」「handoff 給另一個 session」「handoff ...」（以 agent 的 skill 呼叫形點名，見 Agent 對應表）
 - 目前 session 已把某議題研究到一個段落，需要**換一個上下文乾淨的 session**（不同
   程式碼庫、不同角色）接手，且不希望對方重讀整段對話
-- 接手方已完成研究，要回報結論給發起方（`/handoff reply`；含子 repo 回覆所屬
+- 接手方已完成研究，要回報結論給發起方（handoff skill 的 reply 子指令；含子 repo 回覆所屬
   軍師的交接，如口語「回覆軍師」）
-- 使用者要查詢交接現況（`/handoff list`）、標記完成／收尾歸檔（`/handoff done`，
+- 使用者要查詢交接現況（list 子指令）、標記完成／收尾歸檔（done 子指令，
   含口語「這份交接可以收尾了」「歸檔這份交接」）
 
 不要用於：
-- 純粹自己的待辦技術債 → 用 `/todo`
-- 還沒成形的靈感速記 → 用 `/idea`
-- 需要對話釐清需求後才規劃 → 用 `/ce-brainstorm`
+- 純粹自己的待辦技術債 → 執行 todo skill
+- 還沒成形的靈感速記 → 執行 idea skill
+- 需要對話釐清需求後才規劃 → 執行 ce-brainstorm skill
 
 ## 指令格式
 
-- `/handoff` 或 `/handoff list` — 列出所有交接文件（含回覆狀態）
-- `/handoff add <標題> [from] [to] [tag1,tag2]` — 新增一份交接
-- `/handoff reply <原交接檔案 slug 或路徑> [from]` — 針對某份交接新增一則回覆
-- `/handoff done <slug>` — 標記為已完成並歸檔
+子指令以能力名列出，實際呼叫形依 agent 而異（見 Agent 對應表：Claude Code 為斜線指令、Codex 為 `$` 顯式呼叫或依 description 自動選用），下列一律以「handoff <子指令>」表示：
+
+- `handoff` 或 `handoff list` — 列出所有交接文件（含回覆狀態）
+- `handoff add <標題> [from] [to] [tag1,tag2]` — 新增一份交接
+- `handoff reply <原交接檔案 slug 或路徑> [from]` — 針對某份交接新增一則回覆
+- `handoff done <slug>` — 標記為已完成並歸檔
 
 `from`／`to` 範例：`app`、`backend`、`frontend`、`devops`、`dba`。
 本專案最常見方向為 `app` → `backend`（預設值）。
 
-> **kunsu 情境約定**：若此 repo 隸屬某軍師（規劃協調中心），`to:` 應使用該軍師登記的**角色代碼**（與 `~/.claude/kunsu-registry.json` 的 `roles` 及軍師 CLAUDE.md 關聯專案表代碼欄字面一致），`/kunsu-inbox` 據此精確比對待接手交接。子 repo 回覆軍師的交接時，依 reply 步驟 1 的 kunsu 語境分支自軍師 repo 定位原交接檔；回覆落點一律為軍師的 `docs/handoffs/replies/`（軍師 repo 其餘目錄唯讀）。`/handoff` 作為通用交接原語不強制此約定，僅在 kunsu 語境下成立。
+> **kunsu 情境約定**：若此 repo 隸屬某軍師（規劃協調中心），`to:` 應使用該軍師登記的**角色代碼**（與 `~/.claude/kunsu-registry.json` 的 `roles` 及軍師 CLAUDE.md 關聯專案表代碼欄字面一致），kunsu-inbox skill 據此精確比對待接手交接。子 repo 回覆軍師的交接時，依 reply 步驟 1 的 kunsu 語境分支自軍師 repo 定位原交接檔；回覆落點一律為軍師的 `docs/handoffs/replies/`（軍師 repo 其餘目錄唯讀）。handoff skill 作為通用交接原語不強制此約定，僅在 kunsu 語境下成立。
 
 ## 確認 commit（協議步驟）
 
@@ -84,7 +101,7 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
    輸出非空即視為有待提交變更（rename 呈現為 `XY src -> dst` 複合行，亦屬
    待提交變更）。無變更（使用者已自行 commit）→ 回報「相關檔案已提交，
    無需操作」，**不產生空 commit**。
-2. **確認**：AskUserQuestion「是否 commit 本次產出？（訊息：`<固定格式訊息>`）」。
+2. **確認**：以阻塞式確認（見 Agent 對應表）詢問「是否 commit 本次產出？（訊息：`<固定格式訊息>`）」。
 3. **確認後執行**：`git add -- <僅本流程產出的具體路徑> && git commit -m "<固定格式訊息>" -- <同一組路徑>`
    （不用 `git add -A`、不整目錄打包；add 與 commit 的路徑集合一致，`-m` 必在
    `--` 之前——`--` 之後的一切都被解析為 pathspec）。**絕不 push**。
@@ -99,8 +116,11 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
 4. **取消時**：保留全部產出、不回退任何操作，回報可稍後手動執行的完整
    `git add`＋`git commit` 指令。
 
-**非互動環境**：AskUserQuestion 不可用（headless／pipeline）時，一律視同取消
-——不 commit，僅輸出可手動執行的指令提示，不得跳過確認逕行 commit。
+**阻塞式確認工具不可用時**（依 Agent 對應表「阻塞式確認」列的能力類別判定，不以 agent 名稱、不以「使用者是否在線」為判準；ADR 019 對 ADR 009 的修訂）：
+- 具備原生阻塞式工具的 agent（如 Claude Code）：工具不可用即為 headless／pipeline 情境，一律視同取消——不 commit，僅輸出可手動執行的指令提示，不得跳過確認逕行 commit。
+- 不具備者（如 Codex；開啟其 `default_mode_request_user_input` 旗標後工具可用即用）：印出步驟 3 的定型指令與固定格式訊息，附一句狀態宣告「index 已暫存待確認 commit，下一步只能同意或取消」，然後**結束該回合**；同意文字**僅在緊接的下一回合有效**——該回合收到使用者明確同意才執行步驟 3；該回合內容非明確同意（含改要求別事、無回覆）即視同取消（步驟 4），index 暫存保留，之後若要 commit 須重新印出定型指令再問一次，不得把更早回合的懸置確認與後續任何肯定語連結。`codex exec` 非互動下無下一回合，自然等價取消。此形態屬規範層而非結構關卡：事後偵測只覆蓋 commit 內容形狀、對「同意缺席」零觀測，實害邊界由「絕不 push」界定為本地可逆（`git reset --soft HEAD~1`）；真實路徑下 Codex sandbox 對 `.git/` 唯讀時，git 寫入會觸發核准提示，該提示是附帶的工具層關卡（`.git` 被明列進 writable_roots 後即消失）。
+- 對應表未列的 agent 視同不具備，且不進入文字回合：只印定型指令後停止。
+- 取消後 index 停在中間態時，掃描腳本的 tripwire 訊息屬預期，重新印出定型指令再問一次即收斂。
 
 固定訊息格式（「`docs:` 動詞＋對象檔名」結構，用語可微調）：
 
@@ -119,7 +139,7 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
 
 1. **取得內容**：這是交接文件的重點，內文必須讓「上下文乾淨的接手方」讀得懂。
    下筆前先確保議題已想透——現況分析與待決問題要具體、不空泛；仍有隱含假設或
-   未決分支時，先以 grilling／`/ce-brainstorm` 逐一逼出再交接（ce-brainstorm 已內建
+   未決分支時，先以 grilling／ce-brainstorm skill 逐一逼出再交接（ce-brainstorm 已內建
    此「一問一答、達成共識前不動手」的硬化流程，不需另建機制）。
    把目前 session 已釐清的事實整理進以下段落（腳本會產生骨架，再用 Edit 補實）：
    - **背景 / 目標**：為什麼需要這次交接，接手方要達成什麼
@@ -148,9 +168,11 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
 2. **建立檔案**（內文走 stdin）：
 
    ```bash
-   echo "<整理後的內文>" | bash ~/.claude/skills/handoff/scripts/new-handoff.sh "<標題>" "<from>" "<to>" "<tag1,tag2>" "<查重關鍵詞…>"
+   echo "<整理後的內文>" | bash "<skill 目錄>/scripts/new-handoff.sh" "<標題>" "<from>" "<to>" "<tag1,tag2>" "<查重關鍵詞…>"
    ```
 
+   - `<skill 目錄>` 為本 skill 部署後所在目錄（定位見 Agent 對應表：以本 SKILL.md
+     所在目錄推算）。
    - `from`／`to`／tags 皆可省略，預設 `app`／`backend`／`[handoff]`；第 5 參數為
      選填的查重關鍵詞（空白分隔），省略時腳本自標題去通用詞抽取。
    - 腳本會自動定位專案根、建立 `docs/handoffs/`、以 `YYYY-MM-DD-<slug>.md` 命名
@@ -174,11 +196,11 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
 
 4. **回報**：附上建立的檔案路徑（`file_path` 形式方便點擊），一句話說明接手方
    可如何使用（例如「請在後台 session 開啟此檔研究，完成後執行
-   `/handoff reply <slug>` 建立回覆檔案，不要編輯此檔案本體」）。
+   handoff skill 的 reply 子指令（`handoff reply <slug>`）建立回覆檔案，不要編輯此檔案本體」）。
 
 5. **確認 commit**：執行「確認 commit（協議步驟）」——add 與 commit pathspec
    對象為本次建立的交接檔，訊息 `docs: 建立交接 <檔名>`。（未 commit 的頂層新交接檔會在軍師 repo
-   的下一次 `/kunsu-inbox` 觸發 tripwire，此步驟即為收斂點。）
+   的下一次 kunsu-inbox skill 掃描觸發 tripwire，此步驟即為收斂點。）
 
 6. **派發即推播**（僅 kunsu 語境——當前 repo 為 `~/.claude/kunsu-registry.json`
    任一條目的 `kunsu` 值時執行；一般 repo 交接跳過本步驟。ADR 015）：
@@ -186,39 +208,43 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
 
    1. **反查目標路徑**：以註冊表反查本次交接 `to:` 角色代碼對應的子專案路徑
       （比對登記於本軍師的 `roles`）。
-   2. **匹配 session**：以 ListAgents 列出本機 session，兩層匹配：
+   2. **匹配 session**：以跨 session 推播工具（列出 session／發送訊息，見 Agent
+      對應表）列出本機 session，兩層匹配：
       - **精確比對優先**：session 名稱恰為 `<軍師目錄名>-<角色代碼>`（kunsu
         session 命名慣例，如 `ebook-android`），或該慣例名後接 `.` 與任意
         後綴（同資料夾多 session 的 slot 變體，如 `ebook-android.auth`）→
-        直接命中，零歧義。慣例名由使用者在長駐 session 下一次 `/rename`
-        設定（持久化、`/clear` 不影響），或以 `kc` 啟動函式（`scripts/kc.fish`，
+        直接命中，零歧義。慣例名由使用者以 agent 的 session 改名指令
+        （Claude Code `/rename`）設定（持久化、session 清理／新對話（Claude Code
+        `/clear`）不影響），或以 `kc` 啟動函式（`scripts/kc.fish`，
         `kc --slot <後綴>` 產生 slot 變體）在新開 session 時自動帶入；
         軍師自身 session 的慣例名為 `<軍師目錄名>-kunsu`（供日後回覆方向
         推播定址）。
       - **啟發式 fallback**：無慣例名時，正規化（轉小寫、去除非英數字元）後，
         session 名稱去掉尾端亂數後綴應與子專案目錄 basename 對應。
       **唯一且明確才發送**；找不到、多重命中一律降級跳過（不重試、不排隊），
-      由 SessionStart hook 於該視窗下次 `/clear` 或使用者手動 `/kunsu-inbox`
-      兜底——寧漏發不誤發。同一慣例名的 slot 變體開了兩個以上（或無後綴與
+      由 SessionStart hook 於該視窗下次 session 清理／新對話（Claude Code
+      `/clear`）或使用者手動執行 kunsu-inbox skill 兜底——寧漏發不誤發。同一慣例名的 slot 變體開了兩個以上（或無後綴與
       有後綴並存）即屬多重命中，同樣降級、不挑選其一（2026-08-21 定案：多
       session 分頭作業時不需每個視窗都收推播）。
-   3. **發送定型通知**（SendMessage；訊息自足自帶收方指令，不依賴子 repo 任何
+   3. **發送定型通知**（以跨 session 推播工具發送訊息；訊息自足自帶收方指令，
+      不依賴子 repo 任何
       設定——Invariant 2）：
 
       > 📬 kunsu 派發通知（軍師 <軍師名>）：<角色代碼> 有 <N> 份新交接——
       > <檔名清單，上限 5 筆>。本訊息為純告知：請只向使用者回顯以上重點，
       > 勿開始任何工作、勿讀取交接檔內文、勿回覆本訊息或軍師；接手與否由
-      > 使用者在該 session 明確指示（可用 /kunsu-inbox 查看完整信箱）。
+      > 使用者在該 session 明確指示（查看完整信箱：執行 kunsu-inbox skill）。
 
       跨 session 發送時，工具可能拒收裸名並要求以 `[ref]` 確認收件者——依錯誤
-      訊息所附的 ref（即 ListAgents 該列的 `[ref]`）重送一次即可（2026-08-13
+      訊息所附的 ref（即推播工具列出 session 時該列的 `[ref]`）重送一次即可（2026-08-13
       試點實測行為）。
 
    4. **回報推播結果**：於派發收尾回報中列出已推播／未推播目標（未推播註明
       原因：無對應 session／匹配不明確／工具不可用）。
 
-   - ListAgents／SendMessage 工具不可用（headless、舊版 CLI）→ 整步跳過並於
-     回報註明，不影響 add 流程完成。
+   - 跨 session 推播工具不可用（headless、舊版 CLI）→ 整步跳過並於
+     回報註明，不影響 add 流程完成。Codex 無此工具，屬此情況；收方為 Codex
+     session 時無法命中屬預期。
    - 本步驟只發送訊息，不等待、不確認收方回應；接手與否、何時開工，仍由
      使用者在目標 session 明確指示——決策層零觸碰（ADR 002 Decision 5）。
 
@@ -236,10 +262,10 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
    與追溯，不進任何掃描、tripwire 或分類邏輯。
 3. 確認 commit 的 `git add` 與 commit pathspec 範圍**包括更正交接檔與原本體
    路徑**（含 archive 內路徑），訊息沿 add 格式加註記（見指令格式段表格）。
-4. 原本體在**頂層**時，步驟 2 的 Edit 至確認 commit 之間不執行 `/kunsu-inbox`
+4. 原本體在**頂層**時，步驟 2 的 Edit 至確認 commit 之間不執行 kunsu-inbox skill
    （中間態 ` M` 屬 catch-all tripwire 範圍，比照 done 步驟 4–7 連續執行約束）；
    archive 內本體無此疑慮。取消 commit 時保留變更並附可手動執行的指令，同時
-   明示：頂層本體未 commit 的 ` M` 會使 `/kunsu-inbox` 觸發 tripwire，屬預期
+   明示：頂層本體未 commit 的 ` M` 會使 kunsu-inbox skill 掃描觸發 tripwire，屬預期
    訊號、以補 commit 收斂，不是外部入侵。
 
 ### reply
@@ -258,7 +284,7 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
       日期讓使用者選（若均非使用者所指，依零筆分支的主動上報判斷處理）；
       零筆 → 回報「軍師中沒有待你回覆的交接」並停止——**不要**即興寫任何
       檔案進軍師 repo。若使用者意圖是**主動上報**（無對應交接的情報），請改用
-      `/kunsu-report` 投遞（上報信箱管道），不要以孤兒回覆檔投遞。
+      kunsu-report skill 投遞（上報信箱管道），不要以孤兒回覆檔投遞。
 
 2. **取得內容**：這是接手方要交付給發起方的結論，讓對方不必再往返確認就能知道
    結果。內文至少包含：目前狀態（進行中／完成）、對原問題清單的逐項回答、與原
@@ -301,7 +327,7 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
 3. **建立回覆檔案**（內文走 stdin）：
 
    ```bash
-   echo "<回覆內文>" | bash ~/.claude/skills/handoff/scripts/new-handoff-reply.sh "<原交接檔案 slug 或路徑>" "<from>" "<verify>"
+   echo "<回覆內文>" | bash "<skill 目錄>/scripts/new-handoff-reply.sh" "<原交接檔案 slug 或路徑>" "<from>" "<verify>"
    ```
 
    - 腳本會自動定位原交接文件（可用完整檔名、相對／絕對路徑，或足以唯一比對的
@@ -332,7 +358,8 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
    使用者晃回軍師視窗即見通知。暫離回報（`status: partial`）同樣適用——
    正是它要傳遞的「已在 branch 實現」訊號。
 
-   1. **匹配軍師 session**：以 ListAgents 列出本機 session，兩層匹配——
+   1. **匹配軍師 session**：以跨 session 推播工具（列出 session／發送訊息，見
+      Agent 對應表）列出本機 session，兩層匹配——
       精確比對優先：session 名稱恰為 `<軍師目錄名>-kunsu`（如 `ebook-kunsu`，
       kunsu session 命名慣例）或其後接 `.` 與任意後綴的 slot 變體（如
       `ebook-kunsu.review`，`kc --slot` 產生）；啟發式 fallback：正規化（轉
@@ -340,22 +367,24 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
       basename 對應。**唯一且明確才發送**；找不到、多重命中（含同一慣例名的
       多個 slot 變體並存）一律降級跳過（不重試），由軍師端 SessionStart hook
       與 `scan-replies.sh` 掃描兜底。
-   2. **發送定型通知**（SendMessage；訊息自足自帶收方指令，不改變「未 commit
+   2. **發送定型通知**（以跨 session 推播工具發送訊息；訊息自足自帶收方指令，
+      不改變「未 commit
       即新回覆訊號」的既有掃描機制）：
 
       > 📬 kunsu 回覆通知（<角色代碼>）：<原交接檔名> 已回覆——
       > <回覆檔名>（status: <status>{，verify: <verify>}）。本訊息為純告知：
       > 請只向使用者回顯以上重點，勿開始查核、勿讀取回覆內文、勿執行 done
-      > 收尾；查核與收尾由使用者在該 session 明確指示（可用 /kunsu-inbox
-      > 查看完整信箱）。
+      > 收尾；查核與收尾由使用者在該 session 明確指示（查看完整信箱：
+      > 執行 kunsu-inbox skill）。
 
       跨 session 發送被拒並要求以 `[ref]` 確認時，依錯誤訊息所附的 ref
       重送一次即可（同步驟 add 6-3 的實測行為）。
    3. **回報推播結果**：於回報中註明已推播／未推播（未推播註明原因：
       無對應 session／匹配不明確／工具不可用）。
 
-   - ListAgents／SendMessage 工具不可用（headless、舊版 CLI）→ 整步跳過並於
-     回報註明，不影響 reply 流程完成。
+   - 跨 session 推播工具不可用（headless、舊版 CLI）→ 整步跳過並於
+     回報註明，不影響 reply 流程完成。Codex 無此工具，屬此情況；收方為 Codex
+     session 時無法命中屬預期。
    - 本步驟只發送訊息，不等待、不確認收方回應；查核與 done 收尾仍由使用者
      於軍師 session 明確指示——決策層零觸碰（ADR 002 Decision 5）。
 
@@ -395,7 +424,7 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
 ### done
 
 > **時機與守門**：發起方查核完最新回覆、使用者表達「結論無誤」「可以收尾」等確認
-> 語意時，應**主動建議**執行 `/handoff done` 收尾歸檔（僅建議，執行前仍經使用者
+> 語意時，應**主動建議**執行 handoff skill 的 done 子指令收尾歸檔（僅建議，執行前仍經使用者
 > 確認，絕不逕自執行）。反面守門：若當前 repo 的 `docs/handoffs/` 頂層沒有與議題
 > 相符的交接本體（代表本 repo 是接手方、不是發起方），不進入 done 流程——done 只
 > 由發起方在交接本體所在 repo 執行，請提示使用者至發起方 repo（kunsu 語境即軍師
@@ -404,7 +433,7 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
 1. Read 指定的 `docs/handoffs/<slug>.md`（或使用者給的關鍵字，Glob 找出對應檔案）。
 2. Glob `docs/handoffs/replies/*.md`，篩選 frontmatter `in_reply_to` 等於此交接
    文件檔名者；若有多份，依檔名的 `(日期, 序號)` **數值排序**取最新一份 Read
-   確認結論（同日多份以 `-2`、`-3`… 序號消歧；與 `/kunsu-inbox` 4a 的排序慣例
+   確認結論（同日多份以 `-2`、`-3`… 序號消歧；與 kunsu-inbox skill 4a 的排序慣例
    一致，勿以 frontmatter `created` 或整段檔名字串排序——`created` 同日無法
    消歧、字串排序會把 `-10` 排在 `-2` 前）。
    - 若完全沒有回覆檔案，提醒使用者尚無接手方回覆，確認是否仍要標記完成（例如
@@ -447,7 +476,7 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
 3. **來源 todo 查核**：執行查核腳本印出候選——
 
    ```bash
-   bash ~/.claude/skills/handoff/scripts/archive-handoff.sh --precheck "<檔名或 slug>" ["<檔名>"…]
+   bash "<skill 目錄>/scripts/archive-handoff.sh" --precheck "<檔名或 slug>" ["<檔名>"…]
    ```
 
    腳本掃描本 repo `docs/todos/` 頂層 `*.md`（排除 `archive/`）做雙向檔名比對——
@@ -455,30 +484,32 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
    任一方向命中即列為候選（附命中方向與現況 status），零搬移零暫存；目錄不存在
    或無檔案時印零命中行。候選以腳本輸出為準、不憑記憶另行比對；腳本不可用時
    才依上述比對規則手動 grep。
-   - 有候選 → AskUserQuestion 讓使用者確認哪些 todo 一併收尾：候選 ≤4 筆用
-     multiSelect 一次呈現（label 為 todo 標題，description 註明現況 status 與
-     命中方向；若步驟 2 反向路由查核命中的行動項指向該候選 todo，description
-     一併註明「本輪回覆含指向此 todo 的未完成行動項」且該筆不建議收尾——
+   - 有候選 → 以阻塞式確認（依「確認 commit」節的 agent 判定規則；Codex 以文字
+     回合詢問）讓使用者確認哪些 todo 一併收尾：候選 ≤4 筆以複選一次呈現
+     （選項標籤為 todo 標題，選項說明註明現況 status 與命中方向；若步驟 2
+     反向路由查核命中的行動項指向該候選 todo，選項說明一併註明「本輪回覆含
+     指向此 todo 的未完成行動項」且該筆不建議收尾——
      避免未完成行動項隨檔歸檔蒸發），>4 筆改在對話中列數字清單請使用者以
      文字指定。候選 status 已是
      「已解決」或「已封存」（漏歸檔孤兒）者，文案標明「已標記為<status>但尚未
      歸檔，確認一併補歸檔？」，與未處理件的收尾文案區分。
-   - 使用者取消、零選、或非互動環境 AskUserQuestion 不可用 → 一律不執行任何
-     todo 操作，逕行後續交接收尾（比照「確認 commit」不可用視同取消的規則，
+   - 使用者取消、零選、或阻塞式確認工具不可用且無法以文字回合取得答覆（依
+     「確認 commit」節的 agent 判定規則）→ 一律不執行任何 todo 操作，逕行後續
+     交接收尾（比照「確認 commit」不可用視同取消的規則，
      本查核不阻擋 done 完成）。
    - 無候選但頂層仍有未歸檔 todo → 僅顯示一行提示「`docs/todos/` 尚有 N 筆
      未歸檔 todo，若此交接源自其中一筆可一併收尾」，不阻擋流程。
 
    > **連續執行約束**：步驟 4 至步驟 7 必須連續執行，中間不得執行
-   > `/kunsu-inbox`——todo 檔與交接本體在 Edit 後、`git mv` 前的中間態不在
+   > kunsu-inbox skill——todo 檔與交接本體在 Edit 後、`git mv` 前的中間態不在
    > 掃描豁免範圍內，靠流程原子性避免 tripwire 與沙盤誤報。
 
-4. **todo 收尾執行**（僅步驟 3 有經確認的 todo 時執行；語意比照 `/todo done`，
+4. **todo 收尾執行**（僅步驟 3 有經確認的 todo 時執行；語意比照 todo skill 的 done 子指令，
    該 skill 步驟更新時同步核查本段）：先 `mkdir -p docs/todos/archive/`（目錄
    不存在時 `git mv` 會失敗），再對每筆依序——
    - **殘項清點**（每筆先於 Edit 執行）：Read 該 todo 檔，掃描「下一步」「待辦」
      等段落中未註記完成的子項；無可辨識的子項段落時靜默通過。有殘項時逐項
-     回報，由使用者決定各殘項去向（互動沿用步驟 3 慣例：≤4 筆 multiSelect、
+     回報，由使用者決定各殘項去向（互動沿用步驟 3 慣例：≤4 筆複選、
      >4 筆數字清單）——**一併視為已解決**（隨檔歸檔）／**轉出為新 todo**
      （使用者裁決即授權，由 session 代建：新檔內文首行註明
      `轉出自 docs/todos/archive/<原slug>.md`——填歸檔後路徑，比照解決依據
@@ -490,10 +521,11 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
    - **歸檔執行（腳本化）**：
 
      ```bash
-     bash ~/.claude/skills/todo/scripts/archive-todo.sh --done --from-handoff --basis "交接 docs/handoffs/archive/<交接slug>.md 收尾歸檔" "<todo-slug>" ["<todo-slug>"…]
+     bash "<部署目錄>/todo/scripts/archive-todo.sh" --done --from-handoff --basis "交接 docs/handoffs/archive/<交接slug>.md 收尾歸檔" "<todo-slug>" ["<todo-slug>"…]
      ```
 
-     腳本完成 status Edit（非終態→「已解決」）、解決依據回填（`--basis` 填預期
+     `<部署目錄>` 為 skill 部署根目錄（見 Agent 對應表；todo skill 與本 skill 同
+     toolkit 部署）。腳本完成 status Edit（非終態→「已解決」）、解決依據回填（`--basis` 填預期
      歸檔路徑，此時交接本體尚未搬移；於 `git add` 歸檔目的地**前**寫入）、
      untracked 前置 `git add`、`git mv` 至 `docs/todos/archive/` 與 `git add`
      歸檔目的地；status 已是「已解決」／「已封存」的孤兒僅補歸檔、不改終態
@@ -511,7 +543,7 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
    > **步驟 5–7 以歸檔腳本執行**（建議路徑，含手動等效執行時同樣適用）：
    >
    > ```bash
-   > bash ~/.claude/skills/handoff/scripts/archive-handoff.sh "<檔名或 slug>" ["<檔名>"…]
+   > bash "<skill 目錄>/scripts/archive-handoff.sh" "<檔名或 slug>" ["<檔名>"…]
    > ```
    >
    > 腳本一次完成步驟 5（status Edit）、6（untracked 前置 `git add`）、7（本體與
@@ -551,7 +583,7 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
 
 9. 回報歸檔結果（含步驟 4 的 todo 收尾與失敗筆）；步驟 2 沉澱訊號查核有記下
    訊號時，回報中附一句候選教訓提示——「本次往返含〈具名訊號〉，可能值得沉澱
-   （一句候選教訓方向），可用 `/ce-compound` 或手動沉澱至 `docs/solutions/`」
+   （一句候選教訓方向），可執行 ce-compound skill 或手動沉澱至 `docs/solutions/`」
    （僅提示、不自動執行，是否沉澱由使用者決定）；無訊號時不輸出任何沉澱相關
    文字。另附**斷言自查**一句（錨定步驟 1–2 已讀文本、不憑印象回想）：逐筆
    點數本輪交接本體與回覆中的他方系統事實斷言——據以實作級區分「已一手查證」
@@ -611,7 +643,7 @@ App 端目前逐本書呼叫同步 API，需後台提供 bulk 端點。請研究
 
 本檔案是定案快照，完成後**請勿在此檔案內回填任何內容**。請執行以下指令建立回覆檔案：
 
-    /handoff reply 2026-07-02-書籤筆記-bulk-同步-api-契約
+    執行 handoff skill 的 reply 子指令（Claude Code：/handoff reply 2026-07-02-書籤筆記-bulk-同步-api-契約；Codex：$handoff reply 2026-07-02-書籤筆記-bulk-同步-api-契約）
 
 或直接於下列路徑新增檔案（`{YYYY-MM-DD}` 為回覆當天日期；分階段回報多次時每次建立新檔案，不要覆寫前一份回覆）：
 
@@ -631,7 +663,7 @@ status: submitted
 ---
 ```
 
-回覆檔 `status` 值：`submitted`（預設，已完成待發起方確認）／`partial`（部分完成，後續會再回報）／`blocked`（卡關）／`done`（已結案——**由發起方經 `/handoff done` 對交接本體執行，接手方回覆請勿自標**；自標會使此交接從 `/kunsu-inbox` 與軍師沙盤消失，本體卻仍留在頂層未歸檔）。另可加選填欄位 `verify:` 標注驗收方式——`needs-deploy`（需上線測試）／`testable-now`（馬上可測）／`needs-device`（需實機測試）或自由字串，無明確驗收需求則省略。
+回覆檔 `status` 值：`submitted`（預設，已完成待發起方確認）／`partial`（部分完成，後續會再回報）／`blocked`（卡關）／`done`（已結案——**由發起方執行 handoff skill 的 done 子指令對交接本體執行，接手方回覆請勿自標**；自標會使此交接從 kunsu-inbox skill 的掃描與軍師沙盤消失，本體卻仍留在頂層未歸檔）。另可加選填欄位 `verify:` 標注驗收方式——`needs-deploy`（需上線測試）／`testable-now`（馬上可測）／`needs-device`（需實機測試）或自由字串，無明確驗收需求則省略。
 
 投遞前有程式碼改動時，回覆請附主要修改檔案路徑清單（不論 `status`；暫離回報除外——branch 名即查證錨點），細節見 handoff SKILL reply 段。
 
@@ -668,10 +700,10 @@ verify: needs-deploy
   研究中）／`done`（已完成）。**回覆檔**的 `status` 值域不同：`submitted`（預設）
   ／`partial`／`blocked`／`done`，兩者不可混用。回覆檔的 `done` 一般不由接手方
   自標（限制說明見「檔案格式範例」段）——結案動作是發起方對**本體**執行
-  `/handoff done`。
+  handoff skill 的 done 子指令。
 - 回覆檔選填欄位 `verify:`（驗收方式）：建議代碼 `needs-deploy`（需上線測試）／
   `testable-now`（馬上可測）／`needs-device`（需實機測試），開放值域（其他自由
-  字串原樣顯示），缺省不顯示。display-only——不參與任何比對邏輯，`/kunsu-inbox`
+  字串原樣顯示），缺省不顯示。display-only——不參與任何比對邏輯，kunsu-inbox skill
   與軍師沙盤據此顯示標籤。
 - `from`／`to` 是交接文件的靈魂，務必填正確方向，Dataview 才能依角色過濾。
 - 現況分析要引用具體 `檔案:行號` 與資料結構，接手方在**不同程式碼庫**時尤其重要。

@@ -1,3 +1,10 @@
+---
+name: kunsu-dashboard
+description: 軍師沙盤（kunsu dashboard）的安裝與啟動說明。不是可觸發的 skill——不要選用、不要依此執行任何流程；只在使用者要安裝或啟動沙盤時作為閱讀文件。
+disable-model-invocation: true
+user-invocable: false
+---
+
 # kunsu-dashboard — 軍師沙盤（kunsu dashboard）
 
 **這不是一個 Claude Code skill（不透過 `/kunsu-dashboard` 或任何觸發語啟動）。** 這是一個獨立的本機 FastAPI 服務，只是借用 `skills/` 目錄的部署慣例（隨 `install.sh` 一併複製或 symlink），執行時完全不經過 Claude Code session。設計理由與例外條件見 [ADR 010](../../docs/adr/2026-07-11-adr-candidate-010-dashboard-service-exception.md)。

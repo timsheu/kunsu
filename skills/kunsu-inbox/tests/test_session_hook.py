@@ -251,6 +251,9 @@ def test_kunsu_mode_formatting(tmp_path, registry_path, monkeypatch, capsys):
     assert "• docs/handoffs/replies/r1.md" in out
     assert "新上報 1：" in out
     assert "新申請" not in out  # 零分類省略
+    # 注入文案為 agent 無關（ADR 019）：以 skill 名指路，不寫 Claude Code 斜線形
+    assert "kunsu-inbox skill" in out
+    assert "/kunsu-inbox" not in out
 
 
 def test_nested_topology_merges_both_modes(tmp_path, registry_path, monkeypatch, capsys):

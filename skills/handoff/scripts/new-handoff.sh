@@ -131,7 +131,7 @@ fi
   printf -- '\n---\n\n'
   printf '## 回覆方式（請讀，不要編輯本檔案）\n\n'
   printf '本檔案是定案快照，完成後**請勿在此檔案內回填任何內容**。請執行以下指令建立回覆檔案：\n\n'
-  printf '    /handoff reply %s\n\n' "$final_base"
+  printf '    執行 handoff skill 的 reply 子指令（Claude Code：/handoff reply %s；Codex：$handoff reply %s）\n\n' "$final_base" "$final_base"
   printf '或直接於下列路徑新增檔案（`{YYYY-MM-DD}` 為回覆當天日期；分階段回報多次時每次建立新檔案，不要覆寫前一份回覆）：\n\n'
   printf '    docs/handoffs/replies/%s-reply-{YYYY-MM-DD}.md\n\n' "$final_base"
   printf '新檔案請以下列 frontmatter 開頭：\n\n'
@@ -146,7 +146,7 @@ fi
   printf 'status: submitted\n'
   printf -- '---\n'
   printf -- '```\n'
-  printf '\n回覆檔 `status` 值：`submitted`（預設，已完成待發起方確認）／`partial`（部分完成，後續會再回報）／`blocked`（卡關）／`done`（已結案——**由發起方經 `/handoff done` 對交接本體執行，接手方回覆請勿自標**；自標會使此交接從 `/kunsu-inbox` 與軍師沙盤消失，本體卻仍留在頂層未歸檔）。另可加選填欄位 `verify:` 標注驗收方式——`needs-deploy`（需上線測試）／`testable-now`（馬上可測）／`needs-device`（需實機測試）或自由字串，無明確驗收需求則省略。\n'
+  printf '\n回覆檔 `status` 值：`submitted`（預設，已完成待發起方確認）／`partial`（部分完成，後續會再回報）／`blocked`（卡關）／`done`（已結案——**由發起方執行 handoff skill 的 done 子指令對交接本體執行，接手方回覆請勿自標**；自標會使此交接從 kunsu-inbox skill 的掃描與軍師沙盤消失，本體卻仍留在頂層未歸檔）。另可加選填欄位 `verify:` 標注驗收方式——`needs-deploy`（需上線測試）／`testable-now`（馬上可測）／`needs-device`（需實機測試）或自由字串，無明確驗收需求則省略。\n'
   printf '%s\n' '' '投遞前有程式碼改動時，回覆請附主要修改檔案路徑清單（不論 `status`；暫離回報除外——branch 名即查證錨點），細節見 handoff SKILL reply 段。'
   printf '\n中途需切換任務時，請先投遞暫離回報——`status: partial`、內文附 branch 名與現況，之後回來再照常回覆。\n'
 } > "$file"
@@ -316,4 +316,4 @@ PYEOF
 }
 dedup_check || true
 
-echo "ℹ 本腳本僅產檔；撰寫與查核指引（斷言層級紀律、引用檔名權威、更正交接）見 handoff SKILL.md add 段——未經 /handoff skill 執行時請回讀對應步驟" >&2
+echo "ℹ 本腳本僅產檔；撰寫與查核指引（斷言層級紀律、引用檔名權威、更正交接）見 handoff SKILL.md add 段——未經 handoff skill 執行時請回讀對應步驟" >&2

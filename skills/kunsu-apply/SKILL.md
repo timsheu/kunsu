@@ -1,6 +1,6 @@
 ---
 name: kunsu-apply
-version: 0.1.1
+version: 0.2.0
 description: |
   在子專案 session 向軍師（規劃協調中心）投遞「申請加入」：自動偵測子專案路徑、
   顯示名稱與技術棧，從全域反向註冊表 ~/.claude/kunsu-registry.json 撈出軍師清單
@@ -22,6 +22,21 @@ allowed-tools:
 使用者只需手填角色代碼、角色說明與環境限制。
 
 ---
+
+## Agent 對應表
+
+本 skill 以能力名描述步驟；各 agent 的實際工具與慣例對應如下（七份 SKILL.md 共用同一張表，由 `scripts/consistency-check.sh` 比對逐字一致；新增 agent 只改此表，不改內文）。
+
+| 能力 | Claude Code | Codex |
+|------|-------------|-------|
+| 阻塞式確認（流程中需使用者當下裁決的提問） | AskUserQuestion 工具 | 預設無阻塞式工具（`request_user_input` 僅 plan mode；開啟 `[features] default_mode_request_user_input` 後可用即用）：印出定型指令與訊息並結束回合，下一回合收到使用者明確同意文字才執行 |
+| 跨 session 推播（向另一個長駐 session 發一次性通知） | ListAgents＋SendMessage 工具 | 無對應物：整步跳過，由 SessionStart hook 兜底 |
+| skill 目錄（本 skill 部署後所在目錄，用於定位 scripts/ 與 assets/） | `$CLAUDE_SKILL_DIR`（harness 注入；未定義時以本 SKILL.md 所在目錄推算），部署於 `~/.claude/skills/<name>/` | 無注入變數：以本 SKILL.md 所在目錄推算，部署於 `~/.agents/skills/<name>/` |
+| skill 呼叫形（使用者或指引點名某個 skill） | `/<name>` 斜線指令 | `$<name>` 顯式呼叫，或依 description 自動選用（斜線只保留給內建指令） |
+| hook 設定檔（機器層級，不進 repo） | `~/.claude/settings.json` 的 `hooks` | `~/.codex/hooks.json`（或 config.toml `[hooks]`）；改動後須於 TUI 重新信任 |
+| 子 agent（副官：派出新鮮 context 分擔查證與提取） | Agent 工具（subagent） | `spawn_agent`（custom agents 於 `~/.codex/agents/*.toml`） |
+
+未列於本表的 agent 一律採 Codex 欄行為：文字回合確認、不逕行執行；跨 session 推播整步跳過。
 
 ## ⚠️ 授權邊界（必讀）
 
@@ -51,8 +66,8 @@ git rev-parse --show-toplevel
 
 嘗試以 `Read ~/.claude/kunsu-registry.json` 讀取註冊表，掃描所有條目的 `kunsu` 欄位取聯集（去重）得到軍師清單。
 
-- **正常（清單非空）**：以 `AskUserQuestion` 列出軍師路徑供點選（軍師數量超過選項上限時，依 registry 出現順序列前幾個，其餘由使用者以 Other 輸入路徑）。
-- **降級路徑（三種情境同一處理）**：registry 不存在、JSON 格式損壞、或清單為空 → 以 `AskUserQuestion` 直接詢問目標軍師的絕對路徑。本 skill 不因 registry 缺失而終止——申請者本來就可能是尚未登記的 repo。使用者也可在正常路徑選 Other 手動輸入不在清單中的軍師路徑。
+- **正常（清單非空）**：以阻塞式確認（見 Agent 對應表）列出軍師路徑供點選（軍師數量超過選項上限時，依 registry 出現順序列前幾個，其餘由使用者以自由輸入提供路徑）。
+- **降級路徑（三種情境同一處理）**：registry 不存在、JSON 格式損壞、或清單為空 → 以阻塞式確認直接詢問目標軍師的絕對路徑。本 skill 不因 registry 缺失而終止——申請者本來就可能是尚未登記的 repo。使用者也可在正常路徑以自由輸入手動提供不在清單中的軍師路徑。
 
 > 注意：`SUB_ROOT` **不需要**已存在於 registry——首次加入的子專案正是尚未登記的狀態。
 
@@ -63,7 +78,7 @@ test -d "<KUNSU_ROOT>/docs/applications" && echo "ok" || echo "missing"
 ```
 
 - **missing** → 報錯終止，不寫入任何檔案：
-  > 目標軍師 `<KUNSU_ROOT>` 尚無申請信箱（`docs/applications/` 不存在）。請先於該軍師目錄的 session 執行 `/kunsu-init add-project`，依提示完成遷移（補建申請信箱與協議文字），再重新投遞。
+  > 目標軍師 `<KUNSU_ROOT>` 尚無申請信箱（`docs/applications/` 不存在）。請先於該軍師目錄的 session 執行 kunsu-init skill 的 add-project 子指令，依提示完成遷移（補建申請信箱與協議文字），再重新投遞。
 - **ok** → 繼續步驟 4。
 
 ### 步驟 4：重複投遞預檢
@@ -71,13 +86,13 @@ test -d "<KUNSU_ROOT>/docs/applications" && echo "ok" || echo "missing"
 以 `Glob "<KUNSU_ROOT>/docs/applications/*.md"` 取頂層申請檔（不含 `archive/`），先以 `Grep` 篩 `path: <SUB_ROOT>` 縮小範圍，再 `Read` 命中者確認 `status: pending`（積壓多份時避免逐檔全讀）。
 
 - **無待審申請** → 繼續步驟 5。
-- **已有待審申請** → 以 `AskUserQuestion` 告知並詢問：
+- **已有待審申請** → 以阻塞式確認（見 Agent 對應表）告知並詢問：
   - **另投新版**：繼續步驟 5，產生新申請檔（絕不覆寫舊檔——子端無權修改既有檔案；軍師端 `add-project` 審核時會依「同路徑取最新」審最新一份，舊版經軍師確認後才歸檔——確認制、不自動）。
   - **取消**：終止，不寫入任何檔案。
 
 ### 步驟 5：訪談（僅剩人工欄位）
 
-以單次 `AskUserQuestion` 收集：
+以單次阻塞式確認（見 Agent 對應表）收集：
 
 1. **顯示名稱**：預設值為步驟 1 的目錄名，可修改。
 2. **提議角色代碼**：短、kebab-case，即交接文件 `to:` 的比對鍵；此為**提議值**，軍師核准時可修改後定案（代碼定案權在軍師）。宜 ≤ 20 字、不含軍師名前綴。
@@ -91,10 +106,10 @@ test -d "<KUNSU_ROOT>/docs/applications" && echo "ok" || echo "missing"
 
 ### 步驟 6：產生申請檔
 
-呼叫產檔腳本（`$CLAUDE_SKILL_DIR` 若未定義，改用此 SKILL.md 所在目錄的絕對路徑）：
+呼叫產檔腳本（skill 目錄的定位見 Agent 對應表：以本 SKILL.md 所在目錄推算）：
 
 ```bash
-bash "$CLAUDE_SKILL_DIR/scripts/new-application.sh" \
+bash "<skill 目錄>/scripts/new-application.sh" \
   "<KUNSU_ROOT>" \
   "<顯示名稱>" \
   "<SUB_ROOT>" \
@@ -122,7 +137,7 @@ bash "$CLAUDE_SKILL_DIR/scripts/new-application.sh" \
 本次寫入僅此一個新檔案（申請信箱協議授權範圍內），未觸碰軍師其他任何檔案，
 未寫入全域註冊表。
 
-下一步：到軍師目錄的 session 執行 /kunsu-init add-project 審核此申請；
+下一步：到軍師目錄的 session 執行 kunsu-init skill 的 add-project 子指令審核此申請；
 核准當下才會寫入軍師 CLAUDE.md 關聯專案表與 ~/.claude/kunsu-registry.json。
 ```
 
@@ -138,4 +153,4 @@ bash "$CLAUDE_SKILL_DIR/scripts/new-application.sh" \
 | frontmatter | `type: kunsu-application`、`name`、`path`、`proposed_role`（提議角色代碼）、`role_desc`（角色說明，選填）、`constraints`、`self_verify`、`stack`、`created`、`status: pending` |
 | `path` 欄位 | 子專案絕對路徑；軍師端以此作為分組與重複登記判斷的鍵 |
 | 信箱目錄 | `docs/applications/`（一律在軍師 repo 內，頂層投遞、`archive/` 歸檔） |
-| 審核端 | 軍師 session 的 `add-project`（`/kunsu-init` 子指令）；掃描端另有 `/kunsu-inbox` 軍師模式回報新申請 |
+| 審核端 | 軍師 session 的 `add-project`（kunsu-init skill 子指令）；掃描端另有 kunsu-inbox skill 軍師模式回報新申請 |

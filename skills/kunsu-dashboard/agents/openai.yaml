@@ -1,0 +1,7 @@
+# Codex 專屬 skill 設定（Claude Code 忽略此檔）：停用隱式選用，$kunsu-dashboard 顯式呼叫仍可讀到安裝說明。
+# 依據：ADR 010（沙盤不是可觸發的 skill）＋ ADR 019 Decision 7（兩 agent 各以原生旗標停用選用）。
+interface:
+  display_name: "kunsu-dashboard（軍師沙盤安裝說明）"
+  short_description: "軍師沙盤安裝與啟動說明，非可觸發流程"
+policy:
+  allow_implicit_invocation: false

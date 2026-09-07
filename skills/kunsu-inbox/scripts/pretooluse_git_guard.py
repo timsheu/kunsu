@@ -25,7 +25,8 @@ scan-replies.sh 歷史夾帶偵測兜底）：
 
 失敗策略 fail-open：任何錯誤一律放行（exit 0 無輸出），絕不阻斷正常工作。
 掛載與解除（機器層級設定，見 SKILL.md「PreToolUse git add 守門」節）：
-  ~/.claude/settings.json → hooks.PreToolUse matcher "Bash" 指向本腳本。
+  Claude Code ~/.claude/settings.json → hooks.PreToolUse matcher "Bash"；Codex ~/.codex/hooks.json 同形
+  （各指向自己部署位置的本腳本，附加於陣列尾端並於 TUI 信任，ADR 019）。
 
 環境變數（測試隔離用）：KUNSU_REGISTRY_FILE 覆寫註冊表路徑、
 KUNSU_SCAN_STATS_FILE 覆寫統計檔路徑。
@@ -40,14 +41,23 @@ import re
 import shlex
 import subprocess
 import sys
+from pathlib import Path
 
 MAILBOXES = ("docs/handoffs", "docs/applications", "docs/reports")
+
+# 歸檔腳本路徑以本檔所在部署位置推算（parents[2] = 部署目錄，如 ~/.claude/skills 或 ~/.agents/skills），
+# 各 agent 的部署位置自足，不寫死任何一方的目錄（ADR 019）。用 absolute() 不用 resolve()：--link 部署下
+# resolve 會追 symlink 回開發 repo，deny 訊息應指向 agent 自己的部署位置。任何失敗退回相對檔名（fail-open）。
+try:
+    _ARCHIVE_SCRIPT = Path(__file__).absolute().parents[2] / "handoff" / "scripts" / "archive-handoff.sh"
+except Exception:  # 部署層級異常（parents 不足）不得阻斷守門
+    _ARCHIVE_SCRIPT = Path("archive-handoff.sh")
 
 DENY_MESSAGE = (
     "✋ 軍師 repo 內 git add 僅限具體檔案路徑（不用 -A、不整目錄打包）——"
     "整目錄 add 會夾帶未讀信箱檔案、靜默清除「未 commit 即未處理」訊號"
     "（ADR 017；2026-08-29 曾因此夾帶 16 份未讀回覆）。"
-    "歸檔請改用 bash ~/.claude/skills/handoff/scripts/archive-handoff.sh"
+    f"歸檔請改用 bash {_ARCHIVE_SCRIPT}"
     "（自動處理 rename 兩側與暫存範圍）；其他情境請逐檔列名後重新執行。"
     "緊急需整目錄 add 時，指令前綴 KUNSU_ADD_GUARD_OFF=1 可單次放行（留痕可稽）。"
 )

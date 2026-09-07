@@ -133,6 +133,14 @@ def test_e2e_deny_dash_a_in_kunsu_repo(hook_env):
     assert "archive-handoff.sh" in decision["permissionDecisionReason"]
 
 
+def test_deny_message_archive_path_derived_from_deploy_tree():
+    """歸檔腳本路徑以 guard 所在部署位置推算（ADR 019 各部署位置自足），不寫死 ~/.claude/skills。"""
+    expected = Path(guard.__file__).absolute().parents[2] / "handoff" / "scripts" / "archive-handoff.sh"
+    assert str(expected) in guard.DENY_MESSAGE
+    assert expected.exists()  # 非套套邏輯：推算出的路徑在本部署佈局下必須真的存在
+    assert "~/.claude/skills" not in guard.DENY_MESSAGE
+
+
 def test_e2e_deny_logged_to_stats(hook_env):
     _run_hook(hook_env["env"], _bash_payload("git add -A", str(hook_env["repo"])))
     stats = json.loads(hook_env["stats"].read_text(encoding="utf-8"))

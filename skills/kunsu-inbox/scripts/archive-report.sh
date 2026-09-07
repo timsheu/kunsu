@@ -33,7 +33,7 @@ MUTATION_STARTED=0
 on_err() {
   if [[ "$MUTATION_STARTED" -eq 1 ]]; then
     echo "✗ 歸檔中途失敗：已完成的搬移不回滾。請以 git status 檢視現況後重跑本腳本（已在 archive/ 的傳入項會自動略過）。" >&2
-    echo "ℹ 完成前 /kunsu-inbox 對中間態會誤報：已 commit 上報 Edit 後的 \` M\` 觸發 tripwire、untracked 上報仍列為新上報——補跑收斂即回復，不是外部入侵。" >&2
+    echo "ℹ 完成前 kunsu-inbox skill 的掃描對中間態會誤報：已 commit 上報 Edit 後的 \` M\` 觸發 tripwire、untracked 上報仍列為新上報——補跑收斂即回復，不是外部入侵。" >&2
   fi
 }
 trap on_err ERR
@@ -239,4 +239,4 @@ for p in "${PATHSPECS[@]}"; do quoted+=" \"$p\""; done
 echo "git commit -m \"$msg\" --$quoted"
 staged_count="$(git -C "$GITROOT" diff --cached --name-only | wc -l | tr -d ' ')"
 echo "ℹ index 現含 ${staged_count} 筆暫存路徑；上列指令僅收斂 pathspec 宣告範圍（兩形：tracked rename 成對、untracked 僅目的地，ADR 018），範圍外暫存不受影響" >&2
-echo "ℹ 尚未 commit——請經 AskUserQuestion 確認後執行上列指令（ADR 009 上報歸檔第（4）步）；本腳本僅完成步驟（1）–（3）與目的地暫存，審閱與分流義務不因腳本而豁免" >&2
+echo "ℹ 尚未 commit——請經阻塞式確認（Codex 以文字回合，見 SKILL 的 Agent 對應表）後執行上列指令（ADR 009 上報歸檔第（4）步）；本腳本僅完成步驟（1）–（3）與目的地暫存，審閱與分流義務不因腳本而豁免" >&2
