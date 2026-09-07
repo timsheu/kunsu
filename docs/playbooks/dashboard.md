@@ -1,13 +1,13 @@
 # 軍師沙盤（kunsu dashboard）
 
-同時開多個軍師／子專案視窗時，`/kunsu-inbox` 得逐一切換視窗手動執行才知道有沒有新訊息，視窗一多容易顧此失彼。**軍師沙盤**（如統帥推演戰局的沙盤）是一個獨立的本機 FastAPI 服務，把全域註冊表裡所有軍師與子專案的訊息狀態彙整成一頁總覽。
+同時開多個軍師／子專案視窗時，kunsu-inbox skill 得逐一切換視窗手動執行才知道有沒有新訊息，視窗一多容易顧此失彼。**軍師沙盤**（如統帥推演戰局的沙盤）是一個獨立的本機 FastAPI 服務，把全域註冊表裡所有軍師與子專案的訊息狀態彙整成一頁總覽。
 
-**這不是 Claude Code skill**，不透過任何觸發語啟動，純手動啟停（無背景常駐、無開機自動啟動、無背景輪詢，對所有 repo 唯讀）——這是本工具組「純 skill＋範本」原則的唯一例外，例外範圍界定詳見 [ADR 010](../adr/2026-07-11-adr-candidate-010-dashboard-service-exception.md)。
+**這不是可觸發的 skill**（Claude Code 與 Codex 皆以 frontmatter 原生旗標停用選用），不透過任何觸發語啟動，純手動啟停（無背景常駐、無開機自動啟動、無背景輪詢，對所有 repo 唯讀）——這是本工具組「純 skill＋範本」原則的唯一例外，例外範圍界定詳見 [ADR 010](../adr/2026-07-11-adr-candidate-010-dashboard-service-exception.md)。
 
 ## 安裝與啟動
 
 ```bash
-cd skills/kunsu-dashboard          # 或 ~/.claude/skills/kunsu-dashboard（install.sh 部署後）
+cd skills/kunsu-dashboard          # 或部署目錄：~/.claude/skills/kunsu-dashboard（Claude Code）／~/.agents/skills/kunsu-dashboard（Codex）
 pip install -r requirements.txt    # 首次安裝，需 Python 3.10+
 ./start.sh                         # 預設 http://127.0.0.1:8000/
 ```
@@ -30,7 +30,7 @@ pip install -r requirements.txt    # 首次安裝，需 Python 3.10+
 
 - **⚠ 未接手（無回覆）**：以醒目標題呈現。
 - **部分完成**：最新回覆 `status` 為 `partial`／`blocked`（另標 ⛔ 卡關）或未知值。
-- **已回覆待確認**：依回覆 `verify:` 欄位拆成子分組——⚡ 馬上可測 → 📱 需實機測試 → 🚀 需上線測試 → 自由字串各 distinct 值一組 → 未標示驗收方式。愈接近「現在就能以 `/handoff done` 收尾」的排愈前，組內等最久的陳年件排最前；每筆附 verify 推導的白話下一步提示與停留天數（自最新回覆日起算）。
+- **已回覆待確認**：依回覆 `verify:` 欄位拆成子分組——⚡ 馬上可測 → 📱 需實機測試 → 🚀 需上線測試 → 自由字串各 distinct 值一組 → 未標示驗收方式。愈接近「現在就能以 handoff skill 的 done 子指令收尾」的排愈前，組內等最久的陳年件排最前；每筆附 verify 推導的白話下一步提示與停留天數（自最新回覆日起算）。
 
 每筆交接／訊息可展開（原生 `<details>`，零 JS）看完整 md 內容與最後修改時間；軍師的新回覆／新申請／新上報三個分類標題列各顯示「最新」時間。
 

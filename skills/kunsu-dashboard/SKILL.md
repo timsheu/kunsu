@@ -7,9 +7,9 @@ user-invocable: false
 
 # kunsu-dashboard — 軍師沙盤（kunsu dashboard）
 
-**這不是一個 Claude Code skill（不透過 `/kunsu-dashboard` 或任何觸發語啟動）。** 這是一個獨立的本機 FastAPI 服務，只是借用 `skills/` 目錄的部署慣例（隨 `install.sh` 一併複製或 symlink），執行時完全不經過 Claude Code session。設計理由與例外條件見 [ADR 010](../../docs/adr/2026-07-11-adr-candidate-010-dashboard-service-exception.md)。
+**這不是一個可觸發的 skill（frontmatter 已以 Claude Code 與 Codex 的原生旗標停用選用，不透過任何觸發語啟動）。** 這是一個獨立的本機 FastAPI 服務，只是借用 `skills/` 目錄的部署慣例（隨 `install.sh` 一併複製或 symlink），執行時完全不經過任何 agent session。設計理由與例外條件見 [ADR 010](../../docs/adr/2026-07-11-adr-candidate-010-dashboard-service-exception.md)。
 
-**軍師沙盤（kunsu dashboard）**——如統帥推演戰局的沙盤，一頁彙整全域反向註冊表 `~/.claude/kunsu-registry.json` 裡所有軍師與子專案的 kunsu 訊息狀態（未接手／部分完成／已回覆待確認交接、新回覆、新申請、新上報，含回覆 `verify` 驗收標籤，見 ADR 011），取代逐一切換 CLI 視窗手動執行 `/kunsu-inbox` 的做法。重新整理瀏覽器頁面即觸發全新掃描，不跑背景服務。
+**軍師沙盤（kunsu dashboard）**——如統帥推演戰局的沙盤，一頁彙整全域反向註冊表 `~/.claude/kunsu-registry.json` 裡所有軍師與子專案的 kunsu 訊息狀態（未接手／部分完成／已回覆待確認交接、新回覆、新申請、新上報，含回覆 `verify` 驗收標籤，見 ADR 011），取代逐一切換 CLI 視窗手動執行 kunsu-inbox skill 的做法。重新整理瀏覽器頁面即觸發全新掃描，不跑背景服務。
 
 ---
 
@@ -18,7 +18,7 @@ user-invocable: false
 需要 **Python 3.10 以上**（`python3 --version` 確認；FastAPI 0.139.0／uvicorn 0.51.0 皆要求 `>=3.10`）。macOS 內建系統 Python 通常是 3.9，不足時以 Homebrew（`brew install python@3.12`）或 pyenv 安裝較新版本。
 
 ```bash
-cd ~/.claude/skills/kunsu-dashboard   # 或本 repo 的 skills/kunsu-dashboard/（開發模式）
+cd ~/.claude/skills/kunsu-dashboard   # Codex 部署目錄為 ~/.agents/skills/kunsu-dashboard；或本 repo 的 skills/kunsu-dashboard/（開發模式）
 pip install -r requirements.txt
 ```
 
@@ -51,4 +51,4 @@ python3 app/main.py --port 8000
 
 - **`pip install` 失敗**：多半是 Python 版本不足 3.10，先用 `python3 --version` 確認。
 - **Port 已被佔用**：換一個 `--port`（如 `python3 app/main.py --port 8001`）。
-- **頁面顯示「Registry 讀取錯誤」**：`~/.claude/kunsu-registry.json` 不存在或格式損壞，先用 `/kunsu-init` 或 `/kunsu-list` 確認註冊表狀態。
+- **頁面顯示「Registry 讀取錯誤」**：`~/.claude/kunsu-registry.json` 不存在或格式損壞，先用 kunsu-init 或 kunsu-list skill 確認註冊表狀態。

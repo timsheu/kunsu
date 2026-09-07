@@ -40,7 +40,7 @@
 接手方 session 對交接文件回報結論的信箱：每次回覆是一個新檔案（append-only），原交接文件本體任何人不再編輯（唯一例外：done 收尾），以單一作者原則杜絕版本漂移。有無對應的原交接文件是回覆與上報的唯一分界——有對應交接的是回覆，無對應交接的子專案主動情報屬上報信箱。
 
 ### 驗收方式（verify）
-回覆檔的選填 display-only 欄位，由接手方宣告「此交接還缺哪種驗證／目前可怎麼驗證」：建議代碼 `needs-deploy`（需上線測試）／`testable-now`（馬上可測）／`needs-device`（需實機測試，全小寫 kebab-case、顯示端查找前正規化），開放值域可填自由字串，缺省不顯示。不跨回覆繼承——只讀最新回覆，需求未變仍需顯式複寫、環境改變時以新回覆更新。不進註冊表、不參與任何比對邏輯與 tripwire，`/kunsu-inbox` 與軍師沙盤據此顯示標籤（見 [ADR 011](docs/adr/2026-07-12-adr-candidate-011-reply-verify-field.md)）。
+回覆檔的選填 display-only 欄位，由接手方宣告「此交接還缺哪種驗證／目前可怎麼驗證」：建議代碼 `needs-deploy`（需上線測試）／`testable-now`（馬上可測）／`needs-device`（需實機測試，全小寫 kebab-case、顯示端查找前正規化），開放值域可填自由字串，缺省不顯示。不跨回覆繼承——只讀最新回覆，需求未變仍需顯式複寫、環境改變時以新回覆更新。不進註冊表、不參與任何比對邏輯與 tripwire，kunsu-inbox skill 與軍師沙盤據此顯示標籤（見 [ADR 011](docs/adr/2026-07-12-adr-candidate-011-reply-verify-field.md)）。
 
 ### 交接三分類（未接手／部分完成／已回覆待確認）
 子專案視角對軍師交接文件的分類，判準是「有無回覆」＋最新回覆 `status`：無回覆→**未接手**；最新回覆 `partial`／`blocked`／未知值→**部分完成**（blocked 另標卡關）；`submitted`→**已回覆待確認**；`done`→不列出（回覆檔的 `done` 由發起方經 done 收尾設定於本體，接手方勿自標——自標會使交接自掃描面消失而未歸檔）。
@@ -84,7 +84,7 @@
 對他方系統事實斷言的來源層級規範，掛載三處：handoff add 指引（交接撰寫時）、done 斷言自查、軍師對話中回答子專案實作現況（軍師 CLAUDE.md 副官慣例區原則句「子專案實作現況以原始碼為準」，2026-09-01 補）。查閱他方系統的中介文件（規格、索引、對照表、宣告文件）所得＝二手資訊；措辭必居兩態之一——來源為中介文件即標「依 X 記載（未查）」、不以「事實是」語氣轉述，已一手查證者標「已查」並註明方式與位置；無標記的斷言視同未查證（措辭義務涵蓋所有他方系統斷言，不分用途）。接手方會據以實作的斷言（判準：對方會不會據此寫程式或改設計）須一手——落原始碼／實際狀態查證。done 收尾附斷言自查：兩態逐筆點數（已一手查證／僅標明層級，後者列缺口待裁決）、零筆顯式一行「本輪無他方系統斷言」。
 
 ### done 收尾
-發起方確認接手方回覆無誤後，將交接文件本體 `status` 標記為 `done` 並連同其回覆成對歸檔的具名收尾流程；是「本體內文不再編輯」原則例外邊界（frontmatter 生命週期 metadata，ADR 016）內的主要場景——發起方對自己文件的生命週期標記，屬授權歸檔、不改內文，單一作者原則不變。僅發起方可執行；接手方勿在回覆檔自標 `done`，自標會使交接從所有掃描面消失、本體卻未歸檔。收尾完成後 `/kunsu-inbox` 與軍師沙盤不再掃描此交接，積壓歸零。收尾流程內建的歸檔前回頭查核（逐項驗收查核、沉澱訊號查核、反向路由查核、來源 todo 查核、todo 殘項清點與斷言自查）以 handoff SKILL.md done 段為準——無論經 /handoff done 或手動執行等效步驟，查核不豁免，此處不重複其細節；各查核的引入脈絡見母體 CLAUDE.md 開發狀態。歸檔執行（status Edit→成對 git mv→僅具體路徑暫存）以 `skills/handoff/scripts/archive-handoff.sh` 腳本化——git 編排細節（pathspec rename 兩側、add 範圍）該被計算而非被記憶，手動拼裝曾以 `git add -A` 夾帶未讀回覆、靜默清除「未 commit 即未處理」訊號（2026-08-29）。todo 歸檔（done 一併收尾與 `/todo` 單獨收尾）同以 `skills/todo/scripts/archive-todo.sh` 腳本化——手動 todo 歸檔曾把 tracked rename 的 pathspec 拆半、來源刪除留在 index（2026-08-31）；done 步驟 3 來源 todo 查核由 `archive-handoff.sh --precheck` 印候選，todo 收尾／轉出由歸檔執行掃 index 三形（R／archive 下 A／頂層 A，含退化 rename 的 D 回配）聚合為單一 commit 宣告。
+發起方確認接手方回覆無誤後，將交接文件本體 `status` 標記為 `done` 並連同其回覆成對歸檔的具名收尾流程；是「本體內文不再編輯」原則例外邊界（frontmatter 生命週期 metadata，ADR 016）內的主要場景——發起方對自己文件的生命週期標記，屬授權歸檔、不改內文，單一作者原則不變。僅發起方可執行；接手方勿在回覆檔自標 `done`，自標會使交接從所有掃描面消失、本體卻未歸檔。收尾完成後 kunsu-inbox skill 與軍師沙盤不再掃描此交接，積壓歸零。收尾流程內建的歸檔前回頭查核（逐項驗收查核、沉澱訊號查核、反向路由查核、來源 todo 查核、todo 殘項清點與斷言自查）以 handoff SKILL.md done 段為準——無論經 handoff skill 的 done 子指令或手動執行等效步驟，查核不豁免，此處不重複其細節；各查核的引入脈絡見母體 CLAUDE.md 開發狀態。歸檔執行（status Edit→成對 git mv→僅具體路徑暫存）以 `skills/handoff/scripts/archive-handoff.sh` 腳本化——git 編排細節（pathspec rename 兩側、add 範圍）該被計算而非被記憶，手動拼裝曾以 `git add -A` 夾帶未讀回覆、靜默清除「未 commit 即未處理」訊號（2026-08-29）。todo 歸檔（done 一併收尾與 todo skill 單獨收尾）同以 `skills/todo/scripts/archive-todo.sh` 腳本化——手動 todo 歸檔曾把 tracked rename 的 pathspec 拆半、來源刪除留在 index（2026-08-31）；done 步驟 3 來源 todo 查核由 `archive-handoff.sh --precheck` 印候選，todo 收尾／轉出由歸檔執行掃 index 三形（R／archive 下 A／頂層 A，含退化 rename 的 D 回配）聚合為單一 commit 宣告。
 
 ### Tripwire
 彙整信箱內容前的授權範圍核對：確認外部寫入只落在例外授權信箱的允許範圍內，任何範圍外變更視為異常、停下回報而不採信。是授權邊界的執行機制，不是可選的審慎操作。
@@ -96,7 +96,7 @@
 信箱的狀態慣例：未 commit 的信箱檔案視為尚未處理的標記，處理（彙整回覆、審核申請、審閱上報）完成後才 commit；協議流程尾端以確認 commit 收斂此狀態。
 
 ### 確認 commit
-協議流程尾端經 AskUserQuestion 逐次確認後執行的收斂 commit（見 [ADR 009](docs/adr/2026-07-09-adr-candidate-009-protocol-commit-confirmation.md)）：逐次確認即構成「使用者明確要求」，與全域「不主動 commit」規範相容而非牴觸。僅涵蓋軍師側／發起側流程——範圍以各 SKILL 流程尾端明訂的「確認 commit（協議步驟）」為準，不在此重複窮舉；投遞端（`/kunsu-apply`、`/kunsu-report`、kunsu 語境 reply）維持不 commit——未 commit 即信箱新件訊號。內建防護：僅 add 本流程產出的具體路徑、commit 帶與 add 同一組 pathspec——收斂宣告範圍而非 index，前一流程的暫存殘留不被夾帶；pathspec 兩形（tracked rename 成對列來源與目的地、untracked 來源僅列目的地）以 handoff SKILL「確認 commit（協議步驟）」為準（ADR 018）——、固定 `docs:` 訊息格式、防空 commit、絕不 push。
+協議流程尾端經阻塞式確認逐次確認後執行的收斂 commit（見 [ADR 009](docs/adr/2026-07-09-adr-candidate-009-protocol-commit-confirmation.md)；Claude Code 為 AskUserQuestion 工具，Codex 為印出定型指令後結束回合、下一回合獲同意文字才執行，同意僅對緊接的下一回合有效，ADR 019）：逐次確認即構成「使用者明確要求」，與全域「不主動 commit」規範相容而非牴觸。僅涵蓋軍師側／發起側流程——範圍以各 SKILL 流程尾端明訂的「確認 commit（協議步驟）」為準，不在此重複窮舉；投遞端（kunsu-apply skill、kunsu-report skill、kunsu 語境 reply）維持不 commit——未 commit 即信箱新件訊號。內建防護：僅 add 本流程產出的具體路徑、commit 帶與 add 同一組 pathspec——收斂宣告範圍而非 index，前一流程的暫存殘留不被夾帶；pathspec 兩形（tracked rename 成對列來源與目的地、untracked 來源僅列目的地）以 handoff SKILL「確認 commit（協議步驟）」為準（ADR 018）——、固定 `docs:` 訊息格式、防空 commit、絕不 push。
 
 ## 申請生命週期
 

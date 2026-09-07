@@ -67,7 +67,7 @@ docs/handoffs/replies/    → 回覆信箱（append-only，接手方每次回覆
 
 5. **彙整前先跑 tripwire 檢查**：每次彙整外部回覆前，先執行 `git status`／`git diff`，核對這次外部寫入**只落在** `docs/handoffs/replies/` 底下的新檔案。若發現任何檔案在此範圍之外被新增、修改或刪除，視為異常，停下回報使用者，不自行採信或清理。信箱範圍是唯一的例外授權，不是全域寫入權。
 
-6. **交接文件必須附備援路徑**：每份交接文件的「回覆方式」段落除了教 `/handoff reply <slug>` 指令外，必須同時附上以絕對路徑手動建立回覆檔案的備援做法（見 Examples）。
+6. **交接文件必須附備援路徑**：每份交接文件的「回覆方式」段落除了教 handoff skill 的 reply 子指令（Claude Code `/handoff reply <slug>`；Codex `$handoff reply <slug>`）外，必須同時附上以絕對路徑手動建立回覆檔案的備援做法（見 Examples）。
 
 此模式已推廣進全域 `~/.claude/skills/handoff/SKILL.md`，成為所有專案 `/handoff` 指令的預設行為（新增 `/handoff reply` 子指令；`done` 步驟改為檢查信箱裡的回覆，而非同檔案回覆區）。
 
@@ -127,12 +127,12 @@ docs/handoffs/replies/    → 回覆信箱（append-only，接手方每次回覆
 
 **工作目錄陷阱（具體反例）**
 
-接手方 session 的預設工作目錄是自己的 repo（該 repo 也有自己的 `CLAUDE.md`）。若不先 `cd` 到軍師目錄就直接執行 `/handoff reply`，腳本會以「執行當下的工作目錄」往上找最近的 `CLAUDE.md` 定位「專案根」——找到的是接手方自己的 `CLAUDE.md`，信箱路徑因此被解析到接手方自己的 repo 下。**這不會報任何錯誤**，接手方看起來執行成功，但回覆根本到不了軍師的信箱。
+接手方 session 的預設工作目錄是自己的 repo（該 repo 也有自己的 `CLAUDE.md`）。若不先 `cd` 到軍師目錄就直接執行 handoff skill 的 reply 子指令，腳本會以「執行當下的工作目錄」往上找最近的 `CLAUDE.md` 定位「專案根」——找到的是接手方自己的 `CLAUDE.md`，信箱路徑因此被解析到接手方自己的 repo 下。**這不會報任何錯誤**，接手方看起來執行成功，但回覆根本到不了軍師的信箱。
 
 緩解：交接文件的「方法一」必須明確要求先 `cd`；若沙盒限制讓 `cd` 無法執行（工作目錄白名單限制），退而使用「方法二」——以完整絕對路徑建立回覆檔案，完全不依賴工作目錄推導。軍師彙整前的 tripwire（`git status`）也是一種偵測：若軍師什麼都沒收到，應主動詢問接手方是否遇到工作目錄問題，而不是默默等待。
 
 ## Related
 
 - 本模式落地依據：軍師 `CLAUDE.md`「回覆信箱協議（`docs/handoffs/replies/`）」章節
-- 全域 skill：`~/.claude/skills/handoff/SKILL.md`（v0.2.0+，`/handoff reply` 子指令）
+- 全域部署的 handoff skill 之 SKILL.md（v0.2.0+，reply 子指令；部署目錄依 agent 而異，見該 SKILL 首節「Agent 對應表」）
 - [`docs/solutions/architecture-patterns/cross-repo-coordination-planner-pattern.md`](../architecture-patterns/cross-repo-coordination-planner-pattern.md)：本機制所屬的更大架構模式（唯讀軍師角色），本文件是其中 handoff 回覆的細節規則
