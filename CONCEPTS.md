@@ -31,6 +31,13 @@
 讓 kunsu 在不同 AI coding agent（Claude Code、Codex）上可用的方式：一個部署目標（各 agent 的 skill 目錄——Claude Code `~/.claude/skills/`、Codex `~/.agents/skills/`——與 hook 設定檔）加一組字面對應（SKILL.md 內文只用能力名，各 SKILL 首節一張「Agent 對應表」列能力→各 agent 工具；七表由 consistency-check 比對逐字一致，新增 agent 只改表），不是程式層的 runtime interface。資料層與腳本層本就與 agent 無關，adapter 只存在於部署與指引兩層；Claude Code 是第一個 adapter，不是 kunsu 的內部假設（見 [ADR 019](docs/adr/2026-09-06-adr-candidate-019-agent-neutral-deployment.md)）。
 *Avoid:* Agent Runtime、orchestrator（原外部計畫用語，指常駐程式化方案，已否決）
 
+字面中性化的機械比對驗證的是舊字面是否已從內文清空（完整性），不驗證替換後的行文讀不讀得通（正確性）——兩者是不同的失效面，完整性全數通過不蘊含正確性，替換後的排版與語意仍需人眼或語言審查工具把關。
+
+### 遷移波次
+把母體對軍師範本所做的規範性改動，同步推到每個既有 live 軍師的一次批次操作；以序號命名並依序累積（第九波、第十波……）。範本只是新軍師的母本，既有軍師不會自動更新，因此範本每動到憲章層的字面，就得有對應的一波遷移把同一份字面推給所有 live 軍師，否則新舊軍師的憲章逐漸分歧。
+
+遷移前以舊句精確計數確認每處恰中一次才整句替換，遷移後反向核查——新句命中、舊句歸零、改動檔案僅限預期範圍——每個軍師各自一筆確認 commit。live 軍師的工作區常年帶著未 commit 的信箱訊息，因此遷移的暫存與提交都必須限定在具體檔案，否則會一併清除「未 commit 即未處理」的訊號。
+
 ## 信箱協作
 
 ### 例外授權信箱
