@@ -2,7 +2,7 @@
 # new-handoff.sh — 在當前專案的 docs/handoffs/ 建立一份跨 session／跨角色交接文件
 #
 # 用法：
-#   echo "<內文>" | new-handoff.sh "<標題>" [from] [to] [tag1,tag2,...] [查重關鍵詞(空白分隔)]
+#   echo "<內文>" | new-handoff.sh "<標題>" [from] [to] [tag1,tag2,...] [查重關鍵詞(空白分隔)] [depends_on(逗號分隔交接檔名)]
 #
 # 行為：
 #   1. 從當前目錄往上找最近的 CLAUDE.md/AGENTS.md 定位專案根（monorepo/submodule
@@ -20,6 +20,11 @@
 #      零命中顯式，不改產出檔、不改 exit code、stdout 維持單行路徑。有效性為
 #      條件式：時間窗外、索引盲區（未 commit、一小時內新 commit、未 discovery
 #      的 repo）攔不住——查重把候選推到決策時點眼前，不是防重複的保證
+#   7. 依賴宣告（第 6 參數，選填）：逗號分隔的被依賴交接檔名（不含路徑），寫入
+#      frontmatter `depends_on: [a.md, b.md]`（flow 形單行、置於 tags 之後——查重
+#      只讀 frontmatter 前 12 行，block 列表會把欄位擠出窗口）；缺省不產生此欄位。
+#      邊只由軍師派發時寫入、屬定案快照，事後改依賴走更正交接；推導規則見
+#      kunsu-dashboard app/handoff_graph.py 與 handoff SKILL add 段
 
 set -euo pipefail
 
@@ -28,6 +33,7 @@ FROM="${2:-app}"
 TO="${3:-backend}"
 TAGS_RAW="${4:-}"
 DEDUP_KEYWORDS="${5:-}"
+DEPENDS_ON_RAW="${6:-}"
 # to 是否為呼叫端顯式指定——缺省採預設值時查重清單不過濾角色：手動呼叫最易漏傳
 # to，此時以預設值過濾會漏列其他角色的重複交接、產出檔的 to: 本身也可能是錯的
 TO_GIVEN=0
@@ -35,7 +41,7 @@ if [[ $# -ge 3 && -n "${3:-}" ]]; then TO_GIVEN=1; fi
 
 if [[ -z "$TITLE" ]]; then
   echo "錯誤：缺少標題（第一個參數）" >&2
-  echo "用法：new-handoff.sh \"<標題>\" [from] [to] [tag1,tag2,...]" >&2
+  echo "用法：new-handoff.sh \"<標題>\" [from] [to] [tag1,tag2,...] [查重關鍵詞] [depends_on]" >&2
   exit 1
 fi
 
@@ -82,6 +88,26 @@ else
   tags_yaml="[handoff]"
 fi
 
+# depends_on：逗號分隔 → trim、去空、去重，組成 YAML flow 形；缺省留空（不產生欄位）
+depends_yaml=""
+depends_count=0
+if [[ -n "$DEPENDS_ON_RAW" ]]; then
+  deps_list=()
+  IFS=',' read -r -a _raw_deps <<< "$DEPENDS_ON_RAW"
+  for _d in "${_raw_deps[@]+"${_raw_deps[@]}"}"; do
+    _d="$(printf '%s' "$_d" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+    [[ -z "$_d" ]] && continue
+    _dup=0
+    for _e in "${deps_list[@]+"${deps_list[@]}"}"; do [[ "$_e" == "$_d" ]] && { _dup=1; break; }; done
+    [[ "$_dup" -eq 1 ]] && continue
+    deps_list+=("$_d")
+  done
+  depends_count=${#deps_list[@]}
+  if [[ "$depends_count" -gt 0 ]]; then
+    depends_yaml="[$(printf '%s, ' "${deps_list[@]}" | sed 's/, $//')]"
+  fi
+fi
+
 # 讀取 stdin 內文（可為空）
 BODY="$(cat || true)"
 
@@ -105,6 +131,9 @@ fi
   printf 'to: %s\n' "$TO"
   printf 'created: %s\n' "$DATE"
   printf 'tags: %s\n' "$tags_yaml"
+  if [[ -n "$depends_yaml" ]]; then
+    printf 'depends_on: %s\n' "$depends_yaml"
+  fi
   printf -- '---\n\n'
   printf '# %s\n\n' "$TITLE"
   if [[ -n "$BODY" ]]; then
@@ -152,6 +181,13 @@ fi
 } > "$file"
 
 echo "$file"
+
+# 依賴宣告提示（advisory，stderr）：手動路徑上腳本是唯一必經載體，缺省時提醒補宣告
+if [[ "$depends_count" -gt 0 ]]; then
+  echo "ℹ 依賴宣告：${depends_count} 筆（depends_on 已寫入 frontmatter；事後改依賴走更正交接，不編輯本檔）" >&2
+else
+  echo "ℹ 未宣告依賴；本交接若須等其他交接完成才能開工，請以第 6 參數（逗號分隔交接檔名）補宣告" >&2
+fi
 
 # ── 產檔查重（advisory，全走 stderr）────────────────────────────────
 # 三不變條件：不改產出檔內容、不改 exit code、stdout 維持單行路徑——

@@ -50,6 +50,13 @@ from app.todo_status import (
     TodoStatusResult,
     get_todo_status,
 )
+from app.handoff_graph import DERIVED_WAITING, HandoffGraphResult, get_handoff_graph
+from app.handoff_graph_html import (
+    CSS as _DEP_CSS,
+    anchor_id as _dep_anchor_id,
+    dependency_labels as _dep_labels,
+    html_dependency_section as _html_dependency_section,
+)
 
 # ── FastAPI app ───────────────────────────────────────────────────────────────
 # 禁用 OpenAPI、Docs、ReDoc 端點，確保 app 內無任何 JSON 端點存在
@@ -170,7 +177,7 @@ _CSS = (
     "details{margin:.3em 0}"
     "summary{cursor:pointer;color:#1565c0}"
     "summary:hover{text-decoration:underline}"
-)
+) + _DEP_CSS
 
 
 # ── HTML 渲染輔助 ─────────────────────────────────────────────────────────────
@@ -256,15 +263,20 @@ def _format_mtime(mtime: Optional[float]) -> str:
     return datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
 
 
-def _html_detail(summary_html: str, content: str) -> str:
+def _html_detail(summary_html: str, content: str, anchor_id: Optional[str] = None) -> str:
     """展開式預覽卡片（原生 <details>/<summary>，無需 JS）。
 
     summary_html 須為呼叫端已組好、必要字串已 escape() 的 HTML 片段；
     content 為原始檔案內容，本函式負責 escape() 後包入 <pre>。
+    anchor_id 給定時，id 掛在 <details> 隱藏內容區（<pre> 之前）的 <span>——
+    瀏覽器的 fragment navigation 只對「藏在 <details> 收合內容裡」的目標自動
+    展開祖先 <details>；目標若是 <details> 本身或 <summary> 內元素（本來就可見）
+    則不觸發展開。掛在隱藏區，依賴圖節點點過來才會自動展開（HeadlessChrome 145 實測）。
     """
+    anchor = f'<span id="{escape(anchor_id)}"></span>' if anchor_id else ""
     return (
         f'<details><summary>{summary_html}</summary>'
-        f'<pre>{escape(content)}</pre></details>'
+        f'{anchor}<pre>{escape(content)}</pre></details>'
     )
 
 
@@ -402,16 +414,26 @@ def _awaiting_sort_key(h: HandoffInfo) -> tuple:
     return (weight, label, h.latest_reply_date or "", h.mtime or 0.0)
 
 
-def _html_handoff_detail(h: HandoffInfo) -> str:
-    """單一交接文件的展開式預覽卡片，摘要列含標題、檔名、狀態標籤與最後修改時間。"""
+def _html_handoff_detail(
+    h: HandoffInfo,
+    graph: Optional[HandoffGraphResult] = None,
+    kunsu_path: str = "",
+) -> str:
+    """單一交接文件的展開式預覽卡片，摘要列含標題、檔名、狀態標籤與最後修改時間。
+
+    graph 給定時附交接依賴圖的推導態標籤（可開工／等依賴／已被更正／異常；
+    孤立節點不附）並掛錨點供 SVG 節點連結；與 ⛔ 卡關等既有 badge 並列不互抑。
+    """
     mtime_str = _format_mtime(h.mtime)
     name_html = (
         f'{escape(h.title)} '
         f'<span class="filename">({escape(h.filename)})</span>'
         f'{_html_status_badges(h)}'
+        f'{_dep_labels(graph, h.filename)}'
     )
     summary = _html_summary_line(mtime_str, name_html)
-    return _html_detail(summary, h.raw_content)
+    anchor = _dep_anchor_id(kunsu_path, h.filename) if graph is not None else None
+    return _html_detail(summary, h.raw_content, anchor)
 
 
 # ── 下一步提示對照（「已回覆待確認」分類專用）──────────────────────────────────
@@ -441,7 +463,11 @@ def _days_waiting_label(reply_date: Optional[str]) -> str:
     return "今天回覆" if days == 0 else f"已等 {days} 天"
 
 
-def _html_awaiting_confirm_item(h: HandoffInfo) -> str:
+def _html_awaiting_confirm_item(
+    h: HandoffInfo,
+    graph: Optional[HandoffGraphResult] = None,
+    kunsu_path: str = "",
+) -> str:
     """「已回覆待確認」專屬卡片：展開式預覽下方常態顯示下一步提示與停留天數。
 
     提示置於 <details> 之外，收合狀態下仍一眼可見；未接手／部分完成兩分類
@@ -452,7 +478,7 @@ def _html_awaiting_confirm_item(h: HandoffInfo) -> str:
     days = _days_waiting_label(h.latest_reply_date)
     days_html = f'<span class="days-waiting">（{escape(days)}）</span>' if days else ""
     return (
-        f"{_html_handoff_detail(h)}"
+        f"{_html_handoff_detail(h, graph, kunsu_path)}"
         f'<div class="hint-next-step">→ {escape(hint)}{days_html}</div>'
     )
 
@@ -562,6 +588,8 @@ def _html_overview(
     new_messages: int,
     tripwire_kunsus: int,
     script_error_kunsus: int,
+    dep_waiting: int = 0,
+    dep_issues: int = 0,
 ) -> str:
     """頁首全域總覽列；全部計數為零時回傳空字串（不渲染）。
 
@@ -599,6 +627,12 @@ def _html_overview(
     if pending.todo_pending:
         chips.append(
             f'<span class="chip chip-other">待辦 {pending.todo_pending}</span>'
+        )
+    if dep_waiting:
+        chips.append(f'<span class="chip chip-dep-wait">⏳ 等依賴 {dep_waiting}</span>')
+    if dep_issues:
+        chips.append(
+            f'<span class="chip chip-dep-issue">⟳ 依賴圖異常 {dep_issues}</span>'
         )
     if new_messages:
         chips.append(f'<span class="chip chip-msg">📨 新訊息 {new_messages}</span>')
@@ -784,10 +818,16 @@ def _html_todo_section(result: TodoStatusResult) -> str:
     return f'<div class="card card-normal">{"".join(parts)}</div>'
 
 
-def _html_subrepo(path: str, kunsu_path: str, result: SubrepoStatusResult) -> str:
+def _html_subrepo(
+    path: str,
+    kunsu_path: str,
+    result: SubrepoStatusResult,
+    graph: Optional[HandoffGraphResult] = None,
+) -> str:
     """子專案卡片：未接手／部分完成／已回覆待確認／to 不符清單／異常五類。
 
     所有 frontmatter 字串（title、filename 等）一律 escape() 後再拼接。
+    graph 為所屬軍師的交接依賴圖結果（None 時不附推導態標籤與錨點）。
     """
     esc_path = escape(path)
     esc_kunsu = escape(kunsu_path)
@@ -799,7 +839,7 @@ def _html_subrepo(path: str, kunsu_path: str, result: SubrepoStatusResult) -> st
 
     if result.not_picked_up:
         items = "".join(
-            _html_handoff_detail(h)
+            _html_handoff_detail(h, graph, kunsu_path)
             for h in sorted(result.not_picked_up, key=_verify_sort_key)
         )
         parts.append(
@@ -808,7 +848,7 @@ def _html_subrepo(path: str, kunsu_path: str, result: SubrepoStatusResult) -> st
 
     if result.partial_done:
         items = "".join(
-            _html_handoff_detail(h)
+            _html_handoff_detail(h, graph, kunsu_path)
             for h in sorted(result.partial_done, key=_verify_sort_key)
         )
         parts.append(f'<h4>部分完成（{len(result.partial_done)}）</h4>{items}')
@@ -823,7 +863,7 @@ def _html_subrepo(path: str, kunsu_path: str, result: SubrepoStatusResult) -> st
         ):
             group_items = list(grouped)
             items = "".join(
-                _html_awaiting_confirm_item(h) for h in group_items
+                _html_awaiting_confirm_item(h, graph, kunsu_path) for h in group_items
             )
             sub_parts.append(
                 f'<h5>{escape(label)}（{len(group_items)}）</h5>{items}'
@@ -921,6 +961,8 @@ def index() -> HTMLResponse:
     tripwire_kunsus = 0
     script_error_kunsus = 0
     total_todo_pending = 0
+    total_dep_waiting = 0
+    total_dep_issues = 0
 
     for kunsu_path in sorted(kunsu_paths):
         if kunsu_path not in healthy_set and kunsu_path not in stale_set:
@@ -944,7 +986,18 @@ def index() -> HTMLResponse:
         else:
             scan = scan_kunsu(kunsu_path)
             todo_result = get_todo_status(kunsu_path)
-            kunsu_card = _html_kunsu(kunsu_path, scan) + _html_todo_section(todo_result)
+            graph = get_handoff_graph(kunsu_path)
+            kunsu_card = (
+                _html_kunsu(kunsu_path, scan)
+                + _html_dependency_section(kunsu_path, graph)
+                + _html_todo_section(todo_result)
+            )
+            total_dep_waiting += sum(
+                1 for v in graph.derived.values() if v == DERIVED_WAITING
+            )
+            total_dep_issues += (
+                len(graph.cycles) + len(graph.unresolved) + len(graph.anomalies)
+            )
             if scan.tripwire_lines:
                 tripwire_kunsus += 1
             if scan.script_error:
@@ -964,7 +1017,7 @@ def index() -> HTMLResponse:
                 all_known = _get_all_known_roles(data, kunsu_path)
                 status = get_subrepo_status(sp, our_roles, all_known, kunsu_path)
                 sub_results.append(status)
-                nested_parts.append(_html_subrepo(sp, kunsu_path, status))
+                nested_parts.append(_html_subrepo(sp, kunsu_path, status, graph))
             n_todo_pending = len(todo_result.pending)
             pending = _aggregate_pending(sub_results, todo_pending=n_todo_pending)
             all_sub_results.extend(sub_results)
@@ -998,6 +1051,8 @@ def index() -> HTMLResponse:
         total_new_messages,
         tripwire_kunsus,
         script_error_kunsus,
+        dep_waiting=total_dep_waiting,
+        dep_issues=total_dep_issues,
     )
     if overview:
         body_sections.append(overview)

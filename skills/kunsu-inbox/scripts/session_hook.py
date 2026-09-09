@@ -130,12 +130,55 @@ def _capped(items: list[str], indent: str = "  ") -> list[str]:
     return lines
 
 
-def _reply_annotated(info) -> str:
+def _reply_annotated(info, dep_suffix: str = "") -> str:
     """帶最新回覆狀態的交接摘要行（部分完成／已回覆待確認共用）。"""
     status = info.latest_reply_status or ""
     label = f"⛔ {status}" if status == "blocked" else status
     verify = f"，verify: {info.latest_reply_verify}" if info.latest_reply_verify else ""
-    return f"{info.filename}（{label} {info.latest_reply_date}{verify}）"
+    return f"{info.filename}（{label} {info.latest_reply_date}{verify}）{dep_suffix}"
+
+
+def _load_graph(kunsu: str) -> tuple[object | None, str | None]:
+    """讀交接依賴圖（沙盤 app/handoff_graph.py 單一推導來源）。
+
+    自帶 try/except：建圖失敗只回傳錯誤字串供該軍師段補一行提示，不交給
+    main() 外層 fail-open——否則 advisory 的依賴圖會吞掉整份信箱摘要。
+    """
+    try:
+        from app.handoff_graph import get_handoff_graph
+
+        return get_handoff_graph(kunsu), None
+    except Exception as e:  # noqa: BLE001 — advisory，任何失敗都只降級此段
+        return None, f"{type(e).__name__}"
+
+
+def _dep_suffix(graph, filename: str) -> str:
+    """交接摘要行尾的推導態後綴：可開工／等依賴（附在等哪些）；孤立節點空字串。"""
+    if graph is None:
+        return ""
+    from app.handoff_graph import DERIVED_READY, DERIVED_WAITING
+
+    derived = graph.derived.get(filename)
+    if derived == DERIVED_READY:
+        return " 可開工"
+    if derived == DERIVED_WAITING:
+        waiting = "、".join(graph.waiting_on.get(filename, []))
+        return f" 等依賴：{waiting}"
+    return ""
+
+
+def _dep_issue_line(graph) -> str | None:
+    """循環／無法解析／已歸檔未標 done 任一非空時回傳一行摘要，否則 None。"""
+    if graph is None or not graph.has_issues:
+        return None
+    parts = []
+    if graph.cycles:
+        parts.append(f"循環 {len(graph.cycles)}")
+    if graph.unresolved:
+        parts.append(f"無法解析 {len(graph.unresolved)}")
+    if graph.anomalies:
+        parts.append(f"異常 {len(graph.anomalies)}")
+    return "⚠ 依賴圖異常：" + "／".join(parts) + "（詳軍師沙盤或 handoff-graph.py）"
 
 
 def _sub_mode_lines(root: str, raw: dict) -> list[str]:
@@ -158,20 +201,26 @@ def _sub_mode_lines(root: str, raw: dict) -> list[str]:
             continue
 
         result = get_subrepo_status(root, roles, _all_known_roles(raw, kunsu), kunsu)
+        graph, graph_err = _load_graph(kunsu)
 
         section: list[str] = []
         if result.not_picked_up:
             items = sorted(result.not_picked_up, key=lambda h: h.created)
             section.append(f"⚠ 未接手 {len(items)}：")
-            section += _capped([f"{h.filename}（created {h.created}）" for h in items])
+            section += _capped([
+                f"{h.filename}（created {h.created}）{_dep_suffix(graph, h.filename)}"
+                for h in items
+            ])
         if result.partial_done:
             items = sorted(result.partial_done, key=lambda h: h.latest_reply_date or "")
             section.append(f"部分完成 {len(items)}：")
-            section += _capped([_reply_annotated(h) for h in items])
+            section += _capped([_reply_annotated(h, _dep_suffix(graph, h.filename)) for h in items])
         if result.awaiting_confirm:
             items = sorted(result.awaiting_confirm, key=lambda h: h.latest_reply_date or "")
             section.append(f"已回覆待確認 {len(items)}：")
-            section += _capped([_reply_annotated(h) for h in items])
+            section += _capped([_reply_annotated(h, _dep_suffix(graph, h.filename)) for h in items])
+        if graph_err:
+            section.append(f"⚠ 依賴圖不可用（{graph_err}）")
         if result.unknown_to:
             section.append(f"⚠ to: 不符清單 {len(result.unknown_to)} 筆（詳 kunsu-inbox skill）")
         if result.errors:
@@ -194,6 +243,12 @@ def _kunsu_mode_lines(root: str) -> list[str]:
         body += _capped(result.tripwire_lines)
     if result.script_error:
         body.append(f"⚠ 掃描腳本異常：{result.script_error}")
+    graph, graph_err = _load_graph(root)
+    issue = _dep_issue_line(graph)
+    if issue:
+        body.append(issue)
+    elif graph_err:
+        body.append(f"⚠ 依賴圖不可用（{graph_err}）")
     for label, items in (
         ("新回覆", result.new_replies),
         ("新申請", result.new_applications),

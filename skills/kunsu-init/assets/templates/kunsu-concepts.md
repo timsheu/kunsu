@@ -19,6 +19,9 @@
 ### done 收尾
 發起方確認接手方回覆無誤後，將交接文件本體 status 標記為 done 並連同其回覆成對歸檔的具名收尾流程。歸檔前查核清單——逐項驗收查核、沉澱訊號查核、反向路由查核、來源 todo 查核、todo 殘項清點、斷言自查——細節一律以 handoff SKILL.md done 段為準；**無論經 handoff skill 的 done 子指令或手動執行等效步驟，查核不豁免**。歸檔執行（status Edit→本體與回覆成對 git mv→僅具體路徑暫存）以 `bash <部署目錄>/handoff/scripts/archive-handoff.sh "<檔名>"` 腳本完成（多份可並列傳入，不自動 commit）——git 編排細節該被計算而非被記憶：手動拼裝曾以 `git add -A` 夾帶 16 份未讀回覆、靜默清除「未 commit 即未處理」訊號（2026-08-29），軍師 repo 內寬範圍 git add 現由 PreToolUse 守門當場攔截。todo 一併收尾的歸檔執行同樣腳本化——`bash <部署目錄>/todo/scripts/archive-todo.sh --done --from-handoff --basis "<依據>" "<todo-slug>"`（todo skill 單獨收尾用不帶 `--from-handoff` 的同腳本），todo 收尾的 git 編排同屬計算而非記憶：手動 todo 歸檔曾把 tracked rename 的 pathspec 拆半、來源刪除留在 index（2026-08-31）。收尾完成後 kunsu-inbox skill 與軍師沙盤不再掃描此交接。
 
+### 交接依賴圖（depends_on）
+交接之間的有向圖：節點＝交接本體、邊＝派發時寫入本體 frontmatter 的 `depends_on`（被依賴交接的完整檔名列表，不含路徑，歸檔後仍可解析），只由軍師寫入、屬定案快照；依賴變更走更正交接（自帶完整新依賴），不事後編輯此欄位。拓撲純推導、不落地第二份真相：依賴滿足以被依賴本體 `status: done` 為準，只看直接邊——全部滿足→**可開工**、任一未滿足或無法解析→**等依賴**，孤立節點（無任何邊）不標推導態；推導態與接手方自報的回覆 `blocked`（卡關）分開標示、並列不互抑。循環為 advisory 標記不另立狀態。營端零改動；軍師沙盤畫圖、kunsu-inbox skill 與 SessionStart hook 共用同一推導模組（沙盤 `app/handoff_graph.py`）。
+
 ### 副官（Adjutant）
 軍師 session 以 subagent 派出的新鮮 context 跑腿手：查證副官落原始碼查證據以實作級斷言、提取副官逐份回覆挑原文摘錄輔助彙整。僅有的兩條硬規則——原文回傳（證據原文＋檔案:行號，禁轉述結論）與完備性（掃描範圍＋逐份清單，零命中明列）；判斷不外包，裁決與彙整結論留在主 context。為能力提示非義務，觸發判準按用途與負載、不按規模。
 

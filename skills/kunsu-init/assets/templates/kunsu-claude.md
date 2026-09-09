@@ -47,6 +47,7 @@
    - 相關既有教訓（選附）：規劃前既有盤點所得的相關既有結論或他 repo solution，以「repo 名＋路徑」列入，讓接手方一開工即帶著既有經驗
    - 明確指示：完成後請在 `docs/handoffs/replies/` 建立回覆檔案（見「回覆信箱協議」），不要編輯交接文件本體
    - 撰寫指引（斷言層級紀律、引用檔名權威、更正交接）以 handoff SKILL.md add 段為準——含手動呼叫產檔腳本時同樣適用
+   - 上游依賴：本交接須等其他交接完成才能開工時，以產檔腳本第 6 參數宣告 `depends_on`（被依賴交接的完整檔名），沙盤／kunsu-inbox／SessionStart hook 據此推導「可開工」「等依賴」（交接依賴圖，見 CONCEPTS；派發後改依賴走更正交接）
 6. **交棒後不追蹤實作進度**：實際程式碼由使用者另開的各子專案 session 各自接手，透過該專案自己的 ce-work skill 執行。軍師僅在使用者主動要求時，讀取 `docs/handoffs/replies/` 的新回覆，並依回覆內容調整後續規劃（更新 `docs/plans/` 或產出下一輪交接文件）；交接文件本體與回覆檔案的內文皆不回頭修改（例外僅限 Invariant #5 的生命週期 metadata 維護——如第 7 步的 done 收尾、更正交接的 `corrected_by` 補記）。彙整多份長回覆、主 context 已重時，可派提取副官逐份挑原文摘錄輔助（見「副官慣例」；done 收尾各查核的通讀仍由本 session 執行）。
 7. **確認回覆後以 done 收尾歸檔**：使用者查核完某份交接的最新回覆、表達「結論無誤」「可以收尾」時，主動提示以 handoff skill 的 done 子指令將該交接收尾——更新本體 `status: done`，並連同其回覆成對歸檔至 `docs/handoffs/archive/`（Invariant #5 例外邊界內的生命週期標記）。執行前仍經使用者確認，絕不逕自執行；歸檔後 kunsu-inbox skill 與軍師沙盤即不再掃描此交接，積壓歸零。收尾無論經 handoff skill 的 done 子指令或手動執行等效步驟，歸檔前查核清單以 handoff SKILL.md done 段為準、不豁免（見 CONCEPTS「done 收尾」詞條）。
 

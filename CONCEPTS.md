@@ -53,6 +53,10 @@
 子專案視角對軍師交接文件的分類，判準是「有無回覆」＋最新回覆 `status`：無回覆→**未接手**；最新回覆 `partial`／`blocked`／未知值→**部分完成**（blocked 另標卡關）；`submitted`→**已回覆待確認**；`done`→不列出（回覆檔的 `done` 由發起方經 done 收尾設定於本體，接手方勿自標——自標會使交接自掃描面消失而未歸檔）。
 *Avoid:* 待接手（舊分類名，拆分前把「已有人回報過進度」與「完全無回覆」混為一談，見 ADR 011）
 
+### 交接依賴圖（depends_on）
+軍師交接之間的有向無環圖：節點＝交接本體、邊＝派發時寫入本體 frontmatter 的 `depends_on`（被依賴交接的完整檔名列表，不含路徑，歸檔後仍可解析），寫入方只有軍師、屬定案快照的一部分；依賴變更走更正交接，不事後編輯此欄位。拓撲純推導、不落地第二份真相：依賴滿足以被依賴本體 `status: done` 為準，推導只看直接邊：全部滿足→**可開工**、任一未滿足或無法解析→**等依賴**，孤立節點（無任何邊）不標推導態；兩者與營自報的回覆 `blocked`（卡關）分開標示、並列不互抑。循環為 advisory 標記不另立狀態；更正交接為普通節點自帶完整新依賴、原本體的邊不變（`corrected_by` 僅 display）。營端零改動；軍師沙盤以伺服器端 inline SVG 呈現（見 [需求文件](docs/brainstorms/2026-09-08-handoff-dependency-dag-requirements.md)）。
+*Avoid:* 狀態檔／state.json（由多個營 session 更新的共享狀態檔會重演回覆信箱當初解決的雙寫入方版本漂移）
+
 ### 暫離回報
 接手方暫停交接工作、切換至其他任務前投遞的最小回覆:固定 `status: partial`,內文至少含三要素——branch 名、一句現況、之後回來繼續的意向,使軍師端把該交接自「未接手」看成「部分完成」,補上「工作已在 branch 實現但尚未收尾」的狀態訊號。回來完成整合後照常投遞完成回覆(`status: submitted`)並顯式複寫 verify。不新增任何 status／verify 值域,branch 資訊寫於內文而非欄位(見 [需求文件](docs/brainstorms/2026-07-25-handoff-pause-report-requirements.md))。
 

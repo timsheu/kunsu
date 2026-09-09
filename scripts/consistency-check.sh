@@ -89,6 +89,19 @@ if (cd "${tmp}" && git init -q . \
       ng "C  定型文字兩副本不一致或缺失：「${sentence}…」（產生器與 SKILL.md 範例段須連動修改）"
     fi
   done
+  # --- C2. depends_on 第 6 參數實跑（2026-09-08）：欄位存在且位於 tags: 之後、flow 形 ---
+  if (cd "${tmp}" && echo "x" | KUNSU_ZOEKT_URL="http://127.0.0.1:1" bash "${OLDPWD}/skills/handoff/scripts/new-handoff.sh" "依賴檢查" "" "" "" "" "a.md, b.md,a.md" >/dev/null 2>&1); then
+    gen2="$(ls "${tmp}"/docs/handoffs/*依賴檢查*.md 2>/dev/null | head -1)"
+    tl="$(grep -n '^tags:' "${gen2}" | cut -d: -f1)"
+    dl="$(grep -n '^depends_on: \[a.md, b.md\]$' "${gen2}" | cut -d: -f1)"
+    if [[ -n "${tl}" && -n "${dl}" && "${dl}" -eq $((tl + 1)) ]]; then
+      ok "C2 depends_on 第 6 參數寫入 flow 形、去重、緊接 tags: 之後"
+    else
+      ng "C2 depends_on 欄位缺失、未去重或位置不在 tags: 之後（查重 12 行窗口會漏檔）"
+    fi
+  else
+    ng "C2 new-handoff.sh 帶第 6 參數實跑失敗"
+  fi
   # --- K. reply 腳本 stderr 條款行實跑比對（2026-09-01）---
   a="$(grep -F '投遞前有程式碼改動時，回覆請附' "${gen}" | head -1 | sed 's/^[[:space:]]*//')"
   if [[ -n "${a}" ]] \
@@ -296,10 +309,10 @@ if [[ -f "${REG}" ]] && command -v python3 >/dev/null; then
     if [[ "${csz}" -ge 52428 ]]; then
       wn "H  live 軍師 CLAUDE.md 達 ${csz} bytes（project_doc_max_bytes 65536 的 80% 以上，Codex 超限靜默截尾）：${kroot}"
     fi
-    if grep -q '規劃前既有盤點' "${kroot}/CLAUDE.md" && grep -q '勿自標' "${kroot}/CLAUDE.md" && grep -q 'corrected_by' "${kroot}/CLAUDE.md" && grep -q '副官' "${kroot}/CLAUDE.md" && grep -q '不豁免' "${kroot}/CLAUDE.md" && grep -q '宣告範圍' "${kroot}/CLAUDE.md" && grep -q '以原始碼為準' "${kroot}/CLAUDE.md" && grep -q 'Agent 對應表' "${kroot}/CLAUDE.md" && [[ -L "${kroot}/AGENTS.md" ]] && grep -q '不豁免' "${kroot}/CONCEPTS.md" 2>/dev/null && grep -q 'archive-handoff' "${kroot}/CONCEPTS.md" 2>/dev/null && grep -q 'archive-todo' "${kroot}/CONCEPTS.md" 2>/dev/null; then
+    if grep -q '規劃前既有盤點' "${kroot}/CLAUDE.md" && grep -q '勿自標' "${kroot}/CLAUDE.md" && grep -q 'corrected_by' "${kroot}/CLAUDE.md" && grep -q '副官' "${kroot}/CLAUDE.md" && grep -q '不豁免' "${kroot}/CLAUDE.md" && grep -q '宣告範圍' "${kroot}/CLAUDE.md" && grep -q '以原始碼為準' "${kroot}/CLAUDE.md" && grep -q 'Agent 對應表' "${kroot}/CLAUDE.md" && [[ -L "${kroot}/AGENTS.md" ]] && grep -q '不豁免' "${kroot}/CONCEPTS.md" 2>/dev/null && grep -q 'archive-handoff' "${kroot}/CONCEPTS.md" 2>/dev/null && grep -q 'archive-todo' "${kroot}/CONCEPTS.md" 2>/dev/null && grep -q 'depends_on' "${kroot}/CLAUDE.md" && grep -q 'depends_on' "${kroot}/CONCEPTS.md" 2>/dev/null; then
       ok "H  live 軍師遷移標記齊全：${kroot}"
     else
-      wn "H  live 軍師疑似漏遷移（缺 規劃前既有盤點／勿自標／corrected_by／副官／不豁免（CLAUDE 與 CONCEPTS 各自）／宣告範圍／以原始碼為準／Agent 對應表（CLAUDE）／AGENTS.md symlink／archive-handoff／archive-todo（CONCEPTS） 之一）：${kroot}"
+      wn "H  live 軍師疑似漏遷移（缺 規劃前既有盤點／勿自標／corrected_by／副官／不豁免（CLAUDE 與 CONCEPTS 各自）／宣告範圍／以原始碼為準／Agent 對應表（CLAUDE）／AGENTS.md symlink／archive-handoff／archive-todo（CONCEPTS）／depends_on（CLAUDE 與 CONCEPTS 各自） 之一）：${kroot}"
     fi
   done < <(python3 -c "
 import json

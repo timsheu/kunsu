@@ -37,12 +37,18 @@ def _write_handoff(
     filename: str,
     to_role: str,
     created: str = "2026-08-01",
+    depends_on: str | None = None,
+    status: str = "open",
+    archived: bool = False,
 ) -> None:
     handoffs = kunsu_dir / "docs" / "handoffs"
+    if archived:
+        handoffs = handoffs / "archive"
     handoffs.mkdir(parents=True, exist_ok=True)
+    dep_line = f"depends_on: {depends_on}\n" if depends_on else ""
     (handoffs / filename).write_text(
-        f"---\ntitle: {filename}\ntype: handoff\nstatus: open\n"
-        f"from: planner\nto: {to_role}\ncreated: {created}\n---\n\n# 本文\n",
+        f"---\ntitle: {filename}\ntype: handoff\nstatus: {status}\n"
+        f"from: planner\nto: {to_role}\ncreated: {created}\n{dep_line}---\n\n# 本文\n",
         encoding="utf-8",
     )
 
@@ -359,3 +365,85 @@ def test_fail_open_before_identity_is_silent(tmp_path, registry_path, monkeypatc
     monkeypatch.setattr(session_hook, "_git_root", _boom)
     assert _run_main(monkeypatch, repo) == 0
     assert capsys.readouterr().out == ""
+
+
+# ── 交接依賴圖（handoff v0.23.0）：子專案行尾後綴與軍師模式異常行 ─────────────
+
+def test_dep_waiting_suffix_on_subrepo_line(sub_topology, monkeypatch, capsys):
+    """Covers AE2. B 依賴頂層 open 的 A → B 行尾附「等依賴：A」；A 有入邊 → 可開工。"""
+    kunsu_dir, sub_root = sub_topology
+    _write_handoff(kunsu_dir, "2026-08-01-a.md", "ios-app")
+    _write_handoff(kunsu_dir, "2026-08-02-b.md", "backend", created="2026-08-02",
+                   depends_on="[2026-08-01-a.md]")
+    assert _run_main(monkeypatch, sub_root) == 0
+    out = capsys.readouterr().out
+    assert "2026-08-02-b.md（created 2026-08-02） 等依賴：2026-08-01-a.md" in out
+    assert "依賴圖不可用" not in out
+
+
+def test_dep_ready_suffix_when_upstream_done(sub_topology, monkeypatch, capsys):
+    kunsu_dir, sub_root = sub_topology
+    _write_handoff(kunsu_dir, "2026-08-01-a.md", "ios-app", status="done", archived=True)
+    _write_handoff(kunsu_dir, "2026-08-02-b.md", "backend", created="2026-08-02",
+                   depends_on="[2026-08-01-a.md]")
+    _write_reply(kunsu_dir, "2026-08-02-b.md", "2026-08-03", "partial")
+    assert _run_main(monkeypatch, sub_root) == 0
+    out = capsys.readouterr().out
+    assert "2026-08-02-b.md（partial 2026-08-03） 可開工" in out
+
+
+def test_no_depends_on_output_unchanged(sub_topology, monkeypatch, capsys):
+    """Covers AE6. 無 depends_on → 與既有行格式逐字一致，無任何後綴。"""
+    kunsu_dir, sub_root = sub_topology
+    _write_handoff(kunsu_dir, "2026-08-01-a.md", "backend", created="2026-08-01")
+    _write_handoff(kunsu_dir, "2026-08-02-b.md", "backend", created="2026-08-02")
+    _write_reply(kunsu_dir, "2026-08-02-b.md", "2026-08-03", "partial", verify="needs-deploy")
+    assert _run_main(monkeypatch, sub_root) == 0
+    out = capsys.readouterr().out
+    assert "  • 2026-08-01-a.md（created 2026-08-01）\n" in out
+    assert "  • 2026-08-02-b.md（partial 2026-08-03，verify: needs-deploy）\n" in out
+    assert "可開工" not in out and "等依賴" not in out and "依賴圖" not in out
+
+
+def test_kunsu_mode_dep_issue_line(tmp_path, registry_path, monkeypatch, capsys):
+    kunsu_root = _make_git_repo(tmp_path / "kunsu-cyc")
+    sub_root = _make_git_repo(tmp_path / "sub-cyc")
+    registry_path.write_text(
+        json.dumps({sub_root: [{"kunsu": kunsu_root, "roles": ["backend"]}]}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("app.kunsu_scan.scan_kunsu", _fake_scan_result)
+    _write_handoff(Path(kunsu_root), "2026-08-01-a.md", "backend", depends_on="[2026-08-02-b.md]")
+    _write_handoff(Path(kunsu_root), "2026-08-02-b.md", "backend", depends_on="[2026-08-01-a.md, nope.md]")
+    assert _run_main(monkeypatch, kunsu_root) == 0
+    out = capsys.readouterr().out
+    assert "⚠ 依賴圖異常：循環 1／無法解析 1（詳軍師沙盤或 handoff-graph.py）" in out
+
+
+def test_kunsu_mode_no_issue_no_line(tmp_path, registry_path, monkeypatch, capsys):
+    kunsu_root = _make_git_repo(tmp_path / "kunsu-ok")
+    sub_root = _make_git_repo(tmp_path / "sub-ok")
+    registry_path.write_text(
+        json.dumps({sub_root: [{"kunsu": kunsu_root, "roles": ["backend"]}]}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("app.kunsu_scan.scan_kunsu", _fake_scan_result)
+    _write_handoff(Path(kunsu_root), "2026-08-01-a.md", "backend")
+    assert _run_main(monkeypatch, kunsu_root) == 0
+    assert "依賴圖" not in capsys.readouterr().out
+
+
+def test_graph_failure_degrades_only_dep_line(sub_topology, monkeypatch, capsys):
+    """建圖拋例外 → 仍含「未接手」等既有行，另含「依賴圖不可用」提示行，exit 0。"""
+    kunsu_dir, sub_root = sub_topology
+    _write_handoff(kunsu_dir, "2026-08-01-a.md", "backend")
+
+    def _boom(*a, **k):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr("app.handoff_graph.get_handoff_graph", _boom)
+    assert _run_main(monkeypatch, sub_root) == 0
+    out = capsys.readouterr().out
+    assert "⚠ 未接手 1：" in out
+    assert "⚠ 依賴圖不可用（RuntimeError）" in out
+    assert "降級" not in out

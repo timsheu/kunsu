@@ -1,6 +1,6 @@
 ---
 name: kunsu-inbox
-version: 0.12.0
+version: 0.13.0
 description: |
   查詢跨 repo 協作信箱：列出軍師（規劃協調中心）中待接手的交接文件，或回報新抵達的回覆。
   觸發語：/kunsu-inbox、檢查信箱、有沒有待接手的交接、有沒有新的 handoff、
@@ -185,6 +185,20 @@ Glob("{kunsu_path}/docs/handoffs/replies/*.md")
    verify **只讀最新回覆、不跨回覆繼承**：最新回覆未填即顯示 `—`，不沿用
    前輪值（ADR 011）。
 
+**4a-3b. 交接依賴圖推導態（handoff v0.23.0 起，advisory）：**
+
+不手算依賴——執行同 toolkit 的 CLI 取推導態（單一推導來源為沙盤 `app/handoff_graph.py`，兩 agent 呼叫形相同）：
+
+```bash
+python3 "<skill 目錄>/scripts/handoff-graph.py" "{kunsu_abs_path}" --role "{我的角色代碼}"
+```
+
+- 每行 `DEP:<檔名>\t<ready|waiting>\t<在等的檔名逗號分隔>` → 該交接的推導態：`ready`＝**可開工**（全部直接依賴的本體 `status: done`）、`waiting`＝**等依賴**（附在等哪些）；未列出的交接為孤立節點（無依賴宣告亦無人依賴），不標推導態
+- `DEP_CYCLE:`／`DEP_UNRESOLVED:`／`DEP_ANOMALY:`／`DEP_ERROR:` → 顯式列於輸出尾端「依賴圖異常」段（不靜默略過；`DEP_ERROR` 表示建圖失敗，只降級此段）
+- `DEP_NONE` → 無任何依賴宣告，輸出不加「依賴」欄
+
+推導態與回覆分類正交：「未接手＋可開工」＝營該動了、「未接手＋等依賴」＝正當空等；「部分完成」或「已回覆待確認」仍可能等依賴（並列顯示，不互抑）。
+
 **4a-4. 「to: 不符清單」核對：**
 
 若有任何 handoff 的 `to:` 值不在 `ALL_KNOWN_ROLES` 中，收集這些項目。
@@ -196,22 +210,31 @@ Glob("{kunsu_path}/docs/handoffs/replies/*.md")
 
 ### ☐ 未接手（{N} 份）
 
-| 交接文件 | 建立日期 | 方向 |
-|---|---|---|
-| {title} ({HANDOFF_FILENAME}) | {created} | {from} → {to} |
+| 交接文件 | 建立日期 | 方向 | 依賴 |
+|---|---|---|---|
+| {title} ({HANDOFF_FILENAME}) | {created} | {from} → {to} | 可開工 |
+| {title} ({HANDOFF_FILENAME}) | {created} | {from} → {to} | 等依賴：{上游檔名} |
 
 ### ◐ 部分完成（{N} 份）
 
-| 交接文件 | 建立日期 | 方向 | 回覆狀態 | 驗收 |
-|---|---|---|---|---|
-| {title} ({HANDOFF_FILENAME}) | {created} | {from} → {to} | partial（{reply_date}）| 需上線測試 |
-| {title} ({HANDOFF_FILENAME}) | {created} | {from} → {to} | ⛔ blocked（{reply_date}）| — |
+| 交接文件 | 建立日期 | 方向 | 回覆狀態 | 驗收 | 依賴 |
+|---|---|---|---|---|---|
+| {title} ({HANDOFF_FILENAME}) | {created} | {from} → {to} | partial（{reply_date}）| 需上線測試 | — |
+| {title} ({HANDOFF_FILENAME}) | {created} | {from} → {to} | ⛔ blocked（{reply_date}）| — | 等依賴：{上游檔名} |
 
 ### ✓ 已回覆待確認（{N} 份）
 
-| 交接文件 | 建立日期 | 方向 | 最新回覆日期 | 驗收 |
-|---|---|---|---|---|
-| {title} ({HANDOFF_FILENAME}) | {created} | {from} → {to} | {reply_date} | 馬上可測 |
+| 交接文件 | 建立日期 | 方向 | 最新回覆日期 | 驗收 | 依賴 |
+|---|---|---|---|---|---|
+| {title} ({HANDOFF_FILENAME}) | {created} | {from} → {to} | {reply_date} | 馬上可測 | — |
+
+（「依賴」欄：4a-3b 的推導態；孤立節點顯示 `—`；`DEP_NONE` 時整欄省略。）
+
+### ⟳ 依賴圖異常（{N} 筆）——僅 4a-3b 有 DEP_CYCLE／DEP_UNRESOLVED／DEP_ANOMALY／DEP_ERROR 時附加
+
+- 循環：{檔名,檔名}
+- 無法解析：{檔名} → {目標}（{原因：not_found／reply_file／bad_type}）
+- 異常：{檔名}（{archived_not_done／duplicate}）
 
 ---
 ### 回覆方式（Method 2 — 無需切換工作目錄）
@@ -266,6 +289,14 @@ bash "<skill 目錄>/scripts/scan-reports.sh" "{CURRENT_ROOT}"
 
 `<skill 目錄>` 為本 skill 部署後所在目錄（定位見 Agent 對應表：以本 SKILL.md 所在目錄推算）。依序執行，各自記錄 stdout 輸出與 exit code。`scan-applications.sh` 對無 `docs/applications/` 的舊版軍師輸出零筆、exit 0（向後相容，不報錯）；`scan-reports.sh` 對無 `docs/reports/` 的舊版軍師同樣輸出零筆、exit 0（向後相容設計）。任一腳本以非 0 且非 2 的 exit code 結束（如 1：參數錯誤或非 git 根）→ 停下回報該腳本的 stderr，不繼續彙整。
 
+**4b-1b. 交接依賴圖摘要（handoff v0.23.0 起，advisory，獨立於 tripwire 之外）：**
+
+```bash
+python3 "<skill 目錄>/scripts/handoff-graph.py" "{CURRENT_ROOT}"
+```
+
+圖只讀檔不讀 git，4b-3 tripwire 停止彙整時本段仍照印。彙整為一行：可開工 N／等依賴 M，另有 `DEP_CYCLE`／`DEP_UNRESOLVED`／`DEP_ANOMALY`／`DEP_ERROR` 時逐筆列出（不靜默略過）；`DEP_NONE` 則省略本段。
+
 **4b-2. 解析腳本輸出：**
 
 - 每行 `NEW_REPLY:<路徑>` → 新回覆路徑清單（路徑為相對於軍師根的路徑）
@@ -312,6 +343,9 @@ Edit 與 git mv 之間，頂層 ` M` 中間態亦會觸發，續行完成歸檔�
 → 審閱時分流：上報中指向軍師的行動項落 todo 或轉新交接（僅提示，不自動執行）。
 
 （各段為零時改列：目前沒有未 commit 的新回覆。／目前沒有待審申請。／目前沒有待閱上報。）
+
+交接依賴圖：可開工 {N}／等依賴 {M}（4b-1b；`DEP_NONE` 時省略本段）
+{有異常時逐筆：  ⟳ 循環：…／無法解析：… → …（原因）／異常：…（種類）}
 ```
 
 > **「未 commit 即未處理」** 的前提：軍師的慣例是彙整回覆後才 commit，因此 uncommitted 回覆視為尚未處理的標記。若提前 commit，已彙整者在此不再顯示。
@@ -542,7 +576,7 @@ project_doc_max_bytes = 65536
 
 ## 依賴聲明
 
-本 skill 依賴同 toolkit 內建的 `handoff` skill（v0.22.0，原始碼位於本 repo `skills/handoff/`）所定義的下列慣例。兩者共同發版、慣例定義以本 repo 為準；更新 handoff 的以下行為時需同步核查本 skill（v0.10.0 的沉澱訊號查核為 done 流程內部指引、v0.11.0 的派發即推播／回覆即推播為 add／reply 流程收尾通知、v0.12.0 的反向路由查核與 todo 殘項清點為 done 流程內部指引、v0.13.0 的矛盾回報指引為 reply 流程內部指引、v0.14.0 的更正交接與 `corrected_by` 為 add 流程內部慣例（corrected_by 為 display-only frontmatter 欄位；其 Edit 中間態頂層屬既有 catch-all tripwire、archive 內屬既有靜默略過分支，皆無新豁免）、v0.15.0 的斷言層級紀律與 done 斷言自查為 add／done 流程內部指引、v0.16.0 的產檔腳本 stderr 指路行不改變產出檔內容與 stdout 路徑契約、v0.17.0 的 session 命名慣例 slot 變體（`kc --slot`，推播精確比對納入 `<慣例名>.<後綴>`、多重命中仍降級）為 add／reply 推播匹配規則、v0.17.1 的產檔腳本專案根定位「往上找到家目錄即停」為腳本內部防呆（不改變產出檔內容與 stdout 路徑契約）、v0.18.0 的歸檔腳本 `archive-handoff.sh` 為 done 步驟 5–7 的腳本化執行（其 rename 產物即本 skill 掃描豁免的既有兩形狀，`git add` 僅限具體路徑與確認 commit 協議零改動，無新豁免需求）、v0.19.0 的確認 commit 宣告範圍契約（ADR 018——定型指令改帶兩形 pathspec、add 與 commit 路徑集合一致，不改變掃描豁免形狀與「未 commit 即未處理」訊號，無新豁免需求）、v0.20.0 的產檔查重（stderr advisory，不改產出檔內容、exit code 與 stdout 路徑契約）與 done 查核腳本附掛（archive-handoff.sh `--precheck` 印來源 todo 候選、歸檔執行掃 index 聚合 todo 三形進 commit 宣告、尾端印引用偵測——todo 歸檔路徑不在本 skill 掃描範圍，無新豁免需求）、v0.21.0 的回覆修改檔案清單條款（reply 流程內部指引；回覆方式定型文字多一行、new-handoff-reply.sh 多一行 stderr——**確實改變交接本體產出內容**，但 frontmatter、stdout 路徑契約、掃描慣例與豁免形狀不變，無新豁免需求）、v0.22.0 的 SKILL 字面 agent 中性化與 Agent 對應表（ADR 019——阻塞式確認改依 agent 身分判定、跨 session 推播工具不可用時整步跳過；回覆方式定型文字的 reply 呼叫形改為 Claude Code／Codex 兩形並列——**確實改變交接本體產出內容**，但 frontmatter、stdout 路徑契約、掃描慣例與豁免形狀不變，無新豁免需求）——皆不涉掃描慣例；回覆即推播不改變「未 commit 即新回覆」訊號）：
+本 skill 依賴同 toolkit 內建的 `handoff` skill（v0.23.0，原始碼位於本 repo `skills/handoff/`）所定義的下列慣例。兩者共同發版、慣例定義以本 repo 為準；更新 handoff 的以下行為時需同步核查本 skill（v0.10.0 的沉澱訊號查核為 done 流程內部指引、v0.11.0 的派發即推播／回覆即推播為 add／reply 流程收尾通知、v0.12.0 的反向路由查核與 todo 殘項清點為 done 流程內部指引、v0.13.0 的矛盾回報指引為 reply 流程內部指引、v0.14.0 的更正交接與 `corrected_by` 為 add 流程內部慣例（corrected_by 為 display-only frontmatter 欄位；其 Edit 中間態頂層屬既有 catch-all tripwire、archive 內屬既有靜默略過分支，皆無新豁免）、v0.15.0 的斷言層級紀律與 done 斷言自查為 add／done 流程內部指引、v0.16.0 的產檔腳本 stderr 指路行不改變產出檔內容與 stdout 路徑契約、v0.17.0 的 session 命名慣例 slot 變體（`kc --slot`，推播精確比對納入 `<慣例名>.<後綴>`、多重命中仍降級）為 add／reply 推播匹配規則、v0.17.1 的產檔腳本專案根定位「往上找到家目錄即停」為腳本內部防呆（不改變產出檔內容與 stdout 路徑契約）、v0.18.0 的歸檔腳本 `archive-handoff.sh` 為 done 步驟 5–7 的腳本化執行（其 rename 產物即本 skill 掃描豁免的既有兩形狀，`git add` 僅限具體路徑與確認 commit 協議零改動，無新豁免需求）、v0.19.0 的確認 commit 宣告範圍契約（ADR 018——定型指令改帶兩形 pathspec、add 與 commit 路徑集合一致，不改變掃描豁免形狀與「未 commit 即未處理」訊號，無新豁免需求）、v0.20.0 的產檔查重（stderr advisory，不改產出檔內容、exit code 與 stdout 路徑契約）與 done 查核腳本附掛（archive-handoff.sh `--precheck` 印來源 todo 候選、歸檔執行掃 index 聚合 todo 三形進 commit 宣告、尾端印引用偵測——todo 歸檔路徑不在本 skill 掃描範圍，無新豁免需求）、v0.21.0 的回覆修改檔案清單條款（reply 流程內部指引；回覆方式定型文字多一行、new-handoff-reply.sh 多一行 stderr——**確實改變交接本體產出內容**，但 frontmatter、stdout 路徑契約、掃描慣例與豁免形狀不變，無新豁免需求）、v0.22.0 的 SKILL 字面 agent 中性化與 Agent 對應表（ADR 019——阻塞式確認改依 agent 身分判定、跨 session 推播工具不可用時整步跳過；回覆方式定型文字的 reply 呼叫形改為 Claude Code／Codex 兩形並列——**確實改變交接本體產出內容**，但 frontmatter、stdout 路徑契約、掃描慣例與豁免形狀不變，無新豁免需求）、v0.23.0 的交接依賴圖 `depends_on`（產檔腳本第 6 參數——**確實改變交接本體產出內容**（僅給參數時 frontmatter 多一個選填欄位），stdout 路徑契約、掃描慣例與豁免形狀不變，無新豁免需求；推導由沙盤 `app/handoff_graph.py` 單一模組提供，本 skill 4a／4b 經 `scripts/handoff-graph.py` 呼叫）——皆不涉掃描慣例；回覆即推播不改變「未 commit 即新回覆」訊號）：
 
 | 項目 | 慣例 |
 |------|------|
