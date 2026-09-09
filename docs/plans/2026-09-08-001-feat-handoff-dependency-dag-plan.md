@@ -1,7 +1,7 @@
 ---
 title: "feat: 交接依賴圖——depends_on 邊、推導態與沙盤 inline SVG"
 type: feat
-status: active
+status: completed
 date: 2026-09-08
 origin: docs/brainstorms/2026-09-08-handoff-dependency-dag-requirements.md
 ---
