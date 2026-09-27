@@ -62,8 +62,12 @@ def make_reply(
     to_role: str = "ebook-store",
     verify: str | None = None,
     quote_verify: bool = True,
+    body: str = "回覆內容。",
 ) -> Path:
     """在 replies_dir 建立一份回覆檔案（含完整 frontmatter）。
+
+    body 為 frontmatter 之後的內文（預設「回覆內容。」，既有測試零改動）；
+    驗證首句摘錄的各種首段形狀時由呼叫端自訂。
 
     verify 非 None 時附加選填欄位 verify:。預設以 YAML 雙引號包裹，
     使含空白的測試值（如「   」）能以字串型別抵達解析端而非被 YAML
@@ -89,7 +93,7 @@ created: 2026-07-06
 status: {status}
 {verify_line}---
 
-回覆內容。
+{body}
 """
     path = replies_dir / filename
     path.write_text(content, encoding="utf-8")

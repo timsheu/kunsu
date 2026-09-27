@@ -172,11 +172,20 @@ def _capped(items: list[str], indent: str = "  ") -> list[str]:
 
 
 def _reply_annotated(info, dep_suffix: str = "") -> str:
-    """帶最新回覆狀態的交接摘要行（部分完成／已回覆待確認共用）。"""
+    """帶最新回覆狀態的交接摘要行（部分完成／已回覆待確認共用）。
+
+    行尾附最新回覆首句摘錄（沙盤資料層唯讀擷取，display-only）：接在依賴後綴之後、
+    以「｜摘錄「…」」呈現——標籤與引號讓純文字流裡也能自我標示為引用而非事實欄位
+    （比照沙盤「回覆摘錄：「…」」；斷言層級紀律：中介文件內容須可辨識為二手）；
+    摘錄為空值時零後綴，既有行字面不變。getattr 容忍沙盤部署副本尚未帶此欄位的
+    情形（單側漂移時降級為無摘錄而非整份摘要失效）。
+    """
     status = info.latest_reply_status or ""
     label = f"⛔ {status}" if status == "blocked" else status
     verify = f"，verify: {info.latest_reply_verify}" if info.latest_reply_verify else ""
-    return f"{info.filename}（{label} {info.latest_reply_date}{verify}）{dep_suffix}"
+    excerpt = getattr(info, "latest_reply_excerpt", None)
+    tail = f"｜摘錄「{excerpt}」" if excerpt else ""
+    return f"{info.filename}（{label} {info.latest_reply_date}{verify}）{dep_suffix}{tail}"
 
 
 def _load_graph(kunsu: str) -> tuple[object | None, str | None]:

@@ -106,6 +106,7 @@ def _handoff(
     latest_reply_status: str | None = None,
     latest_reply_date: str | None = None,
     latest_reply_verify: str | None = None,
+    latest_reply_excerpt: str | None = None,
 ) -> HandoffInfo:
     """建立 HandoffInfo 測試用實例。"""
     return HandoffInfo(
@@ -117,6 +118,7 @@ def _handoff(
         latest_reply_status=latest_reply_status,
         latest_reply_date=latest_reply_date,
         latest_reply_verify=latest_reply_verify,
+        latest_reply_excerpt=latest_reply_excerpt,
     )
 
 
@@ -1757,3 +1759,92 @@ def test_stale_kunsu_does_not_call_get_todo_status(monkeypatch, client):
 
     assert resp.status_code == 200
     assert "軍師不可達" in resp.text
+
+
+# ── 最新回覆首句摘錄（已回覆待確認／部分完成卡片常態可見）────────────────────
+
+def test_awaiting_confirm_shows_reply_excerpt_outside_details(monkeypatch, client):
+    """Covers AE1：已回覆待確認卡片在 </details> 之後、提示行之後顯示摘錄；既有提示與天數照舊。"""
+    _client_with_subrepo(monkeypatch, _subrepo(
+        awaiting=[_handoff(
+            "a.md", "Excerpt Job",
+            latest_reply_status="submitted",
+            latest_reply_date="2026-07-10",
+            latest_reply_excerpt="七個端點全部實作並接線完成。",
+        )],
+    ))
+    html = client.get("/").text
+
+    assert 'class="reply-excerpt"' in html
+    assert "七個端點全部實作並接線完成。" in html
+    assert 'class="hint-next-step"' in html
+    assert 'class="days-waiting"' in html
+    start = html.index("Excerpt Job")
+    detail_end = html.index("</details>", start)
+    hint_pos = html.index('class="hint-next-step"', start)
+    excerpt_pos = html.index('class="reply-excerpt"', start)
+    assert detail_end < hint_pos < excerpt_pos
+
+
+def test_partial_done_shows_reply_excerpt_without_hint(monkeypatch, client):
+    """Covers AE2：部分完成卡片顯示摘錄，但不帶下一步提示與停留天數。"""
+    _client_with_subrepo(monkeypatch, _subrepo(
+        partial_done=[_handoff(
+            "p.md", "Partial Excerpt Job",
+            latest_reply_status="partial",
+            latest_reply_date="2026-07-10",
+            latest_reply_excerpt="程式改動已完成、Debug 建置與測試套件皆通過。",
+        )],
+    ))
+    html = client.get("/").text
+
+    assert 'class="reply-excerpt"' in html
+    assert "程式改動已完成、Debug 建置與測試套件皆通過。" in html
+    assert 'class="hint-next-step"' not in html
+    assert 'class="days-waiting"' not in html
+    detail_end = html.index("</details>", html.index("Partial Excerpt Job"))
+    assert html.index('class="reply-excerpt"') > detail_end
+
+
+def test_no_excerpt_renders_no_excerpt_element(monkeypatch, client):
+    """Covers AE3：未接手件與摘錄為 None 的已回覆待確認件皆不渲染摘錄元素。"""
+    _client_with_subrepo(monkeypatch, _subrepo(
+        not_picked_up=[_handoff("n.md", "New Job")],
+        awaiting=[_handoff(
+            "a.md", "No Excerpt Job",
+            latest_reply_status="submitted",
+            latest_reply_date="2026-07-10",
+        )],
+    ))
+    html = client.get("/").text
+
+    assert 'class="reply-excerpt"' not in html
+    assert "回覆摘錄" not in html
+
+
+def test_reply_excerpt_is_html_escaped(monkeypatch, client):
+    """Covers AE7：摘錄含 HTML 標籤與 & 時經 escape 輸出。"""
+    _client_with_subrepo(monkeypatch, _subrepo(
+        awaiting=[_handoff(
+            "a.md", "Escape Job",
+            latest_reply_status="submitted",
+            latest_reply_date="2026-07-10",
+            latest_reply_excerpt="<b>完成</b> & 通過",
+        )],
+    ))
+    html = client.get("/").text
+
+    assert "&lt;b&gt;完成&lt;/b&gt; &amp; 通過" in html
+    assert "<b>完成</b>" not in html
+
+
+def test_reply_excerpt_class_avoids_badge_chip_tlabel_literals():
+    """摘錄元素的 class 不含 badge／chip／tlabel 字面，避免觸動既有負向斷言。"""
+    from app.main import _html_reply_excerpt
+    html = _html_reply_excerpt(_handoff(
+        "a.md", "X", latest_reply_status="submitted",
+        latest_reply_date="2026-07-10", latest_reply_excerpt="狀態：完成。",
+    ))
+    assert 'class="reply-excerpt"' in html
+    for literal in ("badge", "chip", "tlabel"):
+        assert literal not in html

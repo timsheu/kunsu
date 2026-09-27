@@ -59,6 +59,7 @@ def _write_reply(
     date: str,
     status: str,
     verify: str | None = None,
+    body: str = "# 回覆\n",
 ) -> None:
     replies = kunsu_dir / "docs" / "handoffs" / "replies"
     replies.mkdir(parents=True, exist_ok=True)
@@ -67,7 +68,7 @@ def _write_reply(
     (replies / f"{stem}-reply-{date}.md").write_text(
         f"---\ntitle: {stem} — 回覆\ntype: handoff-reply\nfrom: backend\n"
         f"to: planner\nin_reply_to: {handoff_filename}\ncreated: {date}\n"
-        f"status: {status}\n{verify_line}---\n\n# 回覆\n",
+        f"status: {status}\n{verify_line}---\n\n{body}",
         encoding="utf-8",
     )
 
@@ -493,3 +494,60 @@ def test_atomic_write_json_cleans_tmp_on_failure(tmp_path, monkeypatch):
         session_hook._atomic_write_json(target, {"a": 1})
     assert not target.exists()
     assert list(tmp_path.glob(".*.tmp")) == []
+
+
+# ── 子專案模式：最新回覆首句摘錄接在行尾 ────────────────────────────────────────
+
+def test_subrepo_lines_append_reply_excerpt(sub_topology, monkeypatch, capsys):
+    """Covers AE6：已回覆待確認與部分完成兩分類行尾附摘錄；既有子字串斷言仍命中。"""
+    kunsu_dir, sub_root = sub_topology
+    _write_handoff(kunsu_dir, "2026-08-02-b.md", "backend", created="2026-08-02")
+    _write_reply(kunsu_dir, "2026-08-02-b.md", "2026-08-03", "partial", verify="needs-deploy",
+                 body="# 標題 — 回覆\n\n程式改動已完成、Debug 建置與測試套件皆通過。\n")
+    _write_handoff(kunsu_dir, "2026-08-04-c.md", "backend", created="2026-08-04")
+    _write_reply(kunsu_dir, "2026-08-04-c.md", "2026-08-05", "submitted", body="狀態：完成。\n")
+    assert _run_main(monkeypatch, sub_root) == 0
+    out = capsys.readouterr().out
+    assert "2026-08-04-c.md（submitted 2026-08-05）" in out
+    assert "  • 2026-08-04-c.md（submitted 2026-08-05）｜摘錄「狀態：完成。」\n" in out
+    assert ("  • 2026-08-02-b.md（partial 2026-08-03，verify: needs-deploy）"
+            "｜摘錄「程式改動已完成、Debug 建置與測試套件皆通過。」\n") in out
+
+
+def test_subrepo_excerpt_after_dep_suffix(sub_topology, monkeypatch, capsys):
+    """依賴後綴與摘錄並存時順序為括號、依賴後綴、摘錄。"""
+    kunsu_dir, sub_root = sub_topology
+    _write_handoff(kunsu_dir, "2026-08-01-a.md", "ios-app", status="done", archived=True)
+    _write_handoff(kunsu_dir, "2026-08-02-b.md", "backend", created="2026-08-02",
+                   depends_on="[2026-08-01-a.md]")
+    _write_reply(kunsu_dir, "2026-08-02-b.md", "2026-08-03", "partial", body="狀態：完成。\n")
+    assert _run_main(monkeypatch, sub_root) == 0
+    out = capsys.readouterr().out
+    assert "  • 2026-08-02-b.md（partial 2026-08-03） 可開工｜摘錄「狀態：完成。」\n" in out
+
+
+def test_subrepo_none_excerpt_has_no_suffix(sub_topology, monkeypatch, capsys):
+    """Covers AE3：未接手行不變；回覆僅標題（摘錄 None）的行零後綴。"""
+    kunsu_dir, sub_root = sub_topology
+    _write_handoff(kunsu_dir, "2026-08-01-a.md", "backend", created="2026-08-01")
+    _write_handoff(kunsu_dir, "2026-08-04-c.md", "backend", created="2026-08-04")
+    _write_reply(kunsu_dir, "2026-08-04-c.md", "2026-08-05", "submitted")
+    assert _run_main(monkeypatch, sub_root) == 0
+    out = capsys.readouterr().out
+    assert "  • 2026-08-01-a.md（created 2026-08-01）\n" in out
+    assert "  • 2026-08-04-c.md（submitted 2026-08-05）\n" in out
+    assert "｜" not in out
+
+
+def test_subrepo_capped_unchanged_with_excerpts(sub_topology, monkeypatch, capsys):
+    """超過 5 筆時「另有 N 筆」照舊。"""
+    kunsu_dir, sub_root = sub_topology
+    for i in range(1, 8):
+        name = f"2026-08-{i:02d}-h{i}.md"
+        _write_handoff(kunsu_dir, name, "backend", created=f"2026-08-{i:02d}")
+        _write_reply(kunsu_dir, name, f"2026-08-{i + 10:02d}", "submitted", body=f"第 {i} 份完成。\n")
+    assert _run_main(monkeypatch, sub_root) == 0
+    out = capsys.readouterr().out
+    assert "已回覆待確認 7：" in out
+    assert "…另有 2 筆" in out
+    assert out.count("｜摘錄「第 ") == 5

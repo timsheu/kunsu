@@ -169,8 +169,10 @@ _CSS = (
     ".chip-now{background:#e8f5e9;color:#2e7d32}"
     ".chip-other{background:#f0f0f0;color:#555}"
     ".chip-msg,.tlabel-open{background:#e3f2fd;color:#1565c0}"
-    ".hint-next-step{color:#2e7d32;font-size:.85em;margin:0 0 .35em 1.5em}"
+    ".hint-next-step,.reply-excerpt{font-size:.85em;margin:0 0 .35em 1.5em}"
+    ".hint-next-step{color:#2e7d32}"
     ".days-waiting{color:#e65100;font-weight:600;margin-left:.5em}"
+    ".reply-excerpt{color:#555}"
     ".detail-name{display:inline-block;padding-left:1.5em;margin-top:.15em}"
     "pre{white-space:pre-wrap;word-break:break-all;background:#f8f8f8;"
     "padding:.5em;border-radius:3px;font-size:.85em;margin:.3em 0}"
@@ -480,7 +482,29 @@ def _html_awaiting_confirm_item(
     return (
         f"{_html_handoff_detail(h, graph, kunsu_path)}"
         f'<div class="hint-next-step">→ {escape(hint)}{days_html}</div>'
+        f"{_html_reply_excerpt(h)}"
     )
+
+
+def _html_reply_excerpt(h: HandoffInfo) -> str:
+    """最新回覆首句摘錄行（display-only，唯讀擷取的原文，非軍師斷言）。
+
+    置於 <details> 之外常態可見，讓久懸件的「內容物做到哪」不被容器開閉遮蔽；
+    摘錄為空值時不渲染。class 刻意避開 badge／chip／tlabel 字面。
+    """
+    if not h.latest_reply_excerpt:
+        return ""
+    return f'<div class="reply-excerpt">回覆摘錄：「{escape(h.latest_reply_excerpt)}」</div>'
+
+
+def _html_partial_done_item(
+    h: HandoffInfo,
+    graph: Optional[HandoffGraphResult] = None,
+    kunsu_path: str = "",
+) -> str:
+    """「部分完成」專屬卡片：展開式預覽下方只附回覆摘錄，不帶下一步提示與天數
+    （其下一步在接手方，非使用者——既有分工不變）。"""
+    return f"{_html_handoff_detail(h, graph, kunsu_path)}{_html_reply_excerpt(h)}"
 
 
 @dataclass(frozen=True)
@@ -848,7 +872,7 @@ def _html_subrepo(
 
     if result.partial_done:
         items = "".join(
-            _html_handoff_detail(h, graph, kunsu_path)
+            _html_partial_done_item(h, graph, kunsu_path)
             for h in sorted(result.partial_done, key=_verify_sort_key)
         )
         parts.append(f'<h4>部分完成（{len(result.partial_done)}）</h4>{items}')
