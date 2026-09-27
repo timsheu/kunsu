@@ -27,11 +27,28 @@ import subprocess
 import sys
 from pathlib import Path
 
+# 共用函式庫註記：prompt_inbox_hook.py（UserPromptSubmit hook）import 本檔重用
+# _env_path／_state_path／_read_stdin_json／_run_git／_git_root／_load_raw_registry／
+# _kunsu_paths_of／_atomic_write_json／MAX_ITEMS_PER_CATEGORY——改名或改簽名時同步該檔
+# （其 main() 為 fail-open，import 失敗會靜默變成永遠零輸出，不會有錯誤訊號）。
+
 REGISTRY_PATH = Path.home() / ".claude" / "kunsu-registry.json"
 
-# skill 版號變動提示的狀態檔（機器層級，不進任何 repo）：只記「上次看到的版號」
-# 這一項告知性事實。測試以 monkeypatch 指向 tmp_path，不觸真實 home。
+# hook 狀態檔（機器層級，不進任何 repo）：本腳本只記「上次看到的 handoff 版號」
+# 這一項告知性事實；prompt_inbox_hook.py 於同一檔以自己的頂層鍵記「已點名新件」。
+# 路徑以 _state_path() 解析：環境變數 KUNSU_HOOK_STATE_FILE 優先（供 subprocess
+# 端到端測試隔離，比照 pretooluse_git_guard.py 的 KUNSU_REGISTRY_FILE），否則本預設。
 STATE_PATH = Path.home() / ".claude" / "kunsu-hook-state.json"
+
+
+def _env_path(var: str, default: Path) -> Path:
+    """環境變數存在即用其路徑，否則退回預設（供測試隔離，比照 pretooluse_git_guard.py）。"""
+    env = os.environ.get(var)
+    return Path(env) if env else default
+
+
+def _state_path() -> Path:
+    return _env_path("KUNSU_HOOK_STATE_FILE", STATE_PATH)
 
 # handoff SKILL.md 於部署樹的相對位置：本腳本 → scripts/ → kunsu-inbox/ →
 # skills/ → handoff/SKILL.md。resolve() 跟隨 symlink，copy／symlink 兩種部署
@@ -47,32 +64,41 @@ MAX_ITEMS_PER_CATEGORY = 5
 _DASHBOARD_ROOT = Path(__file__).resolve().parents[2] / "kunsu-dashboard"
 
 
-def _read_cwd_from_stdin() -> str:
-    """讀取 hook stdin JSON 的 cwd；缺欄位或讀取失敗時退回程序當前目錄。"""
+def _read_stdin_json() -> dict:
+    """一次讀盡 hook stdin 的 JSON 物件；非 dict、讀取或解析失敗一律回傳 {}。"""
     try:
         data = json.loads(sys.stdin.read() or "{}")
-        cwd = data.get("cwd") if isinstance(data, dict) else None
-        if isinstance(cwd, str) and cwd:
-            return cwd
+        return data if isinstance(data, dict) else {}
     except (json.JSONDecodeError, OSError, UnicodeDecodeError):
-        pass
+        return {}
+
+
+def _read_cwd_from_stdin() -> str:
+    """讀取 hook stdin JSON 的 cwd；缺欄位或讀取失敗時退回程序當前目錄。"""
+    cwd = _read_stdin_json().get("cwd")
+    if isinstance(cwd, str) and cwd:
+        return cwd
     return os.getcwd()
 
 
-def _git_root(cwd: str) -> str | None:
-    """取 cwd 所在 git repo 的根路徑；非 repo 或 git 不可用時回傳 None。"""
+def _run_git(args: list[str], cwd: str, timeout: float = 5) -> str | None:
+    """跑一次 git -C cwd；失敗、逾時或非零回傳 None，成功回傳原始 stdout。"""
     try:
         proc = subprocess.run(
-            ["git", "-C", cwd, "rev-parse", "--show-toplevel"],
+            ["git", "-C", cwd, *args],
             capture_output=True,
             text=True,
-            timeout=5,
+            timeout=timeout,
         )
     except (subprocess.TimeoutExpired, OSError):
         return None
-    if proc.returncode != 0:
-        return None
-    return proc.stdout.strip() or None
+    return proc.stdout if proc.returncode == 0 else None
+
+
+def _git_root(cwd: str, timeout: float = 5) -> str | None:
+    """取 cwd 所在 git repo 的根路徑；非 repo 或 git 不可用時回傳 None。"""
+    out = _run_git(["rev-parse", "--show-toplevel"], cwd, timeout)
+    return (out or "").strip() or None
 
 
 def _load_raw_registry(path: Path) -> dict:
@@ -87,6 +113,21 @@ def _load_raw_registry(path: Path) -> dict:
         return data if isinstance(data, dict) else {}
     except (OSError, json.JSONDecodeError, UnicodeDecodeError):
         return {}
+
+
+def _atomic_write_json(path: Path, data: dict) -> None:
+    """tmp＋os.replace 原子寫回；兩支 hook 對同一狀態檔的寫入共用此路徑。"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        tmp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            tmp.unlink()  # 失敗時不留孤兒暫存檔（錯誤零副作用）
+        except OSError:
+            pass
+        raise
 
 
 def _kunsu_paths_of(raw: dict) -> set[str]:
@@ -280,20 +321,15 @@ def _handoff_version_notice() -> list[str]:
         if not current:
             return []
 
-        state: dict = {}
-        try:
-            loaded = json.loads(STATE_PATH.read_text(encoding="utf-8"))
-            if isinstance(loaded, dict):
-                state = loaded
-        except (OSError, json.JSONDecodeError, UnicodeDecodeError):
-            state = {}  # 缺檔或損壞：視同首次
+        state_path = _state_path()
+        state = _load_raw_registry(state_path)  # 缺檔或損壞：視同首次
 
         last = state.get("handoff_version")
         if last == current:
             return []
 
         state["handoff_version"] = current
-        STATE_PATH.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+        _atomic_write_json(state_path, state)
         if last is None:
             return []  # 首次：靜默建檔不提示
         return [

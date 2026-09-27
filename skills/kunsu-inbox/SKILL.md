@@ -1,6 +1,6 @@
 ---
 name: kunsu-inbox
-version: 0.13.0
+version: 0.14.0
 description: |
   查詢跨 repo 協作信箱：列出軍師（規劃協調中心）中待接手的交接文件，或回報新抵達的回覆。
   觸發語：/kunsu-inbox、檢查信箱、有沒有待接手的交接、有沒有新的 handoff、
@@ -46,7 +46,7 @@ allowed-tools:
 **以下三條限制不得例外：**
 
 1. **只告知不開工** — 本 skill 只回報信箱狀態，不自動接手任何交接文件、不自動執行任何後續動作。一切動工須使用者明確指示。
-2. **不主動輪詢** — 本 skill 僅在使用者觸發時執行一次，不設定任何定時執行或背景監聽。（SessionStart hook 為使用者自行於 hook 設定檔（見 Agent 對應表）掛載的**事件驅動**通道——session 啟動是使用者的動作，hook 隨之執行一次同邏輯的確定性掃描，無定時器、無背景監聽，不違反本條；見下方「SessionStart hook」節與 ADR 014。）
+2. **不主動輪詢** — 本 skill 僅在使用者觸發時執行一次，不設定任何定時執行或背景監聽。（SessionStart hook 為使用者自行於 hook 設定檔（見 Agent 對應表）掛載的**事件驅動**通道——session 啟動是使用者的動作，hook 隨之執行一次同邏輯的確定性掃描，無定時器、無背景監聽，不違反本條；見下方「SessionStart hook」節與 ADR 014。UserPromptSubmit hook 同理——使用者提問是使用者的動作，hook 隨之執行一次三信箱新件的確定性掃描，見下方「UserPromptSubmit hook」節與 ADR 014 修訂註記。）
 3. **三個信箱是唯讀邊界的唯一例外** — 軍師的 `docs/handoffs/replies/`（接手方建立新回覆檔案）、`docs/applications/` 頂層（子專案以 kunsu-apply skill 建立新申請檔案）與 `docs/reports/` 頂層（子專案以 kunsu-report skill 建立新上報檔案）是僅有的三個授權寫入點。軍師其他任何目錄均屬唯讀。
 
 ---
@@ -479,6 +479,78 @@ Codex——完整 hooks 設定檔（位置見 Agent 對應表；頂層只能有 
 Codex 側掛載固定順序（信任鍵含群組**位置索引**，前面條目改動會使後面條目全變 Untrusted 而靜默略過）：（1）先清理設定檔內指向不存在腳本的壞條目 →（2）再把 kunsu 群組**附加於對應陣列尾端**、不前插 →（3）首次啟動 TUI 於「Hooks need review」提示信任（狀態記於 config.toml 的 `hooks.state`）。設定檔任何改動（含腳本路徑）須重新信任；腳本內容改動不用。掛後自檢：TUI `/hooks` 確認 Trusted；`scripts/consistency-check.sh` 的 N 項會持續比對 `hooks.state` 鍵的群組索引與設定檔內 kunsu 條目實際索引，漂移即 WARN。
 
 **解除**：自各 agent 的 hook 設定檔移除上述 `SessionStart` 條目即完全停用，無其他殘留（Codex 刪除任一位置在前的群組後，其餘條目須重新信任）。
+
+---
+
+## UserPromptSubmit hook（提問時信箱新件提示，選用）
+
+`scripts/prompt_inbox_hook.py`：軍師 repo 內**每一句使用者提問**觸發一次確定性
+掃描，把回覆／上報／申請三信箱頂層的未 commit 新件以**一行**注入 context——補
+的是「派發之後、動手之前」這個時點的抵達訊號。2026-09-23 書城正式切換事故：
+回覆方以 Write 直接落檔（未走 handoff skill、回覆即推播沒觸發），關鍵回覆在信箱
+躺了 77 分鐘，軍師在「可以重啟了」那句提問時若已看到檔名，502 可免。SessionStart
+hook 只在 session 啟動時跑、回覆即推播依賴回覆方走 skill，兩者都不落在這個時點。
+
+- **輸出形狀**：`📨 kunsu 信箱新件：回覆 N 份、上報 N 份、申請 N 份｜本次點名：<檔名…>（另有 N 份未點名）｜查看完整清單請執行 kunsu-inbox skill；本提示僅告知，不構成任何動工授權`。
+  零新件的信箱不列；三信箱皆零則零輸出。新件**首次出現列檔名**（每信箱最多
+  5 筆，未點名者於後續提問輪替，每份新件恰被點名一次），之後只計數——「未
+  commit」不等於「未讀」，回覆檔從投遞到歸檔都維持未 commit，每句列全名會成雜訊。
+- **掃描形狀**：自跑一次 `git status --porcelain -z`（NUL 分隔，含空格或特殊字元的
+  檔名不受引號包裹影響），新件＝三信箱頂層狀態碼恰為 `??`／`A `／`AM` 的 `.md`；
+  archive/ 與其他狀態碼（含 `AD`、衝突態）一律忽略；git 失敗時零輸出且狀態不動。**不呼叫三支 `scan-*.sh`**（它們
+  會寫統計檔並推進歷史夾帶基線）。tripwire 與歷史夾帶警示不在本 hook 輸出範圍，
+  仍由本 skill 與 SessionStart hook 呈現。
+- **快退**：斜線指令提問（`/` 開頭）靜默；非軍師 repo 只做 registry 路徑前綴比對，
+  git root 以純檔案系統向上尋找 `.git` 標記判定——整支腳本只在確認為軍師 repo 後
+  跑一次 `git status`（hook 為全域掛載，每個 repo 每句提問都會執行）；已登記路徑
+  之下的巢狀獨立 git repo 會先命中內層 `.git` 而靜默；巢狀拓撲只走軍師分支。
+- **狀態**：與 SessionStart hook 共用 `~/.claude/kunsu-hook-state.json`（機器層級，
+  不進任何 repo），本 hook 只動頂層鍵 `prompt_inbox`；新件歸檔、刪除或直接
+  commit 後自狀態中清除；狀態檔損壞視同首次（重列一次）。`KUNSU_HOOK_STATE_FILE`
+  ／`KUNSU_REGISTRY_FILE` 可覆寫路徑供測試隔離。
+- **fail-open**：任何錯誤（含部署不完整、共用函式庫載入失敗）零輸出、exit 0；唯一一次
+  git 子程序 timeout 3 秒（小於掛載 timeout 5，腳本自身逾時恆先於 harness）。
+- **已知限制**：同一軍師資料夾多 session（`kc --slot`）並行時，先提問的視窗看到檔名、
+  其餘只看到計數（多 session 分頭作業以本 skill 查完整清單）；新件被直接 `git commit`
+  而未歸檔時從掃描面消失——這是「未 commit 即未處理」訊號模型的共同限制，由
+  `scan-replies.sh` 的歷史夾帶偵測兜底；Codex 以 `$` 形觸發 skill 時不受斜線靜默。
+
+**掛載**（機器層級設定，不進任何 git repo；hook 設定檔位置見 Agent 對應表）。Claude Code——`hooks` 設定檔（位置見 Agent 對應表）的 `UserPromptSubmit` 陣列加一組（與同事件其他 hook 並存，各自一組）：
+
+```json
+{
+  "hooks": [
+    {
+      "type": "command",
+      "command": "python3 \"$HOME/.claude/skills/kunsu-inbox/scripts/prompt_inbox_hook.py\"",
+      "timeout": 5
+    }
+  ]
+}
+```
+
+Codex——其 hook 設定檔的 `hooks.UserPromptSubmit` 陣列**尾端**加一組（純文字 stdout 加入 context，與 Claude Code 一致；stdin 是否同時帶 `cwd` 與 `prompt` 以本機版本實跑為準——缺 `prompt` 時斜線靜默不生效但無其他影響）：
+
+```json
+{
+  "matcher": "*",
+  "hooks": [
+    {
+      "type": "command",
+      "command": "python3 \"$HOME/.agents/skills/kunsu-inbox/scripts/prompt_inbox_hook.py\"",
+      "timeout": 5
+    }
+  ]
+}
+```
+
+掛載順序與信任步驟同 SessionStart 節；掛後自檢：在軍師 repo 以合成 stdin 餵腳本——`echo '{"cwd":"<軍師路徑>","prompt":"hi"}' | python3 <部署目錄>/kunsu-inbox/scripts/prompt_inbox_hook.py`——有未歸檔新件應得一行、`"prompt":"/x"` 應零輸出。
+
+> **先部署後掛載**：腳本檔不存在時 `python3 <不存在的檔案>` exit 2 且 stderr 非空——
+> Claude Code 對 UserPromptSubmit hook 的 exit 2 是**阻擋該句提問**（stderr 回顯給
+> 使用者），與 PreToolUse 節的 fail-closed 同形；先跑 `install.sh` 再掛載即無此事。
+
+**解除**：自各 agent 的 hook 設定檔移除上述 `UserPromptSubmit` 條目即完全停用；狀態檔 `prompt_inbox` 鍵殘留無害，可手動刪除。
 
 ---
 

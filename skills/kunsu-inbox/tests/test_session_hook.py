@@ -92,6 +92,7 @@ def hook_state_isolation(tmp_path: Path, monkeypatch) -> tuple[Path, Path]:
     skill.write_text("---\nname: handoff\nversion: 9.9.9\n---\n", encoding="utf-8")
     monkeypatch.setattr(session_hook, "STATE_PATH", state)
     monkeypatch.setattr(session_hook, "_HANDOFF_SKILL_PATH", skill)
+    monkeypatch.delenv("KUNSU_HOOK_STATE_FILE", raising=False)
     return state, skill
 
 
@@ -447,3 +448,48 @@ def test_graph_failure_degrades_only_dep_line(sub_topology, monkeypatch, capsys)
     assert "⚠ 未接手 1：" in out
     assert "⚠ 依賴圖不可用（RuntimeError）" in out
     assert "降級" not in out
+
+
+# ── 狀態檔路徑解析：環境變數覆寫（U1，供 subprocess 端到端測試隔離） ──────────
+
+def test_state_path_env_override_wins(hook_state_isolation, tmp_path, monkeypatch):
+    """設定 KUNSU_HOOK_STATE_FILE 時，版號狀態讀寫落在該路徑，預設路徑不被觸碰。"""
+    state, _ = hook_state_isolation
+    env_state = tmp_path / "env-state.json"
+    monkeypatch.setenv("KUNSU_HOOK_STATE_FILE", str(env_state))
+    assert session_hook._state_path() == env_state
+    assert session_hook._handoff_version_notice() == []  # 首次：靜默建檔
+    assert json.loads(env_state.read_text(encoding="utf-8"))["handoff_version"] == "9.9.9"
+    assert not state.exists()
+
+
+def test_state_path_default_without_env(hook_state_isolation):
+    state, _ = hook_state_isolation
+    assert session_hook._state_path() == state
+
+
+def test_version_notice_preserves_other_top_level_keys(hook_state_isolation):
+    """狀態檔含其他頂層鍵（如 prompt_inbox）時，版號提示寫回後原樣保留。"""
+    state, _ = hook_state_isolation
+    state.write_text(
+        json.dumps({"handoff_version": "0.15.0", "prompt_inbox": {"/x": {"replies": ["a.md"]}}}),
+        encoding="utf-8",
+    )
+    assert session_hook._handoff_version_notice()
+    loaded = json.loads(state.read_text(encoding="utf-8"))
+    assert loaded["handoff_version"] == "9.9.9"
+    assert loaded["prompt_inbox"] == {"/x": {"replies": ["a.md"]}}
+
+
+def test_atomic_write_json_cleans_tmp_on_failure(tmp_path, monkeypatch):
+    """review #7：os.replace 失敗時不留 pid 專屬 .tmp 檔，例外照常拋出。"""
+    target = tmp_path / "state.json"
+
+    def _boom(src, dst):
+        raise OSError("replace failed")
+
+    monkeypatch.setattr(session_hook.os, "replace", _boom)
+    with pytest.raises(OSError):
+        session_hook._atomic_write_json(target, {"a": 1})
+    assert not target.exists()
+    assert list(tmp_path.glob(".*.tmp")) == []

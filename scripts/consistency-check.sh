@@ -33,6 +33,13 @@
 #   O. install.sh 實跑六場景（KUNSU_INSTALL_HOME 隔離）——無 ~/.codex 只部署 Claude 樹、有 ~/.codex 建兩樹、
 #      同名非 kunsu 目錄整批中止零改動、懸空 symlink 安全覆寫、--adopt（KUNSU_INSTALL_YES=1）採納寫標記、重跑冪等
 #      另 H 項對 live 軍師 CLAUDE.md 大小達 project_doc_max_bytes（65536）80% 即 WARN（Codex 靜默截尾）
+#   P. UserPromptSubmit hook 實跑（2026-09-27）——四場景皆捕獲 stderr 並斷言為空：損壞 registry、
+#      registry 含真候選但 cwd 非 git repo、斜線提問（三者零輸出且不寫狀態）、以及正向：隔離的已登記
+#      軍師 git repo 放一份頂層未 commit 回覆 → stdout 恰一行含檔名且狀態檔寫入（負向案例獨立無法
+#      分辨「hook 根本不掃」與「正確靜默」，正向案例是判別器與被測現象分離失效通道的那一半）；
+#      SKILL.md 各 hook 節掛載片段引用的腳本檔名須存在於 skills/kunsu-inbox/scripts/（先部署後掛載
+#      的另一半：片段指到不存在的腳本，UserPromptSubmit 會阻擋每句提問）；通知行定型文字兩副本
+#      （腳本 _compose 與 SKILL.md「輸出形狀」）以首尾錨句比對
 
 set -u
 cd "$(dirname "$0")/.." || exit 1
@@ -299,6 +306,42 @@ KUNSU_INSTALL_YES=1 run_install "${oh}/h5" --adopt && [[ -f "${oh}/h5/.claude/sk
 run_install "${oh}/h2" && [[ -f "${oh}/h2/.agents/skills/handoff/.kunsu-origin" ]] || o_fail+="重跑不冪等；"
 rm -rf "${oh}"
 if [[ -z "${o_fail}" ]]; then ok "O  install.sh 六場景實跑全過（雙目標、整批中止零改動、懸空 symlink、--adopt、冪等）"; else ng "O  install.sh 場景失敗：${o_fail}"; fi
+
+# --- P. UserPromptSubmit hook 實跑：三負向（fail-open）＋一正向，stderr 一律須空（2026-09-27）---
+ph="$(mktemp -d)"; p_fail=""
+mkdir -p "${ph}/nogit" "${ph}/kunsu/docs/handoffs/replies" "${ph}/kunsu/docs/reports" "${ph}/kunsu/docs/applications"
+( cd "${ph}/kunsu" && git init -q . && git -c user.email=t@x -c user.name=t commit -q --allow-empty -m init ) 2>/dev/null
+p_kunsu="$(cd "${ph}/kunsu" && pwd -P)"; p_nogit="$(cd "${ph}/nogit" && pwd -P)"
+run_pih(){ printf '%s' "$2" | KUNSU_REGISTRY_FILE="$1" KUNSU_HOOK_STATE_FILE="${ph}/state.json" python3 skills/kunsu-inbox/scripts/prompt_inbox_hook.py 2>"${ph}/stderr"; }
+p_err(){ [[ -s "${ph}/stderr" ]] && p_fail+="$1 有 stderr；"; return 0; }
+# (1) 損壞 registry
+echo '{broken' > "${ph}/registry.json"
+p_out="$(run_pih "${ph}/registry.json" "{\"cwd\":\"${p_kunsu}\",\"prompt\":\"hi\"}")"; p_rc=$?
+[[ "${p_rc}" -eq 0 && -z "${p_out}" ]] || p_fail+="損壞registry未靜默(rc=${p_rc})；"; p_err "損壞registry"
+# (2) registry 含真候選、cwd 為候選路徑但非 git repo
+printf '{"%s":[{"kunsu":"%s","roles":["r"]}]}' "${p_nogit}/sub" "${p_nogit}" > "${ph}/registry.json"
+p_out="$(run_pih "${ph}/registry.json" "{\"cwd\":\"${p_nogit}\",\"prompt\":\"hi\"}")"; p_rc=$?
+[[ "${p_rc}" -eq 0 && -z "${p_out}" && ! -e "${ph}/state.json" ]] || p_fail+="候選非git cwd未靜默(rc=${p_rc})；"; p_err "非git cwd"
+# (3) 斜線提問（已登記軍師 repo 內、信箱有新件，仍須靜默且不寫狀態）
+printf '{"%s":[{"kunsu":"%s","roles":["r"]}]}' "${p_nogit}" "${p_kunsu}" > "${ph}/registry.json"
+echo x > "${ph}/kunsu/docs/handoffs/replies/2026-01-01-a-reply-2026-01-01.md"
+p_out="$(run_pih "${ph}/registry.json" "{\"cwd\":\"${p_kunsu}\",\"prompt\":\"/clear\"}")"; p_rc=$?
+[[ "${p_rc}" -eq 0 && -z "${p_out}" && ! -e "${ph}/state.json" ]] || p_fail+="斜線提問未靜默或寫了狀態(rc=${p_rc})；"; p_err "斜線提問"
+# (4) 正向：同一 repo 一般提問 → 恰一行含檔名、狀態檔寫入
+p_out="$(run_pih "${ph}/registry.json" "{\"cwd\":\"${p_kunsu}\",\"prompt\":\"hi\"}")"; p_rc=$?
+[[ "${p_rc}" -eq 0 && "$(printf '%s' "${p_out}" | grep -c '')" -eq 1 && "${p_out}" == *"2026-01-01-a-reply-2026-01-01.md"* && "${p_out}" == *"回覆 1 份"* && -s "${ph}/state.json" ]] || p_fail+="正向場景未列名或未寫狀態(rc=${p_rc})；"; p_err "正向場景"
+rm -rf "${ph}"
+if [[ -z "${p_fail}" ]]; then ok "P  prompt_inbox_hook.py 實跑四場景全過（損壞 registry、候選非 git cwd、斜線提問靜默；正向列名寫狀態；stderr 皆空）"; else ng "P  prompt_inbox_hook.py 實跑失敗：${p_fail}"; fi
+p_anchor_fail=""
+for anchor in '📨 kunsu 信箱新件：' '本提示僅告知，不構成任何動工授權'; do
+  grep -qF "${anchor}" skills/kunsu-inbox/scripts/prompt_inbox_hook.py && grep -qF "${anchor}" skills/kunsu-inbox/SKILL.md || p_anchor_fail+="${anchor} "
+done
+if [[ -z "${p_anchor_fail}" ]]; then ok "P  通知行定型文字首尾錨句於腳本與 SKILL.md 兩副本皆存在"; else ng "P  通知行定型文字錨句單側缺失：${p_anchor_fail}"; fi
+p_missing=""
+for f in $(grep -o 'kunsu-inbox/scripts/[A-Za-z0-9_.-]*\.py' skills/kunsu-inbox/SKILL.md | sed 's#kunsu-inbox/scripts/##' | sort -u); do
+  [[ -f "skills/kunsu-inbox/scripts/${f}" ]] || p_missing+="${f} "
+done
+if [[ -z "${p_missing}" ]]; then ok "P  SKILL.md 掛載片段引用的 hook 腳本皆存在於 scripts/"; else ng "P  SKILL.md 掛載片段引用不存在的腳本：${p_missing}（片段指到不存在的腳本會阻擋每句提問）"; fi
 
 # --- H. live 軍師同步抽查（WARN 級）---
 REG="${HOME}/.claude/kunsu-registry.json"

@@ -25,6 +25,7 @@ status: accepted
 2. **分類邏輯零重寫**：子專案模式匯入軍師沙盤 `app/subrepo_status.py`（= kunsu-inbox SKILL.md 步驟 4a 的既有 Python 實作，ADR 011 三分類與 verify 標籤照用）；軍師模式匯入 `app/kunsu_scan.py`（= 三支 `scan-*.sh` 的既有包裝）。判斷規則維持單一來源，協議演進時 hook 自然跟隨。
 3. **只告知不開工**：輸出僅含分類摘要（每分類上限 5 筆＋「另有 N 筆」）與 `/kunsu-inbox` 提示，不開啟交接檔內文、不起草回覆、不執行任何 git 寫入。ADR 002 Decision 5 人工閘門零改動。
 4. **「不主動輪詢」界定**：hook 為使用者自行於 `~/.claude/settings.json` 掛載的**事件驅動**通道——session 啟動是使用者的動作，hook 隨之執行一次，無定時器、無背景監聽。與 kunsu-inbox 授權邊界第 2 條「不主動輪詢」不牴觸，該條同步補註明文化。
+   > **修訂註記（2026-09-27，提問時信箱新件提示）**：本條「事件驅動通道」判準同樣涵蓋 **UserPromptSubmit hook**（`skills/kunsu-inbox/scripts/prompt_inbox_hook.py`）——使用者提問是使用者的動作，hook 隨之執行一次三信箱新件的確定性掃描，無定時器、無背景監聽。範圍限軍師 repo，輸出固定一行、首次列名之後計數，tripwire 不入此行；只告知不開工（Decision 3 人工閘門零改動）、fail-open（Decision 5）、機器層級掛載不進 repo（Decision 6）三者照用。動機是 2026-09-23 書城正式切換事故：回覆方未走 handoff skill 落檔、回覆即推播未觸發，關鍵回覆在信箱躺 77 分鐘直到重啟後 502——SessionStart 只在啟動時跑、推播依賴回覆方走 skill，兩者皆不落在「派發之後、動手之前」的時點。不修改本 ADR 結論；kunsu-inbox 授權邊界第 2 條同步擴列（計畫 `docs/plans/2026-09-27-1232-feat-kunsu-prompt-inbox-notice-plan.md`）。
 5. **fail-open**：任何錯誤（含 PyYAML 缺失、註冊表毀損）一律 exit 0；已確認身分後的錯誤輸出單行降級提示，身分確認前的錯誤靜默。hook 絕不阻斷 session 啟動。
 6. **開發部署分離（Invariant 3）**：腳本於本 repo 開發，經 `install.sh` 隨 kunsu-inbox skill 部署；settings.json 的 hook 設定屬機器層級（與註冊表同類），指向部署路徑，不進任何 git repo。
 
