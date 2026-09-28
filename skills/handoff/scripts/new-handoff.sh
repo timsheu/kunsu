@@ -2,7 +2,7 @@
 # new-handoff.sh — 在當前專案的 docs/handoffs/ 建立一份跨 session／跨角色交接文件
 #
 # 用法：
-#   echo "<內文>" | new-handoff.sh "<標題>" [from] [to] [tag1,tag2,...] [查重關鍵詞(空白分隔)] [depends_on(逗號分隔交接檔名)]
+#   echo "<內文>" | new-handoff.sh "<標題>" [from] [to] [tag1,tag2,...] [查重關鍵詞(空白分隔)] [depends_on(逗號分隔交接檔名)] [series(線別名)]
 #
 # 行為：
 #   1. 從當前目錄往上找最近的 CLAUDE.md/AGENTS.md 定位專案根（monorepo/submodule
@@ -25,6 +25,16 @@
 #      只讀 frontmatter 前 12 行，block 列表會把欄位擠出窗口）；缺省不產生此欄位。
 #      邊只由軍師派發時寫入、屬定案快照，事後改依賴走更正交接；推導規則見
 #      kunsu-dashboard app/handoff_graph.py 與 handoff SKILL add 段
+#   8. 線別與線總表訊號（第 7 參數 `series`，選填）：同一工作線拆多份交接時給同一
+#      線別名，寫入 frontmatter `series: <線別名>`（置於 depends_on 之後、閉合 --- 之前；
+#      缺省不產生欄位）。值 trim 後含 YAML flow／註解敏感字元（: # , " ' [ ] { } | > & * ! % @ `）
+#      、以「- 」「? 」開頭、單獨「-」、含 tab／換行或為空，即在寫檔前拒收 exit 1——沙盤以 yaml.safe_load 解整塊 frontmatter，壞值會使該
+#      交接連 depends_on 一起變「無法解析」。給了 series 的產檔一律於 stderr 印同線本體計數
+#      （頂層＋archive/，回覆不計）；接著掃 docs/plans/*.md frontmatter：恰一檔 `series`
+#      相同印總表路徑提醒更新份次狀態、多於一檔全列並標 ⚠、零檔且計數達 3 印可貼上的
+#      立總表骨架（目錄不存在視為零檔、附 mkdir -p 提示、腳本不代建）。advisory、無狀態
+#      每次重算、讀檔錯誤 fail-open 印「線總表偵測略過」；不改 stdout／exit code／產出檔。
+#      規範見 handoff SKILL add 段與 kunsu-init 範本工作流程第 3 步（條件式線總表）
 
 set -euo pipefail
 
@@ -34,6 +44,7 @@ TO="${3:-backend}"
 TAGS_RAW="${4:-}"
 DEDUP_KEYWORDS="${5:-}"
 DEPENDS_ON_RAW="${6:-}"
+SERIES_RAW="${7:-}"
 # to 是否為呼叫端顯式指定——缺省採預設值時查重清單不過濾角色：手動呼叫最易漏傳
 # to，此時以預設值過濾會漏列其他角色的重複交接、產出檔的 to: 本身也可能是錯的
 TO_GIVEN=0
@@ -41,8 +52,24 @@ if [[ $# -ge 3 && -n "${3:-}" ]]; then TO_GIVEN=1; fi
 
 if [[ -z "$TITLE" ]]; then
   echo "錯誤：缺少標題（第一個參數）" >&2
-  echo "用法：new-handoff.sh \"<標題>\" [from] [to] [tag1,tag2,...] [查重關鍵詞] [depends_on]" >&2
+  echo "用法：new-handoff.sh \"<標題>\" [from] [to] [tag1,tag2,...] [查重關鍵詞] [depends_on] [series]" >&2
   exit 1
+fi
+
+# series（線別名）：trim 後以敏感字元黑名單拒收（bash glob 比對，不依賴 locale 字元類別——
+# macOS bash 3.2 在 LC_ALL=C 下 [[:alpha:]] 不含中文，白名單會把所有中文線別擋掉）。
+# 拒收在任何寫檔之前，與「缺少標題」同層：壞值寫進 frontmatter 會讓沙盤整份交接無法解析。
+SERIES=""
+if [[ $# -ge 7 && -n "$SERIES_RAW" ]]; then
+  SERIES="$(printf '%s' "$SERIES_RAW" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+  if [[ -z "$SERIES" ]]; then
+    echo "錯誤：series（第 7 參數）trim 後為空；線別名請給非空字串" >&2
+    exit 1
+  fi
+  if [[ "$SERIES" == *[]:#,\"\'\[{}\|\>\&\*\!%@\`]* || "$SERIES" == "-" || "$SERIES" == "- "* || "$SERIES" == "? "* || "$SERIES" == *[$'\t\r\n']* ]]; then
+    echo "錯誤：series「${SERIES}」含 YAML 敏感字元（不可含 : # , \" ' [ ] { } | > & * ! % @ 反引號，不可以「- 」「? 」開頭或單獨「-」，不可含 tab／換行）；線別名請用中英數、空白、-、_、.、／" >&2
+    exit 1
+  fi
 fi
 
 # 定位專案根：優先往上找最近的 CLAUDE.md/AGENTS.md，其次 git 根，最後當前目錄。
@@ -67,9 +94,12 @@ mkdir -p "$HANDOFFS_DIR"
 DATE="$(date +%F)"
 
 # slug：保留中英數，空白與底線轉連字號，去除其餘標點，收斂連續連字號
-slug="$(printf '%s' "$TITLE" \
-  | tr ' _' '--' \
-  | sed -E 's/[[:punct:]]//g; s/-+/-/g; s/^-+//; s/-+$//')"
+make_slug() {
+  printf '%s' "$1" \
+    | tr ' _' '--' \
+    | sed -E 's/[[:punct:]]//g; s/-+/-/g; s/^-+//; s/-+$//'
+}
+slug="$(make_slug "$TITLE")"
 [[ -z "$slug" ]] && slug="handoff"
 
 base="$DATE-$slug"
@@ -133,6 +163,9 @@ fi
   printf 'tags: %s\n' "$tags_yaml"
   if [[ -n "$depends_yaml" ]]; then
     printf 'depends_on: %s\n' "$depends_yaml"
+  fi
+  if [[ -n "$SERIES" ]]; then
+    printf 'series: %s\n' "$SERIES"
   fi
   printf -- '---\n\n'
   printf '# %s\n\n' "$TITLE"
@@ -351,5 +384,79 @@ PYEOF
   fi
 }
 dedup_check || true
+
+# ── 線別計數與線總表訊號（advisory，全走 stderr）────────────────────
+# 給了 series 才執行；三態文案各自可辨：計數行（一律）、總表路徑／⚠ 多檔／立總表骨架
+# （依掃描結果）、「線總表偵測略過」（讀檔錯誤 fail-open）。無狀態每次重算，不因已提醒
+# 過而消音——純指路型 stderr 行在 ebook 軍師曾 14 次觸發 0 次兌現，印實際資料的查重候選
+# 則被採用，故骨架、grep 範式與既有 series 值一律直接印出可貼上的內容。
+# 取檔案 frontmatter 內容（首行須為 ---、且讀到閉合 --- 才成立；否則回傳 1）——
+# 用固定行窗口會把內文範例（圍欄內的 type: handoff／series:）或未閉合的檔誤判為命中
+frontmatter_of() {
+  awk 'NR==1{ if ($0!="---") exit 1; next } /^---$/{ closed=1; exit } {print} END{ if (!closed) exit 1 }' "$1"
+}
+
+series_index_check() {
+  shopt -s nullglob
+  local f fm n=0
+  # 同線本體計數：單次 grep -lxF 取候選（archive/ 全掃，不能像查重用日期前綴濾），
+  # 再驗 frontmatter 區塊內確有該行且 type: handoff（排除內文引用與非本體）
+  while IFS= read -r f; do
+    [[ -z "$f" ]] && continue
+    fm="$(frontmatter_of "$f")" || continue
+    if printf '%s\n' "$fm" | grep -qxF -- "series: $SERIES" \
+       && printf '%s\n' "$fm" | grep -q '^type: handoff$'; then
+      n=$((n + 1))
+    fi
+  done < <(grep -lxF -- "series: $SERIES" "$HANDOFFS_DIR"/*.md "$HANDOFFS_DIR"/archive/*.md 2>/dev/null || true)
+  echo "ℹ 線別「${SERIES}」：同線已有 ${n} 份交接本體（頂層＋archive/，含本次）" >&2
+
+  # docs/plans 掃描：frontmatter 狀態機擷取（兩種 frontmatter schema 並存，固定行數不可靠；
+  # 無 frontmatter 或未閉合的檔跳過）。目錄不存在視為零檔；不可讀檔印略過行後續掃其餘檔，
+  # 不讓一個無關檔案否決已找到的總表。
+  local plans_dir="$ROOT/docs/plans" p sv
+  local hits=() others=()
+  if [[ -d "$plans_dir" ]]; then
+    for p in "$plans_dir"/*.md; do
+      if [[ ! -r "$p" ]]; then
+        echo "ℹ 線總表偵測略過：無法讀取 ${p#"$ROOT"/}（其餘檔案照常比對）" >&2
+        continue
+      fi
+      fm="$(frontmatter_of "$p")" || continue
+      sv="$(printf '%s\n' "$fm" | sed -n 's/^series:[[:space:]]*//p' | head -1 | sed 's/[[:space:]]*$//')"
+      [[ -z "$sv" ]] && continue
+      if [[ "$sv" == "$SERIES" ]]; then hits+=("${p#"$ROOT"/}"); else others+=("$sv"); fi
+    done
+  fi
+
+  local hit_count=${#hits[@]}
+  if [[ "$hit_count" -eq 1 ]]; then
+    echo "ℹ 本線總表：${hits[0]}（發完請更新該份狀態）" >&2
+  elif [[ "$hit_count" -ge 2 ]]; then
+    echo "⚠ 同 series 總表多於一檔（應只有一份，請合併或改線別）：" >&2
+    printf '  %s\n' "${hits[@]}" >&2
+  elif [[ "$n" -ge 3 ]]; then
+    local sslug today
+    sslug="$(make_slug "$SERIES")"
+    [[ -z "$sslug" ]] && sslug="series"
+    today="$(date +%F)"
+    echo "⚠ 本線已有 ${n} 份交接仍無線總表，請先立總表再續發：" >&2
+    if [[ ! -d "$plans_dir" ]]; then
+      echo "  mkdir -p docs/plans" >&2
+    fi
+    echo "  建議路徑：docs/plans/${today}-${sslug}-線總表.md" >&2
+    echo "  frontmatter 骨架（貼上即可）：" >&2
+    printf '    %s\n' '---' "title: ${SERIES} 線總表" 'type: plan' "date: ${today}" "series: ${SERIES}" '---' >&2
+    echo "  內文只答四問（份次含暫定並標推論；份次編號帶線別）：" >&2
+    echo "    | 份 | 範圍摘要 | 依賴（可引 depends_on 檔名） | 狀態（未發／已發／已驗收） |" >&2
+    echo "  定位：grep -rlxF 'series: ${SERIES}' docs/plans/" >&2
+    if [[ ${#others[@]} -gt 0 ]]; then
+      echo "  既有 series 值：$(printf '%s\n' "${others[@]}" | sort -u | paste -sd '、' -)（若其一即本線，請改用同名）" >&2
+    fi
+  fi
+}
+if [[ -n "$SERIES" ]]; then
+  series_index_check || echo "ℹ 線總表偵測略過：偵測過程發生錯誤（exit $?），產檔不受影響" >&2
+fi
 
 echo "ℹ 本腳本僅產檔；撰寫與查核指引（斷言層級紀律、引用檔名權威、更正交接）見 handoff SKILL.md add 段——未經 handoff skill 執行時請回讀對應步驟" >&2

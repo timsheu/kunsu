@@ -1,6 +1,6 @@
 ---
 name: handoff
-version: 0.23.0
+version: 0.24.0
 description: |
   把一個需要交給「另一個 session／另一個角色（如後台、前端、DevOps）」研究或
   接手的議題，寫成一份獨立交接文件，落在當前專案的 docs/handoffs/。每份交接一個
@@ -82,7 +82,7 @@ docs/handoffs/replies/  → 接手方回覆信箱（append-only，接手方新�
 子指令以能力名列出，實際呼叫形依 agent 而異（見 Agent 對應表：Claude Code 為斜線指令、Codex 為 `$` 顯式呼叫或依 description 自動選用），下列一律以「handoff <子指令>」表示：
 
 - `handoff` 或 `handoff list` — 列出所有交接文件（含回覆狀態）
-- `handoff add <標題> [from] [to] [tag1,tag2] [depends_on]` — 新增一份交接（`depends_on`：逗號分隔的被依賴交接檔名，選填）
+- `handoff add <標題> [from] [to] [tag1,tag2] [depends_on] [series]` — 新增一份交接（`depends_on`：逗號分隔的被依賴交接檔名，選填；`series`：同一工作線的線別名，選填）
 - `handoff reply <原交接檔案 slug 或路徑> [from]` — 針對某份交接新增一則回覆
 - `handoff done <slug>` — 標記為已完成並歸檔
 
@@ -156,6 +156,12 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
      以被依賴本體 `status: done` 為準，沙盤／kunsu-inbox／SessionStart hook 據此推導
      「可開工」「等依賴」（交接依賴圖，見 CONCEPTS）。派發後要改依賴走更正交接，
      不編輯本體的 `depends_on`
+   - **線別**（kunsu 語境）：同一工作線預計拆三份以上交接、或已達三份時，每份都以
+     第 7 參數 `series` 給同一線別名（如「iOS 底層移植」），寫入 `series:` 欄——這是
+     歸屬標記，值與該線線總表的 `series` 精確一致，更正交接亦帶原線 `series`。線別名
+     不可含 `:`、`#`、逗號、引號、括號等 YAML 敏感字元（腳本會拒收）；手動 Write 交接
+     時同樣遵守。腳本據此印同線本體計數與線總表訊號（見下方「產檔後檢視 stderr」）；
+     線總表的規範見 kunsu-init 範本工作流程第 3 步（條件式線總表）與 CONCEPTS「線總表」
 
    **投遞前 redact**：交接檔會 commit 進 repo（kunsu 語境下更落入軍師 repo、可能
    公開），內文與引用的日誌／設定片段務必移除敏感資訊——API key、密碼、token／
@@ -173,8 +179,11 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
 2. **建立檔案**（內文走 stdin）：
 
    ```bash
-   echo "<整理後的內文>" | bash "<skill 目錄>/scripts/new-handoff.sh" "<標題>" "<from>" "<to>" "<tag1,tag2>" "<查重關鍵詞…>" "<a.md,b.md>"
+   echo "<整理後的內文>" | bash "<skill 目錄>/scripts/new-handoff.sh" "<標題>" "<from>" "<to>" "<tag1,tag2>" "<查重關鍵詞…>" "<a.md,b.md>" "<線別名>"
    ```
+
+   七個參數一律全列、不用的位置填空字串 `""` 佔位（例：`"標題" "" "backend" "" "" "" "iOS 底層移植"`），
+   靠後的選填參數才不會因為「數到第七位」而被系統性漏填——`depends_on` 三 live 軍師合計僅 4 檔即為前例。
 
    - `<skill 目錄>` 為本 skill 部署後所在目錄（定位見 Agent 對應表：以本 SKILL.md
      所在目錄推算）。
@@ -183,7 +192,16 @@ add／done／reply（本地語境）三個子指令的尾端，依 ADR 009 執�
      選填的 `depends_on`（逗號分隔的被依賴交接檔名，不含路徑），給第 6 參數時前五個
      參數須填佔位（空字串 `""` 即採預設值）。腳本寫成 flow 形單行
      `depends_on: [a.md, b.md]`（去重、去空），缺省不產生此欄位；stderr 印一行
-     依賴宣告筆數或「未宣告依賴」提醒。
+     依賴宣告筆數或「未宣告依賴」提醒。第 7 參數為選填的 `series`（線別名，見上方
+     「線別」項），寫成 `series: <線別名>` 置於 `depends_on` 之後，缺省不產生此欄位；
+     trim 後為空或含 YAML 敏感字元時腳本在寫檔前以 exit 1 拒收。
+   - **產檔後檢視 stderr 線總表訊號**（advisory，給了 `series` 才有）：腳本印同線本體
+     計數（頂層＋archive/，回覆不計，含本次），再掃 `docs/plans/` frontmatter——恰一檔
+     `series` 相同印該總表路徑（發完請更新該份狀態）；多於一檔全列並標 ⚠；零檔且同線
+     已達三份時印立線總表提醒——建議路徑、可直接貼上的 frontmatter 骨架、四問表頭與
+     `grep -rlF` 定位範式，`docs/plans/` 不存在時附 `mkdir -p` 提示（腳本不代建），另列
+     既有 `series` 值供辨識手誤。提醒無狀態、每份重算，不因已提醒過而消音；讀檔錯誤
+     印「線總表偵測略過」。看到骨架就當場建總表再續發，不要只回話。
    - 腳本會自動定位專案根、建立 `docs/handoffs/`、以 `YYYY-MM-DD-<slug>.md` 命名
      （同日同名自動加 `-2`、`-3`…），並自動附上「回覆方式」段落（見下方範例），
      印出最終檔案路徑。
@@ -724,6 +742,13 @@ verify: needs-deploy
   產生的 slug 已去標點，手動命名的檔案自行遵守）。消費端：沙盤 `app/handoff_graph.py`
   建圖推導「可開工」「等依賴」，kunsu-inbox skill 與 SessionStart hook 共用同一模組；
   不進掃描、tripwire 或分類比對。
+- 本體選填欄位 `series:`（線別）：同一工作線各份交接共用的線別名（純量字串、置於
+  `depends_on:` 之後），由產檔腳本第 7 參數寫入、派發時定案、事後不編輯（改線別走更正
+  交接；更正交接帶原線 `series`）。值不得含 `:`、`#`、逗號、引號、`[]{}`、`|>&*!%@`
+  與反引號，不可以「- 」「? 」開頭或單獨「-」，不可含 tab／換行（腳本拒收；手動 Write 的檔案自行遵守——壞值會使沙盤整份交接連 `depends_on`
+  一起無法解析）。消費端只有產檔腳本自身（同線計數與線總表訊號）；線總表落 `docs/plans/`、
+  frontmatter `series` 與之精確對齊（見 CONCEPTS「線總表」）。不進掃描、tripwire、分類
+  比對或依賴圖。
 - `from`／`to` 是交接文件的靈魂，務必填正確方向，Dataview 才能依角色過濾。
 - 現況分析要引用具體 `檔案:行號` 與資料結構，接手方在**不同程式碼庫**時尤其重要。
 - 內文不要再重複打 `# 標題`（腳本已自動產生一次）；若內文本身已包含「背景 /

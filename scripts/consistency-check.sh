@@ -82,6 +82,8 @@ for f in "skills/handoff/SKILL.md" \
 done
 
 # --- C. 定型文字實跑比對 ---
+# 取某欄位（正則）在產出檔的行號，供 C2／C3 斷言相對位置
+line_of(){ grep -n "$1" "$2" | cut -d: -f1; }
 tmp="$(mktemp -d)"
 trap 'rm -rf "${tmp}"' EXIT
 if (cd "${tmp}" && git init -q . \
@@ -99,8 +101,8 @@ if (cd "${tmp}" && git init -q . \
   # --- C2. depends_on 第 6 參數實跑（2026-09-08）：欄位存在且位於 tags: 之後、flow 形 ---
   if (cd "${tmp}" && echo "x" | KUNSU_ZOEKT_URL="http://127.0.0.1:1" bash "${OLDPWD}/skills/handoff/scripts/new-handoff.sh" "依賴檢查" "" "" "" "" "a.md, b.md,a.md" >/dev/null 2>&1); then
     gen2="$(ls "${tmp}"/docs/handoffs/*依賴檢查*.md 2>/dev/null | head -1)"
-    tl="$(grep -n '^tags:' "${gen2}" | cut -d: -f1)"
-    dl="$(grep -n '^depends_on: \[a.md, b.md\]$' "${gen2}" | cut -d: -f1)"
+    tl="$(line_of '^tags:' "${gen2}")"
+    dl="$(line_of '^depends_on: \[a.md, b.md\]$' "${gen2}")"
     if [[ -n "${tl}" && -n "${dl}" && "${dl}" -eq $((tl + 1)) ]]; then
       ok "C2 depends_on 第 6 參數寫入 flow 形、去重、緊接 tags: 之後"
     else
@@ -108,6 +110,68 @@ if (cd "${tmp}" && git init -q . \
     fi
   else
     ng "C2 new-handoff.sh 帶第 6 參數實跑失敗"
+  fi
+  # --- C3. series 第 7 參數實跑（2026-09-28）：緊接 depends_on 之後、無 depends_on 時緊接 tags: 之後、純量 ---
+  # 腳本路徑以 ${PWD} 為準（第 45 行已 cd 至 repo 根）；頂層的 ${OLDPWD} 是呼叫者目錄，
+  # 從非 repo 根執行會讓 C3／C4 全 FAIL、拒收項因 exit 127 假 PASS
+  NH="${PWD}/skills/handoff/scripts/new-handoff.sh"
+  [[ -f "${NH}" ]] || ng "C3 找不到 new-handoff.sh：${NH}"
+  if (cd "${tmp}" && echo "x" | KUNSU_ZOEKT_URL="http://127.0.0.1:1" bash "${NH}" "線別檢查" "" "" "" "" "a.md" "線A" >/dev/null 2>&1) \
+     && (cd "${tmp}" && echo "x" | KUNSU_ZOEKT_URL="http://127.0.0.1:1" bash "${NH}" "線別檢查二" "" "" "" "" "" "線A" >/dev/null 2>&1); then
+    gen3="$(ls "${tmp}"/docs/handoffs/*線別檢查.md 2>/dev/null | head -1)"
+    gen3b="$(ls "${tmp}"/docs/handoffs/*線別檢查二.md 2>/dev/null | head -1)"
+    dl3="$(line_of '^depends_on: \[a.md\]$' "${gen3}")"
+    sl3="$(line_of '^series: 線A$' "${gen3}")"
+    tl3="$(line_of '^tags:' "${gen3b}")"
+    sl3b="$(line_of '^series: 線A$' "${gen3b}")"
+    if [[ -n "${dl3}" && -n "${sl3}" && "${sl3}" -eq $((dl3 + 1)) && -n "${tl3}" && -n "${sl3b}" && "${sl3b}" -eq $((tl3 + 1)) ]]; then
+      ok "C3 series 第 7 參數寫入純量、緊接 depends_on（無 depends_on 時緊接 tags:）之後"
+    else
+      ng "C3 series 欄位缺失或位置不在 depends_on／tags: 之後（查重 12 行窗口會漏檔）"
+    fi
+  else
+    ng "C3 new-handoff.sh 帶第 7 參數實跑失敗"
+  fi
+  # --- C4. 線總表訊號 stderr 實跑（2026-09-28）：第三份印骨架提醒與 grep 範式、有總表印路徑、敏感字元寫檔前拒收 ---
+  # 前提顯式斷言（不隱含依賴 C3 副作用）：頂層恰有兩份 series: 線A 本體；再把一份移入 archive/、
+  # 放一份帶同 series 的回覆檔，讓「archive 計入、replies 不計」成為機械斷言
+  c4_pre="$(grep -lxF 'series: 線A' "${tmp}"/docs/handoffs/*.md 2>/dev/null | wc -l | tr -d ' ')"
+  mkdir -p "${tmp}/docs/handoffs/archive" "${tmp}/docs/handoffs/replies"
+  mv "${gen3b}" "${tmp}/docs/handoffs/archive/" 2>/dev/null
+  printf -- '---\ntitle: r\ntype: handoff-reply\nseries: 線A\n---\n' > "${tmp}/docs/handoffs/replies/r.md"
+  # 內文範例不得計入：無 frontmatter、只在圍欄內含 type: handoff 與 series: 線A 的 README
+  printf -- '# README\n\n```\ntype: handoff\nseries: 線A\n```\n' > "${tmp}/docs/handoffs/README.md"
+  s3_rc=0; (cd "${tmp}" && echo "x" | KUNSU_ZOEKT_URL="http://127.0.0.1:1" bash "${NH}" "線別檢查三" "" "" "" "" "" "線A" >"${tmp}/series3.out" 2>"${tmp}/series3.err") || s3_rc=$?
+  mkdir -p "${tmp}/docs/plans"
+  printf -- '---\ntitle: 線A 線總表\ntype: plan\ndate: 2026-09-28\nseries: 線A\n---\n' > "${tmp}/docs/plans/x.md"
+  # 未閉合 frontmatter 的檔不得被當成總表
+  printf -- '---\nseries: 線A\n' > "${tmp}/docs/plans/unclosed.md"
+  s4_rc=0; (cd "${tmp}" && echo "x" | KUNSU_ZOEKT_URL="http://127.0.0.1:1" bash "${NH}" "線別檢查四" "" "" "" "" "" "線A" >"${tmp}/series4.out" 2>"${tmp}/series4.err") || s4_rc=$?
+  if [[ "${c4_pre}" -eq 2 && "${s3_rc}" -eq 0 && "${s4_rc}" -eq 0 \
+        && "$(wc -l < "${tmp}/series3.out" | tr -d ' ')" -eq 1 && "$(wc -l < "${tmp}/series4.out" | tr -d ' ')" -eq 1 \
+        && "$(grep -cF '同線已有 3 份交接本體' "${tmp}/series3.err")" -eq 1 \
+        && "$(grep -cF '份交接仍無線總表，請先立總表再續發' "${tmp}/series3.err")" -eq 1 \
+        && "$(grep -cF "grep -rlxF 'series: 線A' docs/plans/" "${tmp}/series3.err")" -eq 1 \
+        && "$(grep -cF 'mkdir -p docs/plans' "${tmp}/series3.err")" -eq 1 \
+        && "$(grep -cF '本線總表：docs/plans/x.md' "${tmp}/series4.err")" -eq 1 \
+        && "$(grep -cF 'unclosed.md' "${tmp}/series4.err")" -eq 0 \
+        && "$(grep -cF '份交接仍無線總表' "${tmp}/series4.err")" -eq 0 ]]; then
+    ok "C4 線總表訊號實跑：archive 計入／replies 與內文範例不計、第三份印骨架（mkdir、grep -rlxF）、有總表改印路徑、未閉合檔不算總表、stdout 單行、exit 0"
+  else
+    ng "C4 線總表訊號實跑不符（前提=${c4_pre} rc3=${s3_rc} rc4=${s4_rc}；見 ${tmp}/series3.err、series4.err）"
+  fi
+  # 拒收契約逐案例：每一項須 exit 1 且無產出檔；空字串為佔位（採缺省）不在此列
+  c4_bad_ok=1
+  for bad in "後端: API" "線 #3" "a,b" 'x"y' "x'y" "[z]" "{z}" "a|b" "a>b" "a&b" "a*b" "a!b" "a%b" "a@b" 'a`b' "-" "- 測試" "? 測試" $'線\tA' $'線\nA' "   "; do
+    if (cd "${tmp}" && echo "x" | KUNSU_ZOEKT_URL="http://127.0.0.1:1" bash "${NH}" "壞線別" "" "" "" "" "" "${bad}" >/dev/null 2>&1); then
+      c4_bad_ok=0; echo "  C4 未拒收：「${bad}」"
+    fi
+  done
+  if ls "${tmp}"/docs/handoffs/*壞線別*.md >/dev/null 2>&1; then c4_bad_ok=0; fi
+  if [[ "${c4_bad_ok}" -eq 1 ]]; then
+    ok "C4 series 拒收契約：敏感字元、區塊指示字首、控制字元與空白值逐案例於寫檔前 exit 1、零產出檔"
+  else
+    ng "C4 series 拒收契約缺口：有案例未拒收或拒收後留下產出檔（沙盤會整份無法解析）"
   fi
   # --- K. reply 腳本 stderr 條款行實跑比對（2026-09-01）---
   a="$(grep -F '投遞前有程式碼改動時，回覆請附' "${gen}" | head -1 | sed 's/^[[:space:]]*//')"
@@ -343,6 +407,22 @@ for f in $(grep -o 'kunsu-inbox/scripts/[A-Za-z0-9_.-]*\.py' skills/kunsu-inbox/
 done
 if [[ -z "${p_missing}" ]]; then ok "P  SKILL.md 掛載片段引用的 hook 腳本皆存在於 scripts/"; else ng "P  SKILL.md 掛載片段引用不存在的腳本：${p_missing}（片段指到不存在的腳本會阻擋每句提問）"; fi
 
+# --- Q. 條件式線總表錨句（2026-09-28）：範本第 3 步字面、舊句歸零、兩句附加、指路句、CONCEPTS 詞條 ---
+qt="skills/kunsu-init/assets/templates/kunsu-claude.md"
+if [[ "$(grep -cF '3. **線總表（條件式）**' "${qt}")" -eq 1 \
+      && "$(grep -cF '以 ce-plan skill 寫入 `docs/plans/`' "${qt}")" -eq 0 \
+      && "$(grep -cF '線總表則更新份次狀態' "${qt}")" -eq 2 \
+      && "$(grep -cF '線進度以線總表為起點' "${qt}")" -eq 1 ]]; then
+  ok "Q  範本第 3 步條件式線總表錨句齊全、舊句「以 ce-plan skill 寫入」歸零"
+else
+  ng "Q  範本第 3 步條件式線總表錨句缺漏或舊句殘留（第 3 步字面／兩句附加／指路句須連動）"
+fi
+if grep -A1 '^### 定案規劃' skills/kunsu-init/assets/templates/kunsu-concepts.md | grep -qF '線總表' && grep -q '^### 線總表' CONCEPTS.md; then
+  ok "Q  範本「定案規劃」詞條含線總表、母體 CONCEPTS 有「線總表」詞條"
+else
+  ng "Q  範本 kunsu-concepts「定案規劃」詞條或母體 CONCEPTS「線總表」詞條缺失"
+fi
+
 # --- H. live 軍師同步抽查（WARN 級）---
 REG="${HOME}/.claude/kunsu-registry.json"
 if [[ -f "${REG}" ]] && command -v python3 >/dev/null; then
@@ -352,10 +432,10 @@ if [[ -f "${REG}" ]] && command -v python3 >/dev/null; then
     if [[ "${csz}" -ge 52428 ]]; then
       wn "H  live 軍師 CLAUDE.md 達 ${csz} bytes（project_doc_max_bytes 65536 的 80% 以上，Codex 超限靜默截尾）：${kroot}"
     fi
-    if grep -q '規劃前既有盤點' "${kroot}/CLAUDE.md" && grep -q '勿自標' "${kroot}/CLAUDE.md" && grep -q 'corrected_by' "${kroot}/CLAUDE.md" && grep -q '副官' "${kroot}/CLAUDE.md" && grep -q '不豁免' "${kroot}/CLAUDE.md" && grep -q '宣告範圍' "${kroot}/CLAUDE.md" && grep -q '以原始碼為準' "${kroot}/CLAUDE.md" && grep -q 'Agent 對應表' "${kroot}/CLAUDE.md" && [[ -L "${kroot}/AGENTS.md" ]] && grep -q '不豁免' "${kroot}/CONCEPTS.md" 2>/dev/null && grep -q 'archive-handoff' "${kroot}/CONCEPTS.md" 2>/dev/null && grep -q 'archive-todo' "${kroot}/CONCEPTS.md" 2>/dev/null && grep -q 'depends_on' "${kroot}/CLAUDE.md" && grep -q 'depends_on' "${kroot}/CONCEPTS.md" 2>/dev/null; then
+    if grep -q '規劃前既有盤點' "${kroot}/CLAUDE.md" && grep -q '勿自標' "${kroot}/CLAUDE.md" && grep -q 'corrected_by' "${kroot}/CLAUDE.md" && grep -q '副官' "${kroot}/CLAUDE.md" && grep -q '不豁免' "${kroot}/CLAUDE.md" && grep -q '宣告範圍' "${kroot}/CLAUDE.md" && grep -q '以原始碼為準' "${kroot}/CLAUDE.md" && grep -q 'Agent 對應表' "${kroot}/CLAUDE.md" && [[ -L "${kroot}/AGENTS.md" ]] && grep -q '不豁免' "${kroot}/CONCEPTS.md" 2>/dev/null && grep -q 'archive-handoff' "${kroot}/CONCEPTS.md" 2>/dev/null && grep -q 'archive-todo' "${kroot}/CONCEPTS.md" 2>/dev/null && grep -q 'depends_on' "${kroot}/CLAUDE.md" && grep -q 'depends_on' "${kroot}/CONCEPTS.md" 2>/dev/null && grep -q '線總表' "${kroot}/CLAUDE.md" && grep -q '線總表' "${kroot}/CONCEPTS.md" 2>/dev/null; then
       ok "H  live 軍師遷移標記齊全：${kroot}"
     else
-      wn "H  live 軍師疑似漏遷移（缺 規劃前既有盤點／勿自標／corrected_by／副官／不豁免（CLAUDE 與 CONCEPTS 各自）／宣告範圍／以原始碼為準／Agent 對應表（CLAUDE）／AGENTS.md symlink／archive-handoff／archive-todo（CONCEPTS）／depends_on（CLAUDE 與 CONCEPTS 各自） 之一）：${kroot}"
+      wn "H  live 軍師疑似漏遷移（缺 規劃前既有盤點／勿自標／corrected_by／副官／不豁免（CLAUDE 與 CONCEPTS 各自）／宣告範圍／以原始碼為準／Agent 對應表（CLAUDE）／AGENTS.md symlink／archive-handoff／archive-todo（CONCEPTS）／depends_on（CLAUDE 與 CONCEPTS 各自）／線總表（CLAUDE 與 CONCEPTS 各自） 之一）：${kroot}"
     fi
   done < <(python3 -c "
 import json
