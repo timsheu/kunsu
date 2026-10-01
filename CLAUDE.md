@@ -57,8 +57,8 @@ skills/                → skill 原始碼
   kunsu-dashboard/     → kunsu 訊息聚合本機網頁（非可觸發的 skill，frontmatter 以兩 agent 原生旗標停用選用，見 ADR 010／019）
     SKILL.md           → 純安裝／啟動說明，不涉及觸發語
     requirements.txt   → fastapi／uvicorn[standard]／PyYAML（本專案首次 pip 依賴）
-    app/               → registry.py／kunsu_scan.py／subrepo_status.py（含最新回覆首句摘錄唯讀擷取，display-only）／todo_status.py／handoff_graph.py（交接依賴圖：頂層＋archive 建圖、直接邊推導可開工／等依賴、Tarjan 循環、無法解析與異常顯式回報——三消費端單一來源）／handoff_graph_html.py（inline SVG 分層排版、dlabel 標籤、錨點、活節點 >8 降級文字清單）／main.py
-    tests/             → pytest，200 項測試（回覆首句摘錄測試自 test_subrepo_status.py 拆至 test_subrepo_status_reply_excerpt.py）
+    app/               → registry.py／kunsu_scan.py／subrepo_status.py（含最新回覆首句摘錄唯讀擷取，display-only）／todo_status.py／handoff_graph.py（交接依賴圖：頂層＋archive 建圖、直接邊推導可開工／等依賴、Tarjan 循環、無法解析與異常顯式回報——三消費端單一來源）／handoff_graph_html.py（inline SVG 分層排版、dlabel 標籤、錨點、活節點 >8 降級文字清單）／main.py（含頁首快速導覽：每軍師一行目錄名連結跳至分組與子專案卡片，錨點 `nav-<軍師>--<子專案>-<雜湊>` 掛 `<details>` 內容區使收合分組自動展開）
+    tests/             → pytest，206 項測試（回覆首句摘錄測試自 test_subrepo_status.py 拆至 test_subrepo_status_reply_excerpt.py）
 scripts/kc.fish        → kunsu claude 啟動函式（fish autoload；依 registry 自動以命名慣例 `-n` 啟動，`--slot <後綴>` 產生 `<慣例名>.<後綴>` 區分同資料夾多 session，部署至 ~/.config/fish/functions/）
 scripts/consistency-check.sh → 跨檔案一致性機械檢查（版號鏈、值域副本、定型文字實跑比對、install 覆蓋、分類詞對映、live 軍師 WARN 級抽查；沉澱自 2026-08-12 邏輯連結稽核）
 install.sh             → 部署至 ~/.claude/skills/ 與 ~/.agents/skills/（Codex，偵測 ~/.codex/ 才啟用；預設 copy 並寫 .kunsu-origin 標記、--link 開發模式、--adopt 採納舊版無標記部署；pre-flight 對非 kunsu 產物整批中止）

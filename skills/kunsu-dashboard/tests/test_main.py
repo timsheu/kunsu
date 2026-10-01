@@ -1848,3 +1848,145 @@ def test_reply_excerpt_class_avoids_badge_chip_tlabel_literals():
     assert 'class="reply-excerpt"' in html
     for literal in ("badge", "chip", "tlabel"):
         assert literal not in html
+
+
+# ── 快速導覽（頁首跳轉錨點） ─────────────────────────────────────────────────
+
+def test_quick_nav_links_resolve_to_existing_anchors(monkeypatch, client):
+    """頁首快速導覽的每個 href 都對應頁內存在的 id，且導覽置於全域總覽之前。"""
+    KUNSU = "/fake/nav-kunsu"
+    SUB_A = "/fake/nav-sub-a"
+    SUB_B = "/fake/nav-sub-b"
+
+    monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
+        healthy=[KUNSU, SUB_A, SUB_B],
+        raw={
+            SUB_A: [{"kunsu": KUNSU, "roles": ["a"]}],
+            SUB_B: [{"kunsu": KUNSU, "roles": ["b"]}],
+        },
+    ))
+    monkeypatch.setattr("app.main.scan_kunsu", lambda p: _scan(p))
+    monkeypatch.setattr(
+        "app.main.get_subrepo_status",
+        lambda *a, **k: _subrepo(not_picked_up=[_handoff()]),
+    )
+
+    html = client.get("/").text
+    nav_start = html.index('<nav class="card quick-nav">')
+    nav_end = html.index("</nav>", nav_start)
+    nav = html[nav_start:nav_end]
+    hrefs = re.findall(r'href="#([^"]+)"', nav)
+    assert len(hrefs) == 3, hrefs  # 軍師 1 ＋ 子專案 2
+    for anchor in hrefs:
+        assert f'id="{anchor}"' in html, f"錨點 {anchor} 在頁內不存在"
+    assert len(set(hrefs)) == 3
+    # 顯示目錄名而非完整路徑；未接手件以 ⚠N 提示
+    assert ">nav-kunsu<" in nav
+    assert ">nav-sub-a" in nav and "⚠1" in nav
+    # 導覽在全域總覽之前（頁面最上面）
+    assert nav_start < html.index('<div class="card overview">')
+
+
+def test_quick_nav_anchor_ids_unique_for_same_basename(monkeypatch, client):
+    """同一軍師底下兩個 basename 相同的子專案，錨點 id 仍不相撞。"""
+    KUNSU = "/fake/nav-kunsu"
+    SUB_A = "/fake/alpha/app"
+    SUB_B = "/fake/beta/app"
+
+    monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
+        healthy=[KUNSU, SUB_A, SUB_B],
+        raw={
+            SUB_A: [{"kunsu": KUNSU, "roles": ["a"]}],
+            SUB_B: [{"kunsu": KUNSU, "roles": ["b"]}],
+        },
+    ))
+    monkeypatch.setattr("app.main.scan_kunsu", lambda p: _scan(p))
+    monkeypatch.setattr("app.main.get_subrepo_status", lambda *a, **k: _subrepo())
+
+    html = client.get("/").text
+    ids = re.findall(r'id="(nav-[^"]+)"', html)
+    assert len(ids) == 3 and len(set(ids)) == 3, ids
+    assert sum(1 for i in ids if "--app-" in i) == 2
+
+
+def test_quick_nav_sub_anchor_inside_group_details_and_kunsu_anchor_after_summary(
+    monkeypatch, client
+):
+    """子專案錨點位於軍師分組 <details> 內容區、軍師錨點緊接 </summary> 之後——
+
+    兩者皆藏在收合內容裡，瀏覽器 fragment navigation 才會自動展開分組。
+    """
+    KUNSU = "/fake/nav-kunsu"
+    SUB = "/fake/nav-sub"
+    monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
+        healthy=[KUNSU, SUB],
+        raw={SUB: [{"kunsu": KUNSU, "roles": ["a"]}]},
+    ))
+    monkeypatch.setattr("app.main.scan_kunsu", lambda p: _scan(p))
+    monkeypatch.setattr("app.main.get_subrepo_status", lambda *a, **k: _subrepo())
+
+    html = client.get("/").text
+    group_start = html.index('<details class="kunsu-group"')
+    summary_end = html.index("</summary>", group_start) + len("</summary>")
+    group_end = html.index("</details>", group_start)
+    assert html[summary_end:].startswith('<span id="nav-nav-kunsu-')
+    sub_id = html.index('<div id="nav-nav-kunsu--nav-sub-')
+    assert summary_end < sub_id < group_end
+
+
+def test_quick_nav_stale_kunsu_and_stale_subrepo_still_linked(monkeypatch, client):
+    """stale 軍師與 stale 子專案仍列入導覽（灰字標示），點擊可跳至其卡片。"""
+    KUNSU_OK = "/fake/ok-kunsu"
+    SUB_STALE = "/fake/gone-sub"
+    KUNSU_STALE = "/fake/gone-kunsu"
+    SUB_UNDER_STALE = "/fake/orphan-sub"
+
+    monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
+        healthy=[KUNSU_OK],
+        stale=[SUB_STALE, KUNSU_STALE, SUB_UNDER_STALE],
+        raw={
+            SUB_STALE: [{"kunsu": KUNSU_OK, "roles": ["a"]}],
+            SUB_UNDER_STALE: [{"kunsu": KUNSU_STALE, "roles": ["b"]}],
+        },
+    ))
+    monkeypatch.setattr("app.main.scan_kunsu", lambda p: _scan(p))
+    monkeypatch.setattr("app.main.get_subrepo_status", lambda *a, **k: _subrepo())
+
+    html = client.get("/").text
+    nav = html[html.index('<nav class="card quick-nav">'):html.index("</nav>")]
+    hrefs = re.findall(r'href="#([^"]+)"', nav)
+    assert len(hrefs) == 4
+    for anchor in hrefs:
+        assert f'id="{anchor}"' in html
+    assert nav.count('nav-stale') == 3  # stale 子專案 1 ＋ stale 軍師 1 ＋ 其底下子專案 1
+
+
+def test_quick_nav_blocked_mark_and_label_escaped(monkeypatch, client):
+    """⛔N 計 partial_done 中 status 恰為 blocked 者；目錄名含 HTML 字元須 escape。"""
+    KUNSU = "/fake/nav-kunsu"
+    SUB = "/fake/<x>sub"
+    monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
+        healthy=[KUNSU, SUB],
+        raw={SUB: [{"kunsu": KUNSU, "roles": ["a"]}]},
+    ))
+    monkeypatch.setattr("app.main.scan_kunsu", lambda p: _scan(p))
+    monkeypatch.setattr(
+        "app.main.get_subrepo_status",
+        lambda *a, **k: _subrepo(partial_done=[
+            _handoff(filename="b1.md", latest_reply_status="blocked"),
+            _handoff(filename="b2.md", latest_reply_status="partial"),
+        ]),
+    )
+    html = client.get("/").text
+    nav = html[html.index('<nav class="card quick-nav">'):html.index("</nav>")]
+    assert "⛔1" in nav and "⚠" not in nav
+    assert "&lt;x&gt;sub" in nav and "<x>sub" not in nav
+
+
+def test_quick_nav_absent_when_no_kunsu(monkeypatch, client):
+    """無任何軍師分組（純 stale 殘留路徑）時不渲染快速導覽。"""
+    monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
+        stale=["/fake/lonely"], raw={},
+    ))
+    html = client.get("/").text
+    assert '<nav class="card quick-nav">' not in html

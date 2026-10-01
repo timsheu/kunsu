@@ -13,6 +13,7 @@ ADR 010 Decision 1.5：所有端點僅回傳 text/html，不提供任何 JSON／
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 import re
 import sys
@@ -161,6 +162,15 @@ _CSS = (
     ".badge-other,.tlabel-other{background:#f0f0f0;color:#555}"
     ".badge-blocked,.tlabel-high{background:#ffebee;color:#b71c1c}"
     ".badge-status-unknown,.tlabel-orphaned{background:#f3e5f5;color:#7b1fa2}"
+    ".quick-nav{border-color:#b0bec5;background:#fafafa;font-size:.9em;padding:.5em 1em}"
+    ".quick-nav ul{list-style:none;padding:0;margin:0}"
+    ".quick-nav li{margin:.15em 0}"
+    ".quick-nav a{color:#1565c0;text-decoration:none;margin-right:.6em;white-space:nowrap}"
+    ".quick-nav a:hover{text-decoration:underline}"
+    ".quick-nav .nav-kunsu{font-weight:700;margin-right:.8em}"
+    ".quick-nav .nav-mark{color:#b71c1c;font-weight:600;font-size:.85em}"
+    ".quick-nav .nav-stale{color:#616161}"
+    "[id^=nav-]{scroll-margin-top:.6em}"
     ".overview{border-color:#90caf9;background:#f7fbff;display:flex;"
     "flex-wrap:wrap;gap:.4em;align-items:center}"
     ".chip{display:inline-block;padding:.15em .6em;border-radius:12px;"
@@ -607,6 +617,74 @@ def _kunsu_group_open_and_label(
     return True, f'軍師：<code>{esc}</code>（{total} 則新訊息）{suffix}'
 
 
+def _nav_anchor_id(kunsu_path: str, sub_path: Optional[str] = None) -> str:
+    """快速導覽錨點 id：`nav-<軍師目錄名>[--<子專案目錄名>]-<6 碼雜湊>`。
+
+    目錄名只保留 `[A-Za-z0-9_-]`（其餘字元折成 `-`）供肉眼辨識；唯一性由
+    完整路徑雜湊保證——同一軍師底下兩個同名 basename 子專案、或巢狀拓撲
+    同一路徑在不同軍師分組各渲染一次，都不會撞 id。
+    """
+    key = f"{kunsu_path}\0{sub_path or ''}"
+    digest = hashlib.sha1(key.encode("utf-8")).hexdigest()[:6]
+    parts = [Path(kunsu_path).name or "root"]
+    if sub_path is not None:
+        parts.append(Path(sub_path).name or "root")
+    slug = "--".join(re.sub(r"[^A-Za-z0-9_-]+", "-", n) for n in parts)
+    return f"nav-{slug}-{digest}"
+
+
+@dataclass(frozen=True)
+class _NavSubEntry:
+    label: str
+    anchor: str
+    stale: bool = False
+    not_picked_up: int = 0
+    blocked: int = 0
+
+
+@dataclass(frozen=True)
+class _NavKunsuEntry:
+    label: str
+    anchor: str
+    stale: bool = False
+    subs: tuple[_NavSubEntry, ...] = ()
+
+
+def _html_quick_nav(entries: list[_NavKunsuEntry]) -> str:
+    """頁首快速導覽：每個軍師一行，列出軍師目錄名與所屬子專案目錄名連結。
+
+    點擊即以 fragment navigation 跳至該卡片；子專案卡片位於軍師分組
+    `<details>` 的內容區，瀏覽器會自動展開收合中的分組（與 `_html_detail`
+    錨點同一機制），零 JS。子專案名後附 ⚠N（未接手）／⛔N（卡關）提示，
+    stale 者以灰字標示。無任何軍師時回傳空字串。
+    """
+    if not entries:
+        return ""
+    rows: list[str] = []
+    for k in entries:
+        k_cls = "nav-kunsu nav-stale" if k.stale else "nav-kunsu"
+        row = [f'<a class="{k_cls}" href="#{escape(k.anchor)}">{escape(k.label)}</a>']
+        for sub in k.subs:
+            marks: list[str] = []
+            if sub.not_picked_up:
+                marks.append(f"⚠{sub.not_picked_up}")
+            if sub.blocked:
+                marks.append(f"⛔{sub.blocked}")
+            mark_html = (
+                f' <span class="nav-mark">{" ".join(marks)}</span>' if marks else ""
+            )
+            s_cls = ' class="nav-stale"' if sub.stale else ""
+            row.append(
+                f'<a{s_cls} href="#{escape(sub.anchor)}">{escape(sub.label)}'
+                f"{mark_html}</a>"
+            )
+        rows.append(f"<li>{''.join(row)}</li>")
+    return (
+        '<nav class="card quick-nav"><strong>快速導覽</strong>'
+        f'<ul>{"".join(rows)}</ul></nav>'
+    )
+
+
 def _html_overview(
     pending: PendingAggregate,
     new_messages: int,
@@ -978,6 +1056,7 @@ def index() -> HTMLResponse:
     # 也會巢狀出現在「上游軍師」的分組底下——兩處各自獨立渲染，不合併。
     group_parts: list[str] = []
     covered: set[str] = set()
+    nav_entries: list[_NavKunsuEntry] = []
 
     # 全域總覽累計（頁首總覽列用）
     all_sub_results: list[SubrepoStatusResult] = []
@@ -995,6 +1074,7 @@ def index() -> HTMLResponse:
 
         sub_paths = sorted(kunsu_to_subrepos.get(kunsu_path, ()))
         nested_parts: list[str] = []
+        nav_subs: list[_NavSubEntry] = []
         is_stale = kunsu_path in stale_set
         scan: Optional[KunsuScanResult] = None
         pending: Optional[PendingAggregate] = None
@@ -1006,7 +1086,12 @@ def index() -> HTMLResponse:
                 # 所屬軍師本身 stale，呼叫 get_subrepo_status 只會靜默回傳
                 # 空結果，誤導使用者以為「無待處理交接文件」——改為明確告知
                 # 軍師不可達，不呼叫 get_subrepo_status。
-                nested_parts.append(_html_subrepo_kunsu_unreachable(sp, kunsu_path))
+                sub_anchor = _nav_anchor_id(kunsu_path, sp)
+                nested_parts.append(
+                    f'<div id="{sub_anchor}">'
+                    f'{_html_subrepo_kunsu_unreachable(sp, kunsu_path)}</div>'
+                )
+                nav_subs.append(_NavSubEntry(Path(sp).name or sp, sub_anchor, stale=True))
         else:
             scan = scan_kunsu(kunsu_path)
             todo_result = get_todo_status(kunsu_path)
@@ -1034,14 +1119,33 @@ def index() -> HTMLResponse:
             sub_results: list[SubrepoStatusResult] = []
             for sp in sub_paths:
                 covered.add(sp)
+                sub_anchor = _nav_anchor_id(kunsu_path, sp)
                 if sp in stale_set:
-                    nested_parts.append(_html_subrepo_stale(sp, kunsu_path))
+                    nested_parts.append(
+                        f'<div id="{sub_anchor}">'
+                        f'{_html_subrepo_stale(sp, kunsu_path)}</div>'
+                    )
+                    nav_subs.append(
+                        _NavSubEntry(Path(sp).name or sp, sub_anchor, stale=True)
+                    )
                     continue
                 our_roles = _get_our_roles(data, sp, kunsu_path)
                 all_known = _get_all_known_roles(data, kunsu_path)
                 status = get_subrepo_status(sp, our_roles, all_known, kunsu_path)
                 sub_results.append(status)
-                nested_parts.append(_html_subrepo(sp, kunsu_path, status, graph))
+                nested_parts.append(
+                    f'<div id="{sub_anchor}">'
+                    f'{_html_subrepo(sp, kunsu_path, status, graph)}</div>'
+                )
+                nav_subs.append(_NavSubEntry(
+                    Path(sp).name or sp,
+                    sub_anchor,
+                    not_picked_up=len(status.not_picked_up),
+                    blocked=sum(
+                        1 for h in status.partial_done
+                        if h.latest_reply_status == "blocked"
+                    ),
+                ))
             n_todo_pending = len(todo_result.pending)
             pending = _aggregate_pending(sub_results, todo_pending=n_todo_pending)
             all_sub_results.extend(sub_results)
@@ -1056,12 +1160,22 @@ def index() -> HTMLResponse:
             else ""
         )
         open_attr = " open" if is_open else ""
+        # 軍師錨點掛在 <summary> 之後的內容區：fragment navigation 只對「藏在
+        # <details> 收合內容裡」的目標自動展開分組，掛在 <details> 本身不會。
+        kunsu_anchor = _nav_anchor_id(kunsu_path)
         group_parts.append(
             f'<details class="kunsu-group"{open_attr}>'
             f'<summary>{summary_label}</summary>'
+            f'<span id="{kunsu_anchor}"></span>'
             f'{kunsu_card}{nested_html}'
             '</details>'
         )
+        nav_entries.append(_NavKunsuEntry(
+            Path(kunsu_path).name or kunsu_path,
+            kunsu_anchor,
+            stale=is_stale,
+            subs=tuple(nav_subs),
+        ))
 
     # ── 未歸類的殘留路徑（理論上不應發生，防禦性 fallback） ───────────────
     leftover_stale = [
@@ -1070,6 +1184,9 @@ def index() -> HTMLResponse:
 
     # ── 組裝頁面 ───────────────────────────────────────────────────────────
     body_sections: list[str] = []
+    quick_nav = _html_quick_nav(nav_entries)
+    if quick_nav:
+        body_sections.append(quick_nav)
     overview = _html_overview(
         _aggregate_pending(all_sub_results, todo_pending=total_todo_pending),
         total_new_messages,
