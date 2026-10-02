@@ -246,6 +246,46 @@ def test_stale_kunsu_shows_notice_without_grid(client, monkeypatch, ebook):
     assert 'href="/overview' in html
 
 
+def test_card_shows_unknown_status_kind_tag_and_three_day_states(client, monkeypatch, ebook):
+    """卡片三態：未知 status 原值、信箱類型標籤、停留天數（今天／N 天／不明）（PR #1 review）。"""
+    from datetime import date, timedelta
+    today = date.today().isoformat()
+    old_day = (date.today() - timedelta(days=3)).isoformat()
+    _handoff(ebook, "2026-09-01-u.md", "未知狀態交接")
+    _reply(ebook, "2026-09-01-u-reply-2026-09-05.md", "2026-09-01-u.md", "weird-value")
+    _handoff(ebook, "2026-09-02-t.md", "今天派發", created=today)
+    _handoff(ebook, "2026-09-03-o.md", "三天前派發", created=old_day)
+    _handoff(ebook, "2026-09-04-n.md", "日期不明派發", created="not-a-date")
+    _write(ebook / "docs/applications/2026-09-01-apply.md",
+           "---\ntitle: 申請加入\nstatus: submitted\ncreated: 2026-09-01\n---\n\n申請內文。\n")
+    _write(ebook / "docs/reports/2026-09-01-report.md",
+           "---\ntitle: 上報一件\nstatus: submitted\ncreated: 2026-09-01\n---\n\n上報內文。\n")
+    _install(monkeypatch, {str(ebook): ["android"]}, scans={
+        str(ebook): KunsuScanResult(
+            kunsu_path=str(ebook),
+            new_applications=["docs/applications/2026-09-01-apply.md"],
+            new_reports=["docs/reports/2026-09-01-report.md"],
+        ),
+    })
+    html = client.get("/?k=ebook").text
+    assert "status: weird-value" in html
+    assert 'class="kb-tag kb-tag-kind">申請</span>' in html
+    assert 'class="kb-tag kb-tag-kind">上報</span>' in html
+    assert "今天（" in html
+    assert "已等 3 天（" in html
+    assert "日期不明" in html
+
+
+def test_registry_error_renders_200_with_message_on_board_and_archive(client, monkeypatch):
+    """registry 讀取失敗：/ 與 /archive 皆 HTTP 200 並顯示錯誤訊息（PR #1 review）。"""
+    reg = RegistryResult(healthy=[], stale=[], registry_error="JSON 損壞：模擬", raw={})
+    monkeypatch.setattr("app.main.load_registry", lambda _p: reg)
+    for path in ("/", "/archive", "/handoff?k=x&f=docs/handoffs/a.md"):
+        resp = client.get(path)
+        assert resp.status_code == 200, path
+        assert "Registry 讀取錯誤" in resp.text and "JSON 損壞：模擬" in resp.text
+
+
 # ── archive 頁 ──────────────────────────────────────────────────────────────────
 
 def test_archive_lists_newest_first_with_titles(client, monkeypatch, ebook):

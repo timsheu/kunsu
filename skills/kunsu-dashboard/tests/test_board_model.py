@@ -12,6 +12,8 @@ U2 的 test scenarios：AE1–AE3 歸欄、已回覆但依賴未滿足、孤立�
 
 from pathlib import Path
 
+import pytest
+
 from app.board_model import (
     ANOMALY_DEPENDENCY,
     ANOMALY_PARSE_ERROR,
@@ -227,6 +229,20 @@ def test_unknown_role_is_anomaly_not_card():
 def test_top_level_done_unarchived_is_anomaly_not_card():
     h = _h("a.md")
     board = _build(sub=_sub(not_picked=[h]), graph=_graph([_node("a.md", status="done")]))
+    assert board.card_count == 0
+    assert ANOMALY_TOP_DONE_UNARCHIVED in _kinds(board)
+
+
+@pytest.mark.parametrize("bucket,status", [
+    ("partial", "partial"),
+    ("partial", "blocked"),
+    ("awaiting", "submitted"),
+])
+def test_top_level_done_skip_covers_partial_and_awaiting(bucket, status):
+    """頂層本體已 done 但未歸檔：partial_done／awaiting_confirm 同樣不出卡片（PR #1 review）。"""
+    h = _h("a.md", status=status, reply_date="2026-09-05")
+    sub = _sub(partial=[h]) if bucket == "partial" else _sub(awaiting=[h])
+    board = _build(sub=sub, graph=_graph([_node("a.md", status="done")]))
     assert board.card_count == 0
     assert ANOMALY_TOP_DONE_UNARCHIVED in _kinds(board)
 
