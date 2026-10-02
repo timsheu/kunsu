@@ -36,7 +36,7 @@ def page_shell(body: str, css: str) -> str:
         '</head><body>'
         f'<h1>{PAGE_TITLE}</h1>'
         f'{body}'
-        '<p style="color:#aaa;font-size:.8em;margin-top:3em">'
+        '<p style="color:#6b7280;font-size:.8em;margin-top:3em">'
         '重新整理瀏覽器頁面觸發全新掃描。</p>'
         '</body></html>'
     )

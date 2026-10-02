@@ -444,3 +444,18 @@ def test_handoff_page_degrades_to_pre_when_markdown_unavailable(client, monkeypa
     assert mr.MARKDOWN_UNAVAILABLE_NOTICE in html
     assert "<pre>" in html and "## 標題 &lt;b&gt;x&lt;/b&gt;" in html
     assert "<h2>標題" not in html
+
+
+def test_handoff_page_does_not_repeat_title_from_frontmatter_or_leading_h1(client, monkeypatch, ebook):
+    _write(
+        ebook / "docs/handoffs/2026-09-01-t.md",
+        "---\ntitle: 不重複的標題\nto: android\nstatus: open\n---\n\n# 不重複的標題\n\n"
+        "## 第一節\n\n內文。\n",
+    )
+    _install(monkeypatch, {str(ebook): ["android"]})
+    html = _detail(client, "docs/handoffs/2026-09-01-t.md").text
+    doc = html.split('<div class="kb-doc">')[1]
+    assert doc.count("不重複的標題") == 1
+    assert "<h1>" not in doc
+    assert "<h2>第一節</h2>" in doc
+    assert "<th>title</th>" not in doc

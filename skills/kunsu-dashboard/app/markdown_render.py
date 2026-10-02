@@ -17,6 +17,7 @@ markdown-it-py 為選用依賴（requirements.txt 已列）：匯入失敗時降
 
 from __future__ import annotations
 
+import re
 from html import escape
 from typing import Optional
 
@@ -70,22 +71,44 @@ def _format_value(value) -> str:
     return str(value)
 
 
-def render_frontmatter_table(fm: dict) -> str:
-    """frontmatter 以鍵值表呈現（值一律 escape，不經 Markdown）。空 dict 回空字串。"""
-    if not fm:
-        return ""
+def render_frontmatter_table(fm: dict, omit: tuple[str, ...] = ()) -> str:
+    """frontmatter 以鍵值表呈現（值一律 escape，不經 Markdown）。空 dict 回空字串。
+
+    omit 列出不入表的鍵（例如頁首已以標題呈現的 title），全部被略過時亦回空字串。
+    """
     rows = "".join(
         f"<tr><th>{escape(str(k))}</th><td>{escape(_format_value(v))}</td></tr>"
         for k, v in fm.items()
+        if k not in omit
     )
+    if not rows:
+        return ""
     return f'<table class="kb-fm">{rows}</table>'
 
 
-def render_document(content: str) -> tuple[dict, str]:
+_LEADING_H1_RE = re.compile(r"^\s*#\s+(.+?)\s*#*\s*$", re.M)
+
+
+def _drop_leading_h1(body: str, title: str) -> str:
+    """本文第一個非空行若是與 title 同文的 `# 標題`，去掉它（頁首已顯示標題）。"""
+    stripped = body.lstrip("\n")
+    first_line, _, rest = stripped.partition("\n")
+    m = _LEADING_H1_RE.match(first_line)
+    if m and m.group(1).strip() == title.strip():
+        return rest
+    return body
+
+
+def render_document(content: str, *, title: Optional[str] = None) -> tuple[dict, str]:
     """拆 frontmatter 後渲染整份文件；回傳 (frontmatter dict, HTML 片段)。
 
     frontmatter 解析失敗時 split_frontmatter 回傳空 dict 與完整原文，
-    此時整份內容交由 Markdown 渲染，不會遺失文字。
+    此時整份內容交由 Markdown 渲染，不會遺失文字。給了 title 時，frontmatter
+    表略過 title 列、本文開頭與之同文的 `# 標題` 行不重複渲染（頁首已顯示）。
     """
     fm, body = split_frontmatter(content)
-    return fm, render_frontmatter_table(fm) + render_markdown(body)
+    omit: tuple[str, ...] = ()
+    if title:
+        omit = ("title",)
+        body = _drop_leading_h1(body, title)
+    return fm, render_frontmatter_table(fm, omit) + render_markdown(body)
