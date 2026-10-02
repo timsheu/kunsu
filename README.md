@@ -23,7 +23,7 @@
 | `kunsu-list` | 唯讀列出全域註冊表全部登記，含 stale 偵測與當前位置標記 |
 | `handoff` | 通用交接原語：`add`（斷言層級紀律——引用中介文件標「依 X 記載」、據以實作的斷言落原始碼並留查證痕跡；引用以完整檔名為權威識別；更正交接——已定案交接有誤時發更正交接並在原本體 frontmatter 補 `corrected_by` 指標）／`reply`（`verify:` 驗收方式、暫離回報、矛盾回報——發現交接與自身參照物不符時即使不影響實作也明列）／`list`／`done`（逐項驗收、沉澱訊號、反向路由、來源 todo 收尾與殘項清點、斷言自查等歸檔前查核；歸檔由 `archive-handoff.sh` 執行——status 更新、本體與回覆成對 `git mv`、僅暫存具體路徑，印出帶宣告範圍 pathspec 的待確認 commit 指令而不自動 commit）。`add` 產檔後印出近期同收件角色的交接候選與 zoekt 關鍵詞命中（advisory 查重）。單 repo 專案也能獨立使用；kunsu 語境下 `add`／`reply` 內建派發即推播／回覆即推播（[ADR 015](docs/adr/2026-08-13-adr-candidate-015-dispatch-push-notification.md)）；手動呼叫產檔腳本時 stderr 指路行提示回讀對應指引 |
 | `todo` | CE 副作用技術債清單：一檔一項落在 `docs/todos/`，`add`／`list`／`done`（歸檔前先清點檔內未完成殘項）／`rm`；歸檔由 `archive-todo.sh` 執行，handoff `done` 收尾時一併找出並收尾來源 todo |
-| 軍師沙盤 | 本機網頁一頁彙整所有軍師與子專案的訊息狀態與待辦技術債（非 skill，見 [ADR 010](docs/adr/2026-07-11-adr-candidate-010-dashboard-service-exception.md)） |
+| 軍師沙盤 | 本機網頁：看板首頁依「球在誰手上」攤開每個軍師的未收尾交接與信箱新件，另有全文頁、已完成頁與完整彙整頁；可選登入自動啟動（非 skill，見 [ADR 010](docs/adr/2026-07-11-adr-candidate-010-dashboard-service-exception.md)、[ADR 020](docs/adr/2026-10-01-adr-candidate-020-dashboard-login-autostart.md)） |
 | SessionStart hook | session 啟動（含 `/clear`）自動攤開 kunsu 信箱摘要；toolkit 升版後另提示一行「handoff skill 已更新至 vX」使長駐 session 得知指引有變。未登記 repo 靜默、fail-open 不阻斷 session（隨 kunsu-inbox skill 部署，於各 agent 的 hook 設定檔掛載後生效，見 [ADR 014](docs/adr/2026-08-13-adr-candidate-014-sessionstart-hook-activation.md)） |
 | PreToolUse git add 守門 | 在軍師 repo 內攔下 `git add -A`／`.`／涵蓋信箱路徑的整目錄 add，deny 訊息內嵌逐檔列名與歸檔腳本的正確做法；`KUNSU_ADD_GUARD_OFF=1` 前綴單次放行、deny 事件記入掃描統計。這是 kunsu 唯一的行為強制點，判準四要件：機械可判、規則已明文、可逆、零能力限縮（[ADR 017](docs/adr/2026-08-29-adr-candidate-017-pretooluse-git-add-guard.md)） |
 | `kc` 啟動函式 | fish 函式：依註冊表以 kunsu session 命名慣例自動 `claude -n` 啟動，使推播匹配走精確比對；`--slot <後綴>` 區分同資料夾多 session（`scripts/kc.fish`；Claude Code 限定，Codex 無 session 命名與推播、不需此函式） |
@@ -73,7 +73,14 @@ cd kunsu
 
 ## 軍師沙盤（選用）
 
-獨立的本機 FastAPI 服務。首頁是看板：每個軍師一張，每份未收尾的交接掛在下一個要動作的角色（軍師或子專案）底下，依等待中／待辦／進行中／待驗收分欄，一眼看出球在誰手上；完整彙整頁（`/overview`）保留所有軍師與子專案的分組明細、三信箱新訊息、依賴圖與待辦技術債，archive 頁列出已完成的交接。重新整理頁面才掃描、無背景常駐、純手動啟停。安裝啟動與頁面導覽見 **[docs/playbooks/dashboard.md](docs/playbooks/dashboard.md)**。
+獨立的本機 FastAPI 服務，把所有軍師與子專案的訊息狀態攤在同一個瀏覽器分頁，取代逐一切換 CLI 視窗手動執行 `kunsu-inbox`。四個頁面：
+
+- **看板（首頁 `/`）**：每個軍師一張，縱向泳道是持球者（軍師置頂，其下為各子專案角色），橫向依等待中／待辦／進行中／待驗收分欄。尚無回覆的交接掛在收件角色底下（依賴未滿足者進等待中並標所等的前置交接）、`partial` 進收件角色進行中、`blocked` 進軍師進行中並標 ⛔ 卡關、`submitted` 進軍師待驗收並標驗收方式，未 commit 的新申請／新上報進軍師待辦。卡片顯示標題、驗收方式、停留天數、線別與最新回覆摘錄；有異常（軍師路徑失聯、tripwire、已標 done 未歸檔、回覆自標 done 等）時頂端出現一行警示並連到完整彙整頁，異常件不上看板。
+- **全文頁（`/handoff`）**：卡片與已完成列表的「全文」連結開啟獨立頁面，frontmatter 鍵值表＋交接本體的 Markdown 伺服器端渲染（markdown-it-py，缺席時降級純文字），另列依賴區塊與同串回覆舊→新。路徑參數只接受四個信箱目錄下的單層 `.md`，HTML 一律轉義。
+- **已完成（`/archive`）**：依日期由新到舊列出已歸檔交接，每筆標題即全文頁連結。
+- **完整彙整頁（`/overview`）**：原首頁，保留軍師分組與子專案巢狀明細、三信箱新訊息、依賴圖、交接三分類（未接手／部分完成／已回覆待確認依 `verify:` 子分組）與待辦技術債卡片。
+
+頁首有四組配色主題（墨與朱、沙盤、青瓷、夜戰）可點選切換，選擇存在瀏覽器 localStorage，伺服器不持有狀態。設計邊界不變：唯讀、重新整理頁面才掃描（看板不跑 `scan-replies.sh`，避免推進歷史夾帶偵測基線）、無背景輪詢；啟停由使用者掌握——前景手動啟動，或親手安裝只含 `RunAtLoad` 的 macOS LaunchAgent 於登入時啟動一次（範本與安裝步驟見 SKILL.md，[ADR 020](docs/adr/2026-10-01-adr-candidate-020-dashboard-login-autostart.md)）。安裝啟動與頁面導覽見 **[docs/playbooks/dashboard.md](docs/playbooks/dashboard.md)**。
 
 ## 知悉層自動化（選用）
 
@@ -118,8 +125,8 @@ skills/
   kunsu-apply/         → 申請投遞 skill（SKILL.md＋new-application.sh）
   kunsu-report/        → 上報投遞 skill（SKILL.md＋new-report.sh）
   kunsu-list/          → 全域登記清單查詢 skill（SKILL.md＋registry-list.sh）
-  kunsu-dashboard/     → 軍師沙盤（kunsu dashboard），本機訊息聚合頁面（非可觸發的 skill，frontmatter 以兩 agent 原生旗標停用選用，見 ADR 010／019）
-scripts/               → kc.fish（session 自動命名啟動函式，`--slot` 後綴）、consistency-check.sh（跨檔案一致性機械檢查，30 項）、codex-pilot.sh（Codex 雙端試點）
+  kunsu-dashboard/     → 軍師沙盤（kunsu dashboard）：看板／全文頁／已完成頁／完整彙整頁的本機 FastAPI 服務，含 launchd/ 登入自啟 plist 範本（非可觸發的 skill，frontmatter 以兩 agent 原生旗標停用選用，見 ADR 010／019／020）
+scripts/               → kc.fish（session 自動命名啟動函式，`--slot` 後綴）、consistency-check.sh（跨檔案一致性機械檢查，43 項）、codex-pilot.sh（Codex 雙端試點）
 install.sh             → 部署腳本（Claude Code `~/.claude/skills/`；偵測到 `~/.codex/` 時一併部署 Codex `~/.agents/skills/`）
 docs/                  → 本工具組自身的需求、ADR、實作計畫、操作教學與可重用學習
 ```
