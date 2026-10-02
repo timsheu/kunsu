@@ -84,7 +84,7 @@ def test_waiting_handoff_renders_svg_anchors_label_and_overview_chip(tmp_path, m
     _mk(top, B, depends_on=f"[{A}]")
     sub = SubrepoStatusResult(not_picked_up=[_handoff(A), _handoff(B)], partial_done=[],
                               awaiting_confirm=[], unknown_to=[], errors=[])
-    html = _client_for(monkeypatch, k, sub).get("/").text
+    html = _client_for(monkeypatch, k, sub).get("/overview").text
     assert "<svg" in html
     assert f'href="#{anchor_id(str(k), A)}"' in html and f'href="#{anchor_id(str(k), B)}"' in html
     assert f'</summary><span id="{anchor_id(str(k), B)}"></span><pre>' in html
@@ -101,7 +101,7 @@ def test_ae3_blocked_and_waiting_coexist(tmp_path, monkeypatch):
     sub = SubrepoStatusResult(not_picked_up=[_handoff(A)],
                               partial_done=[_handoff(B, "blocked", "2026-09-05")],
                               awaiting_confirm=[], unknown_to=[], errors=[])
-    html = _client_for(monkeypatch, k, sub).get("/").text
+    html = _client_for(monkeypatch, k, sub).get("/overview").text
     # 定位到子專案卡片內 B 的摘要列（SVG 內也含檔名，故自「部分完成」標題起找）
     b_start = html.index(B, html.index("部分完成（1）"))
     seg = html[b_start: b_start + 600]
@@ -115,7 +115,7 @@ def test_ae6_no_depends_on_has_no_labels_and_says_none(tmp_path, monkeypatch):
     _mk(archive, C, status="done")
     sub = SubrepoStatusResult(not_picked_up=[_handoff(A), _handoff(B)], partial_done=[],
                               awaiting_confirm=[], unknown_to=[], errors=[])
-    html = _client_for(monkeypatch, k, sub).get("/").text
+    html = _client_for(monkeypatch, k, sub).get("/overview").text
     body = html[html.index("<body"):]
     assert 'class="dlabel' not in body
     assert "交接依賴圖：無依賴宣告" in body
@@ -130,7 +130,7 @@ def test_cycle_renders_svg_same_column_and_issue_list(tmp_path, monkeypatch):
     _mk(top, B, depends_on=f"[{A}]")
     sub = SubrepoStatusResult(not_picked_up=[_handoff(A), _handoff(B)], partial_done=[],
                               awaiting_confirm=[], unknown_to=[], errors=[])
-    html = _client_for(monkeypatch, k, sub).get("/").text
+    html = _client_for(monkeypatch, k, sub).get("/overview").text
     assert "<svg" in html
     assert f"⟳ 循環：{A}、{B}" in html
     assert "⟳ 依賴圖異常 1" in html
@@ -147,7 +147,7 @@ def test_unresolved_edge_lists_reason_and_draws_ghost_in_first_column(tmp_path, 
     _mk(top, B, depends_on=f"[{A}, 2026-01-01-nope.md]")
     sub = SubrepoStatusResult(not_picked_up=[_handoff(B)], partial_done=[],
                               awaiting_confirm=[], unknown_to=[], errors=[])
-    html = _client_for(monkeypatch, k, sub).get("/").text
+    html = _client_for(monkeypatch, k, sub).get("/overview").text
     assert f"無法解析：{B} → 2026-01-01-nope.md（不存在）" in html
     assert 'stroke-dasharray="5,4"' in html
     assert "無法解析</text>" in html
@@ -167,7 +167,7 @@ def test_more_than_max_active_degrades_to_text_list(tmp_path, monkeypatch):
         _mk(top, f"2026-08-{i + 1:02d}-iso{i}.md")
     sub = SubrepoStatusResult(not_picked_up=[], partial_done=[], awaiting_confirm=[],
                               unknown_to=[], errors=[])
-    html = _client_for(monkeypatch, k, sub).get("/").text
+    html = _client_for(monkeypatch, k, sub).get("/overview").text
     assert "<svg" not in html
     assert f"活節點 {SVG_MAX_ACTIVE + 1} 筆超過 {SVG_MAX_ACTIVE}，改列文字清單" in html
     assert '<ul class="dep-list">' in html
@@ -179,7 +179,7 @@ def test_corrected_by_label_lists_each_filename(tmp_path, monkeypatch):
     _mk(top, B, depends_on=f"[{A}]", corrected_by=f"\n  - {C}\n  - 2026-09-09-y.md")
     sub = SubrepoStatusResult(not_picked_up=[_handoff(B)], partial_done=[],
                               awaiting_confirm=[], unknown_to=[], errors=[])
-    html = _client_for(monkeypatch, k, sub).get("/").text
+    html = _client_for(monkeypatch, k, sub).get("/overview").text
     assert f'dlabel-corrected">已被更正：{C}、2026-09-09-y.md</span>' in html
 
 

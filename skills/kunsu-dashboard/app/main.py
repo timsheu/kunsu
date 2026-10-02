@@ -1,7 +1,9 @@
 """
 main.py — 軍師沙盤（kunsu dashboard）FastAPI 應用
 
-GET / 路由彙整全域反向註冊表所有軍師與子專案的訊息狀態，渲染為單頁 HTML。
+三個端點皆回傳 HTML：GET / 為看板（每軍師一張，持球者泳道 × 狀態欄）；
+GET /overview 為原彙整頁（全域反向註冊表所有軍師與子專案的訊息狀態、
+異常與依賴圖）；GET /archive 列出指定軍師已歸檔的交接。
 
 ADR 010 Decision 1.5：所有端點僅回傳 text/html，不提供任何 JSON／XML
 等結構化格式端點，確保本工具不構成機器對機器介面。
@@ -17,7 +19,7 @@ import os
 import re
 import sys
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date
 from html import escape
 from itertools import groupby
 from pathlib import Path
@@ -35,7 +37,15 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 
-from app.registry import RegistryResult, load_registry
+from app.registry import (
+    DEFAULT_REGISTRY,
+    RegistryResult,
+    build_kunsu_paths,
+    get_all_known_roles,
+    get_our_roles,
+    get_registry_path,
+    load_registry,
+)
 from app.kunsu_scan import KunsuScanResult, scan_kunsu
 from app.subrepo_status import (
     ErrorItem,
@@ -51,6 +61,14 @@ from app.todo_status import (
     get_todo_status,
 )
 from app.handoff_graph import DERIVED_WAITING, HandoffGraphResult, get_handoff_graph
+from app.board_routes import router as board_router
+from app.html_common import (
+    VERIFY_LABELS,
+    format_mtime,
+    nav_anchor_id,
+    page_shell,
+    read_related_file,
+)
 from app.handoff_graph_html import (
     CSS as _DEP_CSS,
     anchor_id as _dep_anchor_id,
@@ -62,60 +80,15 @@ from app.handoff_graph_html import (
 # 禁用 OpenAPI、Docs、ReDoc 端點，確保 app 內無任何 JSON 端點存在
 # （ADR 010 Decision 1.5 可程式碼驗證的技術條件）。
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+app.include_router(board_router)
 
-_DEFAULT_REGISTRY = os.path.expanduser("~/.claude/kunsu-registry.json")
-
-
-# ── Registry 路徑解析 ─────────────────────────────────────────────────────────
-
-def _get_registry_path() -> str:
-    """取得 registry 路徑。
-
-    優先讀取環境變數 KUNSU_REGISTRY_PATH（測試覆寫用途），
-    未設定時使用預設路徑 ~/.claude/kunsu-registry.json。
-    在 request 時呼叫（非模組匯入時），確保測試透過 monkeypatch.setenv 覆寫有效。
-    """
-    return os.environ.get("KUNSU_REGISTRY_PATH", _DEFAULT_REGISTRY)
-
-
-# ── 身分判斷輔助 ──────────────────────────────────────────────────────────────
-
-def _build_kunsu_paths(data: dict) -> set[str]:
-    """提取所有軍師路徑——出現在任一條目 kunsu 欄位的路徑集合。"""
-    result: set[str] = set()
-    for entries in data.values():
-        if isinstance(entries, list):
-            for entry in entries:
-                if isinstance(entry, dict):
-                    k = entry.get("kunsu", "")
-                    if k:
-                        result.add(k)
-    return result
-
-
-def _get_our_roles(data: dict, subrepo_path: str, kunsu_path: str) -> set[str]:
-    """取得子專案在指定軍師底下的角色代碼集合。"""
-    roles: set[str] = set()
-    for entry in data.get(subrepo_path) or []:
-        if isinstance(entry, dict) and entry.get("kunsu") == kunsu_path:
-            for role in entry.get("roles") or []:
-                if role:
-                    roles.add(str(role))
-    return roles
-
-
-def _get_all_known_roles(data: dict, kunsu_path: str) -> set[str]:
-    """取得指定軍師底下所有子專案角色代碼的聯集。"""
-    roles: set[str] = set()
-    for entries in data.values():
-        if not isinstance(entries, list):
-            continue
-        for entry in entries:
-            if isinstance(entry, dict) and entry.get("kunsu") == kunsu_path:
-                for role in entry.get("roles") or []:
-                    if role:
-                        roles.add(str(role))
-    return roles
+# registry 路徑與角色輔助自 app.registry 匯入；保留底線別名供 overview 路由與既有
+# 測試（monkeypatch "app.main._get_registry_path" 等）沿用
+_DEFAULT_REGISTRY = DEFAULT_REGISTRY
+_get_registry_path = get_registry_path
+_build_kunsu_paths = build_kunsu_paths
+_get_our_roles = get_our_roles
+_get_all_known_roles = get_all_known_roles
 
 
 # ── CSS ──────────────────────────────────────────────────────────────────────
@@ -161,6 +134,15 @@ _CSS = (
     ".badge-other,.tlabel-other{background:#f0f0f0;color:#555}"
     ".badge-blocked,.tlabel-high{background:#ffebee;color:#b71c1c}"
     ".badge-status-unknown,.tlabel-orphaned{background:#f3e5f5;color:#7b1fa2}"
+    ".quick-nav{border-color:#b0bec5;background:#fafafa;font-size:.9em;padding:.5em 1em}"
+    ".quick-nav ul{list-style:none;padding:0;margin:0}"
+    ".quick-nav li{margin:.15em 0}"
+    ".quick-nav a{color:#1565c0;text-decoration:none;margin-right:.6em;white-space:nowrap}"
+    ".quick-nav a:hover{text-decoration:underline}"
+    ".quick-nav .nav-kunsu{font-weight:700;margin-right:.8em}"
+    ".quick-nav .nav-mark{color:#b71c1c;font-weight:600;font-size:.85em}"
+    ".quick-nav .nav-stale{color:#616161}"
+    "[id^=nav-]{scroll-margin-top:.6em}"
     ".overview{border-color:#90caf9;background:#f7fbff;display:flex;"
     "flex-wrap:wrap;gap:.4em;align-items:center}"
     ".chip{display:inline-block;padding:.15em .6em;border-radius:12px;"
@@ -185,20 +167,8 @@ _CSS = (
 # ── HTML 渲染輔助 ─────────────────────────────────────────────────────────────
 
 def _page(body: str) -> str:
-    """以 body 內容組裝完整 HTML 頁面骨架。"""
-    return (
-        '<!DOCTYPE html><html lang="zh-Hant"><head>'
-        '<meta charset="utf-8">'
-        '<meta name="viewport" content="width=device-width,initial-scale=1">'
-        '<title>軍師沙盤（kunsu dashboard）</title>'
-        f'<style>{_CSS}</style>'
-        '</head><body>'
-        '<h1>軍師沙盤（kunsu dashboard）</h1>'
-        f'{body}'
-        '<p style="color:#aaa;font-size:.8em;margin-top:3em">'
-        '重新整理瀏覽器頁面觸發全新掃描。</p>'
-        '</body></html>'
-    )
+    """以 body 內容組裝完整 HTML 頁面骨架（原彙整頁樣式）。"""
+    return page_shell(body, _CSS)
 
 
 def _html_error(msg: str) -> str:
@@ -243,28 +213,6 @@ def _html_subrepo_kunsu_unreachable(path: str, kunsu_path: str) -> str:
     )
 
 
-def _read_related_file(base_path: str, rel_path: str) -> tuple[str, Optional[float]]:
-    """讀取 base_path 底下 rel_path 檔案內容與最後修改時間，供展開式預覽使用。
-
-    讀取失敗（檔案在掃描與渲染之間被搬移／歸檔，或權限問題等競態）不拋例外，
-    回傳錯誤提示字串與 None，避免單一檔案讀取失敗導致整頁渲染中斷。
-    """
-    full_path = Path(base_path) / rel_path
-    try:
-        content = full_path.read_text(encoding="utf-8")
-        mtime = full_path.stat().st_mtime
-    except (OSError, UnicodeDecodeError) as e:
-        return f"（無法讀取檔案內容：{e}）", None
-    return content, mtime
-
-
-def _format_mtime(mtime: Optional[float]) -> str:
-    """將檔案最後修改時間（epoch）格式化為可讀字串；None 時回傳空字串。"""
-    if mtime is None:
-        return ""
-    return datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
-
-
 def _html_detail(summary_html: str, content: str, anchor_id: Optional[str] = None) -> str:
     """展開式預覽卡片（原生 <details>/<summary>，無需 JS）。
 
@@ -296,7 +244,7 @@ def _html_summary_line(mtime_str: str, name_html: str) -> str:
 
 def _html_latest_badge(mtime: Optional[float]) -> str:
     """分類標題列的「最新」時間標示；mtime 為 None 時回傳空字串。"""
-    s = _format_mtime(mtime)
+    s = format_mtime(mtime)
     return f' <span class="mtime">最新 {escape(s)}</span>' if s else ""
 
 
@@ -311,23 +259,17 @@ def _render_kunsu_category(
     items_html: list[str] = []
     mtimes: list[float] = []
     for rel_path in rel_paths:
-        content, mtime = _read_related_file(base_path, rel_path)
+        content, mtime = read_related_file(base_path, rel_path)
         if mtime is not None:
             mtimes.append(mtime)
-        mtime_str = _format_mtime(mtime)
+        mtime_str = format_mtime(mtime)
         summary = _html_summary_line(mtime_str, f'<code>{escape(rel_path)}</code>')
         items_html.append(_html_detail(summary, content))
     latest = max(mtimes) if mtimes else None
     return "".join(items_html), latest
 
 
-# ── verify 標籤對照（ADR 011）──────────────────────────────────────────────
-# 建議代碼 → (中文標籤, CSS class)；其他非空字串原樣顯示為一般標籤（badge-other）
-_VERIFY_LABELS: dict[str, tuple[str, str]] = {
-    "needs-deploy": ("需上線測試 🚀", "badge-deploy"),
-    "testable-now": ("馬上可測 ⚡", "badge-now"),
-    "needs-device": ("需實機測試 📱", "badge-device"),
-}
+# verify 標籤對照（ADR 011）見 app.html_common.VERIFY_LABELS；其他非空字串原樣顯示為一般標籤（badge-other）
 
 
 def _html_status_badges(h: HandoffInfo) -> str:
@@ -351,7 +293,7 @@ def _html_status_badges(h: HandoffInfo) -> str:
         # 建議代碼為全小寫 kebab-case；查找前正規化為小寫（ADR 011），
         # 大小寫變體（Needs-Deploy 等）仍命中彩色標籤，不靜默降格。
         # 未命中的自由字串一律原樣顯示「原始值」，不顯示正規化後的字串。
-        known = _VERIFY_LABELS.get(verify.lower())
+        known = VERIFY_LABELS.get(verify.lower())
         if known:
             label, css = known
             badges.append(f'<span class="badge {css}">{label}</span>')
@@ -371,7 +313,7 @@ def _verify_sort_key(h: HandoffInfo) -> tuple:
     做顯式子分組（見下方）。
     """
     verify = h.latest_reply_verify
-    if verify and verify.lower() in _VERIFY_LABELS:
+    if verify and verify.lower() in VERIFY_LABELS:
         group, value = 0, verify.lower()
     elif verify:
         group, value = 1, verify
@@ -426,7 +368,7 @@ def _html_handoff_detail(
     graph 給定時附交接依賴圖的推導態標籤（可開工／等依賴／已被更正／異常；
     孤立節點不附）並掛錨點供 SVG 節點連結；與 ⛔ 卡關等既有 badge 並列不互抑。
     """
-    mtime_str = _format_mtime(h.mtime)
+    mtime_str = format_mtime(h.mtime)
     name_html = (
         f'{escape(h.title)} '
         f'<span class="filename">({escape(h.filename)})</span>'
@@ -607,6 +549,58 @@ def _kunsu_group_open_and_label(
     return True, f'軍師：<code>{esc}</code>（{total} 則新訊息）{suffix}'
 
 
+@dataclass(frozen=True)
+class _NavSubEntry:
+    label: str
+    anchor: str
+    stale: bool = False
+    not_picked_up: int = 0
+    blocked: int = 0
+
+
+@dataclass(frozen=True)
+class _NavKunsuEntry:
+    label: str
+    anchor: str
+    stale: bool = False
+    subs: tuple[_NavSubEntry, ...] = ()
+
+
+def _html_quick_nav(entries: list[_NavKunsuEntry]) -> str:
+    """頁首快速導覽：每個軍師一行，列出軍師目錄名與所屬子專案目錄名連結。
+
+    點擊即以 fragment navigation 跳至該卡片；子專案卡片位於軍師分組
+    `<details>` 的內容區，瀏覽器會自動展開收合中的分組（與 `_html_detail`
+    錨點同一機制），零 JS。子專案名後附 ⚠N（未接手）／⛔N（卡關）提示，
+    stale 者以灰字標示。無任何軍師時回傳空字串。
+    """
+    if not entries:
+        return ""
+    rows: list[str] = []
+    for k in entries:
+        k_cls = "nav-kunsu nav-stale" if k.stale else "nav-kunsu"
+        row = [f'<a class="{k_cls}" href="#{escape(k.anchor)}">{escape(k.label)}</a>']
+        for sub in k.subs:
+            marks: list[str] = []
+            if sub.not_picked_up:
+                marks.append(f"⚠{sub.not_picked_up}")
+            if sub.blocked:
+                marks.append(f"⛔{sub.blocked}")
+            mark_html = (
+                f' <span class="nav-mark">{" ".join(marks)}</span>' if marks else ""
+            )
+            s_cls = ' class="nav-stale"' if sub.stale else ""
+            row.append(
+                f'<a{s_cls} href="#{escape(sub.anchor)}">{escape(sub.label)}'
+                f"{mark_html}</a>"
+            )
+        rows.append(f"<li>{''.join(row)}</li>")
+    return (
+        '<nav class="card quick-nav"><strong>快速導覽</strong>'
+        f'<ul>{"".join(rows)}</ul></nav>'
+    )
+
+
 def _html_overview(
     pending: PendingAggregate,
     new_messages: int,
@@ -782,7 +776,7 @@ def _html_kunsu(path: str, result: KunsuScanResult) -> str:
 
 def _html_todo_item(t: TodoInfo, *, orphaned: bool = False) -> str:
     """單一待辦技術債的展開式預覽卡片，摘要列含標題、檔名、狀態與 severity 標籤。"""
-    mtime_str = _format_mtime(t.mtime)
+    mtime_str = format_mtime(t.mtime)
     labels: list[str] = []
     if orphaned:
         labels.append('<span class="tlabel tlabel-orphaned">看似完成但未歸檔</span>')
@@ -931,11 +925,15 @@ def _html_subrepo(
     return "".join(parts)
 
 
-# ── 路由（唯一端點） ──────────────────────────────────────────────────────────
+# ── 路由：原彙整頁 /overview ──────────────────────────────────────────────────
 
-@app.get("/", response_class=HTMLResponse)
-def index() -> HTMLResponse:
-    """彙整全部軍師與子專案訊息狀態，渲染為 text/html。
+# 原彙整頁頂端連回看板（看板化計畫 U3）
+_BACK_TO_BOARD = '<p class="back-to-board"><a href="/">← 回看板</a></p>'
+
+
+@app.get("/overview", response_class=HTMLResponse)
+def overview() -> HTMLResponse:
+    """彙整全部軍師與子專案訊息狀態，渲染為 text/html（原首頁，看板化後搬至 /overview）。
 
     遵守 ADR 010 Decision 1.5：本函式及 app 內所有路由僅回傳 text/html。
     registry 讀取失敗時仍回傳 HTTP 200（計畫明確要求），
@@ -946,11 +944,11 @@ def index() -> HTMLResponse:
 
     # ── 錯誤狀態：registry 無法讀取 ─────────────────────────────────────────
     if reg.registry_error:
-        return HTMLResponse(content=_page(_html_error(reg.registry_error)))
+        return HTMLResponse(content=_page(_BACK_TO_BOARD + _html_error(reg.registry_error)))
 
     # ── 空登記狀態：healthy 與 stale 皆空 ─────────────────────────────────
     if not reg.healthy and not reg.stale:
-        return HTMLResponse(content=_page(_html_empty()))
+        return HTMLResponse(content=_page(_BACK_TO_BOARD + _html_empty()))
 
     # ── 身分判斷（軍師 vs 子專案） ─────────────────────────────────────────
     # reg.raw 是 load_registry 內部已解析的同一份資料，不再次開檔讀取——
@@ -978,6 +976,7 @@ def index() -> HTMLResponse:
     # 也會巢狀出現在「上游軍師」的分組底下——兩處各自獨立渲染，不合併。
     group_parts: list[str] = []
     covered: set[str] = set()
+    nav_entries: list[_NavKunsuEntry] = []
 
     # 全域總覽累計（頁首總覽列用）
     all_sub_results: list[SubrepoStatusResult] = []
@@ -995,6 +994,7 @@ def index() -> HTMLResponse:
 
         sub_paths = sorted(kunsu_to_subrepos.get(kunsu_path, ()))
         nested_parts: list[str] = []
+        nav_subs: list[_NavSubEntry] = []
         is_stale = kunsu_path in stale_set
         scan: Optional[KunsuScanResult] = None
         pending: Optional[PendingAggregate] = None
@@ -1006,7 +1006,12 @@ def index() -> HTMLResponse:
                 # 所屬軍師本身 stale，呼叫 get_subrepo_status 只會靜默回傳
                 # 空結果，誤導使用者以為「無待處理交接文件」——改為明確告知
                 # 軍師不可達，不呼叫 get_subrepo_status。
-                nested_parts.append(_html_subrepo_kunsu_unreachable(sp, kunsu_path))
+                sub_anchor = nav_anchor_id(kunsu_path, sp)
+                nested_parts.append(
+                    f'<div id="{sub_anchor}">'
+                    f'{_html_subrepo_kunsu_unreachable(sp, kunsu_path)}</div>'
+                )
+                nav_subs.append(_NavSubEntry(Path(sp).name or sp, sub_anchor, stale=True))
         else:
             scan = scan_kunsu(kunsu_path)
             todo_result = get_todo_status(kunsu_path)
@@ -1034,14 +1039,33 @@ def index() -> HTMLResponse:
             sub_results: list[SubrepoStatusResult] = []
             for sp in sub_paths:
                 covered.add(sp)
+                sub_anchor = nav_anchor_id(kunsu_path, sp)
                 if sp in stale_set:
-                    nested_parts.append(_html_subrepo_stale(sp, kunsu_path))
+                    nested_parts.append(
+                        f'<div id="{sub_anchor}">'
+                        f'{_html_subrepo_stale(sp, kunsu_path)}</div>'
+                    )
+                    nav_subs.append(
+                        _NavSubEntry(Path(sp).name or sp, sub_anchor, stale=True)
+                    )
                     continue
                 our_roles = _get_our_roles(data, sp, kunsu_path)
                 all_known = _get_all_known_roles(data, kunsu_path)
                 status = get_subrepo_status(sp, our_roles, all_known, kunsu_path)
                 sub_results.append(status)
-                nested_parts.append(_html_subrepo(sp, kunsu_path, status, graph))
+                nested_parts.append(
+                    f'<div id="{sub_anchor}">'
+                    f'{_html_subrepo(sp, kunsu_path, status, graph)}</div>'
+                )
+                nav_subs.append(_NavSubEntry(
+                    Path(sp).name or sp,
+                    sub_anchor,
+                    not_picked_up=len(status.not_picked_up),
+                    blocked=sum(
+                        1 for h in status.partial_done
+                        if h.latest_reply_status == "blocked"
+                    ),
+                ))
             n_todo_pending = len(todo_result.pending)
             pending = _aggregate_pending(sub_results, todo_pending=n_todo_pending)
             all_sub_results.extend(sub_results)
@@ -1056,12 +1080,22 @@ def index() -> HTMLResponse:
             else ""
         )
         open_attr = " open" if is_open else ""
+        # 軍師錨點掛在 <summary> 之後的內容區：fragment navigation 只對「藏在
+        # <details> 收合內容裡」的目標自動展開分組，掛在 <details> 本身不會。
+        kunsu_anchor = nav_anchor_id(kunsu_path)
         group_parts.append(
             f'<details class="kunsu-group"{open_attr}>'
             f'<summary>{summary_label}</summary>'
+            f'<span id="{kunsu_anchor}"></span>'
             f'{kunsu_card}{nested_html}'
             '</details>'
         )
+        nav_entries.append(_NavKunsuEntry(
+            Path(kunsu_path).name or kunsu_path,
+            kunsu_anchor,
+            stale=is_stale,
+            subs=tuple(nav_subs),
+        ))
 
     # ── 未歸類的殘留路徑（理論上不應發生，防禦性 fallback） ───────────────
     leftover_stale = [
@@ -1070,6 +1104,9 @@ def index() -> HTMLResponse:
 
     # ── 組裝頁面 ───────────────────────────────────────────────────────────
     body_sections: list[str] = []
+    quick_nav = _html_quick_nav(nav_entries)
+    if quick_nav:
+        body_sections.append(quick_nav)
     overview = _html_overview(
         _aggregate_pending(all_sub_results, todo_pending=total_todo_pending),
         total_new_messages,
@@ -1093,7 +1130,7 @@ def index() -> HTMLResponse:
         # healthy/stale 非空但身分未能識別（理論上不應發生）
         body_sections.append(_html_empty())
 
-    return HTMLResponse(content=_page("".join(body_sections)))
+    return HTMLResponse(content=_page(_BACK_TO_BOARD + "".join(body_sections)))
 
 
 # ── 程式化啟動 ────────────────────────────────────────────────────────────────

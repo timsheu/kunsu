@@ -144,3 +144,60 @@ def load_registry(registry_path: str | Path) -> RegistryResult:
             stale.append(path)
 
     return RegistryResult(healthy=healthy, stale=stale, raw=data)
+
+
+# ── registry 路徑與角色輔助（自 main.py 搬入，供 main 與 board_routes 共用）──
+
+DEFAULT_REGISTRY = os.path.expanduser("~/.claude/kunsu-registry.json")
+
+
+# ── Registry 路徑解析 ─────────────────────────────────────────────────────────
+
+def get_registry_path() -> str:
+    """取得 registry 路徑。
+
+    優先讀取環境變數 KUNSU_REGISTRY_PATH（測試覆寫用途），
+    未設定時使用預設路徑 ~/.claude/kunsu-registry.json。
+    在 request 時呼叫（非模組匯入時），確保測試透過 monkeypatch.setenv 覆寫有效。
+    """
+    return os.environ.get("KUNSU_REGISTRY_PATH", DEFAULT_REGISTRY)
+
+
+# ── 身分判斷輔助 ──────────────────────────────────────────────────────────────
+
+def build_kunsu_paths(data: dict) -> set[str]:
+    """提取所有軍師路徑——出現在任一條目 kunsu 欄位的路徑集合。"""
+    result: set[str] = set()
+    for entries in data.values():
+        if isinstance(entries, list):
+            for entry in entries:
+                if isinstance(entry, dict):
+                    k = entry.get("kunsu", "")
+                    if k:
+                        result.add(k)
+    return result
+
+
+def get_our_roles(data: dict, subrepo_path: str, kunsu_path: str) -> set[str]:
+    """取得子專案在指定軍師底下的角色代碼集合。"""
+    roles: set[str] = set()
+    for entry in data.get(subrepo_path) or []:
+        if isinstance(entry, dict) and entry.get("kunsu") == kunsu_path:
+            for role in entry.get("roles") or []:
+                if role:
+                    roles.add(str(role))
+    return roles
+
+
+def get_all_known_roles(data: dict, kunsu_path: str) -> set[str]:
+    """取得指定軍師底下所有子專案角色代碼的聯集。"""
+    roles: set[str] = set()
+    for entries in data.values():
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            if isinstance(entry, dict) and entry.get("kunsu") == kunsu_path:
+                for role in entry.get("roles") or []:
+                    if role:
+                        roles.add(str(role))
+    return roles

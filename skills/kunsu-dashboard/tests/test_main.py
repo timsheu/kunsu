@@ -150,7 +150,7 @@ def test_tripwire_kunsu_shown_other_sections_normal(monkeypatch, client):
     ))
     monkeypatch.setattr("app.main.get_subrepo_status", lambda *a, **k: _subrepo())
 
-    resp = client.get("/")
+    resp = client.get("/overview")
     assert resp.status_code == 200
     html = resp.text
 
@@ -185,7 +185,7 @@ def test_happy_path_kunsu_and_subrepo_both_rendered(monkeypatch, client):
         not_picked_up=[_handoff(filename="work.md", title="Pending Task")]
     ))
 
-    resp = client.get("/")
+    resp = client.get("/overview")
     assert resp.status_code == 200
     html = resp.text
 
@@ -204,7 +204,7 @@ def test_empty_registry_shows_empty_message(monkeypatch, client):
     """registry 為空物件 {} → 顯示「無登記」訊息，非錯誤樣式。"""
     monkeypatch.setattr("app.main.load_registry", lambda _: _reg())
 
-    resp = client.get("/")
+    resp = client.get("/overview")
     assert resp.status_code == 200
     html = resp.text
 
@@ -221,7 +221,7 @@ def test_registry_not_found_returns_200_with_error_message(monkeypatch, client):
         error="Registry file not found: /no/such/registry.json"
     ))
 
-    resp = client.get("/")
+    resp = client.get("/overview")
     assert resp.status_code == 200  # 非 500，避免瀏覽器顯示通用錯誤頁
     html = resp.text
 
@@ -239,7 +239,7 @@ def test_malformed_registry_returns_200_with_distinct_error(monkeypatch, client)
               "Expecting value: line 1 column 1"
     ))
 
-    resp = client.get("/")
+    resp = client.get("/overview")
     assert resp.status_code == 200
     html = resp.text
 
@@ -269,7 +269,7 @@ def test_nested_topology_appears_in_both_sections(monkeypatch, client):
     monkeypatch.setattr("app.main.scan_kunsu", lambda p: _scan(p))
     monkeypatch.setattr("app.main.get_subrepo_status", lambda *a, **k: _subrepo())
 
-    resp = client.get("/")
+    resp = client.get("/overview")
     assert resp.status_code == 200
     html = resp.text
 
@@ -300,7 +300,7 @@ def test_stale_path_shows_stale_card(monkeypatch, client):
         # → 不觸發 scan_kunsu 或 get_subrepo_status
     ))
 
-    resp = client.get("/")
+    resp = client.get("/overview")
     assert resp.status_code == 200
     html = resp.text
 
@@ -338,7 +338,7 @@ def test_subrepo_with_stale_kunsu_shows_unreachable_not_empty(monkeypatch, clien
         )
     monkeypatch.setattr("app.main.get_subrepo_status", _fail_if_called)
 
-    resp = client.get("/")
+    resp = client.get("/overview")
     assert resp.status_code == 200
     html = resp.text
 
@@ -363,7 +363,7 @@ def test_unknown_to_shown_as_separate_warning_list(monkeypatch, client):
         unknown=[UnknownToItem(filename="mystery.md", to_value="ghost-role")]
     ))
 
-    resp = client.get("/")
+    resp = client.get("/overview")
     assert resp.status_code == 200
     html = resp.text
 
@@ -396,7 +396,7 @@ def test_xss_in_handoff_title_is_escaped(monkeypatch, client):
         not_picked_up=[_handoff(filename="task.md", title=XSS_TITLE)]
     ))
 
-    resp = client.get("/")
+    resp = client.get("/overview")
     assert resp.status_code == 200
     html = resp.text
 
@@ -458,7 +458,7 @@ def test_integration_all_status_types_rendered(monkeypatch, client):
     monkeypatch.setattr("app.main.scan_kunsu", mock_scan)
     monkeypatch.setattr("app.main.get_subrepo_status", mock_subrepo)
 
-    resp = client.get("/")
+    resp = client.get("/overview")
     assert resp.status_code == 200
     html = resp.text
 
@@ -504,7 +504,7 @@ def test_subrepo_rendered_nested_within_its_kunsu_group(monkeypatch, client):
     monkeypatch.setattr("app.main.scan_kunsu", lambda p: _scan(p))
     monkeypatch.setattr("app.main.get_subrepo_status", lambda *a, **k: _subrepo())
 
-    resp = client.get("/")
+    resp = client.get("/overview")
     assert resp.status_code == 200
     html = resp.text
 
@@ -534,7 +534,7 @@ def test_stale_subrepo_nested_under_healthy_kunsu(monkeypatch, client):
         raise AssertionError("get_subrepo_status 不應在子專案自身 stale 時被呼叫")
     monkeypatch.setattr("app.main.get_subrepo_status", _fail_if_called)
 
-    resp = client.get("/")
+    resp = client.get("/overview")
     assert resp.status_code == 200
     html = resp.text
 
@@ -575,7 +575,7 @@ def test_pending_handoff_shows_expandable_raw_content(monkeypatch, client):
         )]
     ))
 
-    resp = client.get("/")
+    resp = client.get("/overview")
     assert resp.status_code == 200
     html = resp.text
 
@@ -622,7 +622,7 @@ def test_kunsu_new_reply_reads_actual_file_content(monkeypatch, client, tmp_path
     ))
     monkeypatch.setattr("app.main.get_subrepo_status", lambda *a, **k: _subrepo())
 
-    resp = client.get("/")
+    resp = client.get("/overview")
     assert resp.status_code == 200
     html = resp.text
 
@@ -671,7 +671,7 @@ def test_kunsu_category_heading_shows_latest_mtime_among_multiple_items(
     ))
     monkeypatch.setattr("app.main.get_subrepo_status", lambda *a, **k: _subrepo())
 
-    resp = client.get("/")
+    resp = client.get("/overview")
     assert resp.status_code == 200
     html = resp.text
 
@@ -727,7 +727,7 @@ def test_kunsu_group_open_state_reflects_activity(monkeypatch, client):
     monkeypatch.setattr("app.main.scan_kunsu", mock_scan)
     monkeypatch.setattr("app.main.get_subrepo_status", lambda *a, **k: _subrepo())
 
-    resp = client.get("/")
+    resp = client.get("/overview")
     assert resp.status_code == 200
     html = resp.text
 
@@ -746,7 +746,7 @@ def test_response_content_type_is_text_html(monkeypatch, client):
     """回應 Content-Type 為 text/html（ADR 010 Decision 1.5 可驗證條件）。"""
     monkeypatch.setattr("app.main.load_registry", lambda _: _reg())
 
-    resp = client.get("/")
+    resp = client.get("/overview")
     assert resp.status_code == 200
     assert "text/html" in resp.headers["content-type"]
 
@@ -836,7 +836,7 @@ def test_uncommitted_handoff_hint_rendered_in_tripwire_card(monkeypatch, client)
         tripwire_lines=["TRIPWIRE:?? docs/handoffs/2026-07-11-vmcapi-restart.md"],
     ))
 
-    resp = client.get("/")
+    resp = client.get("/overview")
     html = resp.text
 
     assert "hint-uncommitted" in html
@@ -887,7 +887,7 @@ def test_three_categories_rendered_with_verify_badges(monkeypatch, client):
         )],
     ))
 
-    resp = client.get("/")
+    resp = client.get("/overview")
     assert resp.status_code == 200
     html = resp.text
 
@@ -909,7 +909,7 @@ def test_free_text_verify_rendered_as_plain_badge_and_escaped(monkeypatch, clien
         )],
     ))
 
-    resp = client.get("/")
+    resp = client.get("/overview")
     html = resp.text
 
     assert "badge-other" in html
@@ -927,7 +927,7 @@ def test_blocked_reply_shows_blocked_badge(monkeypatch, client):
         )],
     ))
 
-    resp = client.get("/")
+    resp = client.get("/overview")
     html = resp.text
 
     assert "部分完成（1）" in html
@@ -945,7 +945,7 @@ def test_unknown_status_shows_raw_status_badge(monkeypatch, client):
         )],
     ))
 
-    resp = client.get("/")
+    resp = client.get("/overview")
     html = resp.text
 
     assert "部分完成（1）" in html
@@ -963,7 +963,7 @@ def test_missing_verify_shows_no_badge(monkeypatch, client):
         )],
     ))
 
-    resp = client.get("/")
+    resp = client.get("/overview")
     html = resp.text
 
     assert "已回覆待確認（1）" in html
@@ -983,7 +983,7 @@ def test_verify_suggested_code_lookup_is_case_insensitive(monkeypatch, client):
         )],
     ))
 
-    resp = client.get("/")
+    resp = client.get("/overview")
     html = resp.text
 
     assert "需上線測試 🚀" in html and "badge-deploy" in html
@@ -1012,7 +1012,7 @@ def test_items_within_category_sorted_by_verify_grouping(monkeypatch, client):
         ],
     ))
 
-    resp = client.get("/")
+    resp = client.get("/overview")
     html = resp.text
 
     # 已知代碼（needs-deploy < needs-device，值相同者相鄰）→ 自由字串 → 缺省
@@ -1061,7 +1061,7 @@ def test_awaiting_confirm_shows_verify_hint_and_days(monkeypatch, client):
         )],
     ))
 
-    resp = client.get("/")
+    resp = client.get("/overview")
     assert resp.status_code == 200
     html = resp.text
 
@@ -1081,7 +1081,7 @@ def test_awaiting_confirm_missing_verify_shows_generic_hint(monkeypatch, client)
         )],
     ))
 
-    html = client.get("/").text
+    html = client.get("/overview").text
 
     assert "開軍師 session 查核回覆，確認無誤後以 /handoff done 收尾歸檔" in html
     assert 'class="badge badge-deploy"' not in html
@@ -1100,7 +1100,7 @@ def test_awaiting_confirm_free_text_verify_generic_hint_with_badge(monkeypatch, 
         )],
     ))
 
-    html = client.get("/").text
+    html = client.get("/overview").text
 
     assert "開軍師 session 查核回覆，確認無誤後以 /handoff done 收尾歸檔" in html
     assert 'class="badge badge-other"' in html
@@ -1118,7 +1118,7 @@ def test_awaiting_confirm_invalid_reply_date_degrades_silently(monkeypatch, clie
         )],
     ))
 
-    resp = client.get("/")
+    resp = client.get("/overview")
     assert resp.status_code == 200
     html = resp.text
 
@@ -1136,7 +1136,7 @@ def test_awaiting_confirm_none_reply_date_no_days(monkeypatch, client):
         )],
     ))
 
-    resp = client.get("/")
+    resp = client.get("/overview")
     assert resp.status_code == 200
     html = resp.text
 
@@ -1156,7 +1156,7 @@ def test_other_categories_have_no_next_step_hint(monkeypatch, client):
         )],
     ))
 
-    html = client.get("/").text
+    html = client.get("/overview").text
 
     assert 'class="hint-next-step"' not in html
     assert 'class="days-waiting"' not in html
@@ -1172,7 +1172,7 @@ def test_awaiting_confirm_hint_outside_details(monkeypatch, client):
         )],
     ))
 
-    html = client.get("/").text
+    html = client.get("/overview").text
 
     # hint-next-step 出現在 </details> 之後，不被包在 details 內
     detail_end = html.index("</details>", html.index("Visible Hint Job"))
@@ -1183,7 +1183,8 @@ def test_awaiting_confirm_hint_outside_details(monkeypatch, client):
 def test_next_step_hints_keys_match_verify_labels():
     """_NEXT_STEP_HINTS 與 _VERIFY_LABELS 鍵集合必須一致——新增建議代碼時
     兩個對照表須同步，否則新代碼會顯示彩色 badge 卻靜默降格為通用提示。"""
-    from app.main import _NEXT_STEP_HINTS, _VERIFY_LABELS
+    from app.main import _NEXT_STEP_HINTS
+    from app.html_common import VERIFY_LABELS as _VERIFY_LABELS
 
     assert set(_NEXT_STEP_HINTS.keys()) == set(_VERIFY_LABELS.keys())
 
@@ -1217,7 +1218,7 @@ def test_awaiting_confirm_rendered_in_verify_subgroups(monkeypatch, client):
         ],
     ))
 
-    html = client.get("/").text
+    html = client.get("/overview").text
 
     assert "已回覆待確認（5）" in html
     assert "<h5>⚡ 馬上可測（1）</h5>" in html
@@ -1247,7 +1248,7 @@ def test_awaiting_subgroup_free_label_escaped(monkeypatch, client):
         )],
     ))
 
-    html = client.get("/").text
+    html = client.get("/overview").text
 
     assert "<h5>等 &lt;b&gt;DBA&lt;/b&gt; 開權限（1）</h5>" in html
     assert "<b>DBA</b>" not in html
@@ -1272,7 +1273,7 @@ def test_awaiting_subgroup_items_oldest_reply_first(monkeypatch, client):
         ],
     ))
 
-    html = client.get("/").text
+    html = client.get("/overview").text
 
     assert (
         html.index("Oldest Job")
@@ -1304,7 +1305,8 @@ def test_awaiting_subgroup_pure_function():
 def test_awaiting_subgroups_keys_match_verify_labels():
     """_AWAITING_SUBGROUPS 與 _VERIFY_LABELS 鍵集合必須一致——新增建議代碼時
     兩個對照表須同步，否則新代碼會顯示彩色 badge 卻靜默落入自由字串子分組。"""
-    from app.main import _AWAITING_SUBGROUPS, _VERIFY_LABELS
+    from app.main import _AWAITING_SUBGROUPS
+    from app.html_common import VERIFY_LABELS as _VERIFY_LABELS
 
     assert set(_AWAITING_SUBGROUPS.keys()) == set(_VERIFY_LABELS.keys())
 
@@ -1315,7 +1317,7 @@ def test_not_picked_up_heading_highlighted(monkeypatch, client):
         not_picked_up=[_handoff("n.md", "New Job")],
     ))
 
-    html = client.get("/").text
+    html = client.get("/overview").text
 
     assert '<h4 class="lbl-warn">⚠ 未接手（1）</h4>' in html
 
@@ -1373,7 +1375,7 @@ def test_kunsu_group_summary_shows_pending_counts_and_opens(monkeypatch, client)
         )],
     ))
 
-    html = client.get("/").text
+    html = client.get("/overview").text
 
     assert '<details class="kunsu-group" open>' in html
     summary_start = html.index("<summary>")
@@ -1401,7 +1403,7 @@ def test_kunsu_group_awaiting_only_counts_but_stays_collapsed(monkeypatch, clien
         )],
     ))
 
-    html = client.get("/").text
+    html = client.get("/overview").text
 
     assert '<details class="kunsu-group">' in html
     assert '<details class="kunsu-group" open>' not in html
@@ -1422,7 +1424,7 @@ def test_kunsu_group_anomaly_forces_open(monkeypatch, client):
         unknown=[UnknownToItem("mystery.md", "ghost-role")],
     ))
 
-    html = client.get("/").text
+    html = client.get("/overview").text
 
     assert '<details class="kunsu-group" open>' in html
     assert "異常 1" in html
@@ -1476,7 +1478,7 @@ def test_overview_bar_aggregates_across_kunsus(monkeypatch, client):
         )
     monkeypatch.setattr("app.main.get_subrepo_status", mock_subrepo)
 
-    html = client.get("/").text
+    html = client.get("/overview").text
 
     assert "全域總覽" in html
     assert '<span class="chip chip-alert">⚠ 未接手 1</span>' in html
@@ -1490,7 +1492,7 @@ def test_overview_bar_absent_when_nothing_pending(monkeypatch, client):
     """全部計數為零 → 總覽列整條不渲染。"""
     _client_with_subrepo(monkeypatch, _subrepo())
 
-    html = client.get("/").text
+    html = client.get("/overview").text
 
     assert "全域總覽" not in html
     assert '<div class="card overview">' not in html
@@ -1502,7 +1504,7 @@ def test_overview_bar_appears_before_kunsu_groups(monkeypatch, client):
         not_picked_up=[_handoff("n.md", "New Job")],
     ))
 
-    html = client.get("/").text
+    html = client.get("/overview").text
 
     assert (
         html.index('<div class="card overview">')
@@ -1560,7 +1562,7 @@ def test_todo_section_happy_path_shows_pending_and_orphaned(monkeypatch, client)
         ),
     )
 
-    html = client.get("/").text
+    html = client.get("/overview").text
 
     assert "待辦技術債（1）" in html
     assert "已歸檔 3 筆" in html
@@ -1583,7 +1585,7 @@ def test_covers_r5_three_way_display_distinction(monkeypatch, client):
         ),
     )
 
-    html = client.get("/").text
+    html = client.get("/overview").text
 
     assert '<span class="tlabel tlabel-open">未處理</span>' in html
     assert '<span class="tlabel tlabel-other">open</span>' in html
@@ -1600,7 +1602,7 @@ def test_todo_section_renders_parse_errors(monkeypatch, client):
         ),
     )
 
-    html = client.get("/").text
+    html = client.get("/overview").text
 
     assert "無待辦" not in html
     assert "異常（1）" in html
@@ -1616,7 +1618,7 @@ def test_todo_section_only_orphaned_no_pending(monkeypatch, client):
         lambda p: TodoStatusResult(orphaned_done=[_todo("resolved.md", status="已解決")]),
     )
 
-    html = client.get("/").text
+    html = client.get("/overview").text
 
     assert "待辦技術債（0）" in html
     assert "無未處理待辦" in html
@@ -1628,7 +1630,7 @@ def test_todo_section_empty_shows_no_todo_message(monkeypatch, client):
     KUNSU = _client_with_kunsu_only(monkeypatch)
     monkeypatch.setattr("app.main.get_todo_status", lambda p: TodoStatusResult())
 
-    resp = client.get("/")
+    resp = client.get("/overview")
 
     assert resp.status_code == 200
     assert "無待辦" in resp.text
@@ -1647,7 +1649,7 @@ def test_covers_ae3_high_severity_item_has_highlight_class(monkeypatch, client):
         ),
     )
 
-    html = client.get("/").text
+    html = client.get("/overview").text
 
     assert html.index("高風險待辦") < html.index("低風險待辦")
     assert '<span class="tlabel tlabel-high">high</span>' in html
@@ -1657,7 +1659,7 @@ def test_covers_ae4_missing_todos_dir_does_not_crash(monkeypatch, client):
     """Covers AE4：軍師 repo 沒有 docs/todos/ 目錄（真實呼叫，不 mock）——顯示空狀態，不中斷整頁渲染。"""
     _client_with_kunsu_only(monkeypatch)  # 不 monkeypatch get_todo_status，走真實函式
 
-    resp = client.get("/")
+    resp = client.get("/overview")
 
     assert resp.status_code == 200
     assert "無待辦" in resp.text
@@ -1678,7 +1680,7 @@ def test_todo_labels_do_not_use_badge_or_chip_class(monkeypatch, client):
         ),
     )
 
-    html = client.get("/").text
+    html = client.get("/overview").text
     todo_section = html[html.index("待辦技術債") :]
 
     assert '<span class="badge' not in todo_section
@@ -1693,7 +1695,7 @@ def test_kunsu_group_summary_shows_todo_pending_count(monkeypatch, client):
         lambda p: TodoStatusResult(pending=[_todo("a.md"), _todo("b.md")]),
     )
 
-    html = client.get("/").text
+    html = client.get("/overview").text
 
     assert "待辦 2" in html
 
@@ -1719,7 +1721,7 @@ def test_overview_bar_aggregates_todo_pending_across_kunsus(monkeypatch, client)
 
     monkeypatch.setattr("app.main.get_todo_status", _mock_todo)
 
-    html = client.get("/").text
+    html = client.get("/overview").text
 
     assert '<span class="chip chip-other">待辦 8</span>' in html
 
@@ -1730,7 +1732,7 @@ def test_overview_bar_no_todo_chip_when_zero(monkeypatch, client):
         not_picked_up=[_handoff("n.md", "New Job")],
     ))
 
-    html = client.get("/").text
+    html = client.get("/overview").text
 
     assert "全域總覽" in html
     assert "待辦" not in html.split("全域總覽")[1].split("</div>")[0]
@@ -1755,7 +1757,7 @@ def test_stale_kunsu_does_not_call_get_todo_status(monkeypatch, client):
 
     monkeypatch.setattr("app.main.get_todo_status", _fail_if_called)
 
-    resp = client.get("/")
+    resp = client.get("/overview")
 
     assert resp.status_code == 200
     assert "軍師不可達" in resp.text
@@ -1773,7 +1775,7 @@ def test_awaiting_confirm_shows_reply_excerpt_outside_details(monkeypatch, clien
             latest_reply_excerpt="七個端點全部實作並接線完成。",
         )],
     ))
-    html = client.get("/").text
+    html = client.get("/overview").text
 
     assert 'class="reply-excerpt"' in html
     assert "七個端點全部實作並接線完成。" in html
@@ -1796,7 +1798,7 @@ def test_partial_done_shows_reply_excerpt_without_hint(monkeypatch, client):
             latest_reply_excerpt="程式改動已完成、Debug 建置與測試套件皆通過。",
         )],
     ))
-    html = client.get("/").text
+    html = client.get("/overview").text
 
     assert 'class="reply-excerpt"' in html
     assert "程式改動已完成、Debug 建置與測試套件皆通過。" in html
@@ -1816,7 +1818,7 @@ def test_no_excerpt_renders_no_excerpt_element(monkeypatch, client):
             latest_reply_date="2026-07-10",
         )],
     ))
-    html = client.get("/").text
+    html = client.get("/overview").text
 
     assert 'class="reply-excerpt"' not in html
     assert "回覆摘錄" not in html
@@ -1832,7 +1834,7 @@ def test_reply_excerpt_is_html_escaped(monkeypatch, client):
             latest_reply_excerpt="<b>完成</b> & 通過",
         )],
     ))
-    html = client.get("/").text
+    html = client.get("/overview").text
 
     assert "&lt;b&gt;完成&lt;/b&gt; &amp; 通過" in html
     assert "<b>完成</b>" not in html
@@ -1848,3 +1850,145 @@ def test_reply_excerpt_class_avoids_badge_chip_tlabel_literals():
     assert 'class="reply-excerpt"' in html
     for literal in ("badge", "chip", "tlabel"):
         assert literal not in html
+
+
+# ── 快速導覽（頁首跳轉錨點） ─────────────────────────────────────────────────
+
+def test_quick_nav_links_resolve_to_existing_anchors(monkeypatch, client):
+    """頁首快速導覽的每個 href 都對應頁內存在的 id，且導覽置於全域總覽之前。"""
+    KUNSU = "/fake/nav-kunsu"
+    SUB_A = "/fake/nav-sub-a"
+    SUB_B = "/fake/nav-sub-b"
+
+    monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
+        healthy=[KUNSU, SUB_A, SUB_B],
+        raw={
+            SUB_A: [{"kunsu": KUNSU, "roles": ["a"]}],
+            SUB_B: [{"kunsu": KUNSU, "roles": ["b"]}],
+        },
+    ))
+    monkeypatch.setattr("app.main.scan_kunsu", lambda p: _scan(p))
+    monkeypatch.setattr(
+        "app.main.get_subrepo_status",
+        lambda *a, **k: _subrepo(not_picked_up=[_handoff()]),
+    )
+
+    html = client.get("/overview").text
+    nav_start = html.index('<nav class="card quick-nav">')
+    nav_end = html.index("</nav>", nav_start)
+    nav = html[nav_start:nav_end]
+    hrefs = re.findall(r'href="#([^"]+)"', nav)
+    assert len(hrefs) == 3, hrefs  # 軍師 1 ＋ 子專案 2
+    for anchor in hrefs:
+        assert f'id="{anchor}"' in html, f"錨點 {anchor} 在頁內不存在"
+    assert len(set(hrefs)) == 3
+    # 顯示目錄名而非完整路徑；未接手件以 ⚠N 提示
+    assert ">nav-kunsu<" in nav
+    assert ">nav-sub-a" in nav and "⚠1" in nav
+    # 導覽在全域總覽之前（頁面最上面）
+    assert nav_start < html.index('<div class="card overview">')
+
+
+def test_quick_nav_anchor_ids_unique_for_same_basename(monkeypatch, client):
+    """同一軍師底下兩個 basename 相同的子專案，錨點 id 仍不相撞。"""
+    KUNSU = "/fake/nav-kunsu"
+    SUB_A = "/fake/alpha/app"
+    SUB_B = "/fake/beta/app"
+
+    monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
+        healthy=[KUNSU, SUB_A, SUB_B],
+        raw={
+            SUB_A: [{"kunsu": KUNSU, "roles": ["a"]}],
+            SUB_B: [{"kunsu": KUNSU, "roles": ["b"]}],
+        },
+    ))
+    monkeypatch.setattr("app.main.scan_kunsu", lambda p: _scan(p))
+    monkeypatch.setattr("app.main.get_subrepo_status", lambda *a, **k: _subrepo())
+
+    html = client.get("/overview").text
+    ids = re.findall(r'id="(nav-[^"]+)"', html)
+    assert len(ids) == 3 and len(set(ids)) == 3, ids
+    assert sum(1 for i in ids if "--app-" in i) == 2
+
+
+def test_quick_nav_sub_anchor_inside_group_details_and_kunsu_anchor_after_summary(
+    monkeypatch, client
+):
+    """子專案錨點位於軍師分組 <details> 內容區、軍師錨點緊接 </summary> 之後——
+
+    兩者皆藏在收合內容裡，瀏覽器 fragment navigation 才會自動展開分組。
+    """
+    KUNSU = "/fake/nav-kunsu"
+    SUB = "/fake/nav-sub"
+    monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
+        healthy=[KUNSU, SUB],
+        raw={SUB: [{"kunsu": KUNSU, "roles": ["a"]}]},
+    ))
+    monkeypatch.setattr("app.main.scan_kunsu", lambda p: _scan(p))
+    monkeypatch.setattr("app.main.get_subrepo_status", lambda *a, **k: _subrepo())
+
+    html = client.get("/overview").text
+    group_start = html.index('<details class="kunsu-group"')
+    summary_end = html.index("</summary>", group_start) + len("</summary>")
+    group_end = html.index("</details>", group_start)
+    assert html[summary_end:].startswith('<span id="nav-nav-kunsu-')
+    sub_id = html.index('<div id="nav-nav-kunsu--nav-sub-')
+    assert summary_end < sub_id < group_end
+
+
+def test_quick_nav_stale_kunsu_and_stale_subrepo_still_linked(monkeypatch, client):
+    """stale 軍師與 stale 子專案仍列入導覽（灰字標示），點擊可跳至其卡片。"""
+    KUNSU_OK = "/fake/ok-kunsu"
+    SUB_STALE = "/fake/gone-sub"
+    KUNSU_STALE = "/fake/gone-kunsu"
+    SUB_UNDER_STALE = "/fake/orphan-sub"
+
+    monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
+        healthy=[KUNSU_OK],
+        stale=[SUB_STALE, KUNSU_STALE, SUB_UNDER_STALE],
+        raw={
+            SUB_STALE: [{"kunsu": KUNSU_OK, "roles": ["a"]}],
+            SUB_UNDER_STALE: [{"kunsu": KUNSU_STALE, "roles": ["b"]}],
+        },
+    ))
+    monkeypatch.setattr("app.main.scan_kunsu", lambda p: _scan(p))
+    monkeypatch.setattr("app.main.get_subrepo_status", lambda *a, **k: _subrepo())
+
+    html = client.get("/overview").text
+    nav = html[html.index('<nav class="card quick-nav">'):html.index("</nav>")]
+    hrefs = re.findall(r'href="#([^"]+)"', nav)
+    assert len(hrefs) == 4
+    for anchor in hrefs:
+        assert f'id="{anchor}"' in html
+    assert nav.count('nav-stale') == 3  # stale 子專案 1 ＋ stale 軍師 1 ＋ 其底下子專案 1
+
+
+def test_quick_nav_blocked_mark_and_label_escaped(monkeypatch, client):
+    """⛔N 計 partial_done 中 status 恰為 blocked 者；目錄名含 HTML 字元須 escape。"""
+    KUNSU = "/fake/nav-kunsu"
+    SUB = "/fake/<x>sub"
+    monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
+        healthy=[KUNSU, SUB],
+        raw={SUB: [{"kunsu": KUNSU, "roles": ["a"]}]},
+    ))
+    monkeypatch.setattr("app.main.scan_kunsu", lambda p: _scan(p))
+    monkeypatch.setattr(
+        "app.main.get_subrepo_status",
+        lambda *a, **k: _subrepo(partial_done=[
+            _handoff(filename="b1.md", latest_reply_status="blocked"),
+            _handoff(filename="b2.md", latest_reply_status="partial"),
+        ]),
+    )
+    html = client.get("/overview").text
+    nav = html[html.index('<nav class="card quick-nav">'):html.index("</nav>")]
+    assert "⛔1" in nav and "⚠" not in nav
+    assert "&lt;x&gt;sub" in nav and "<x>sub" not in nav
+
+
+def test_quick_nav_absent_when_no_kunsu(monkeypatch, client):
+    """無任何軍師分組（純 stale 殘留路徑）時不渲染快速導覽。"""
+    monkeypatch.setattr("app.main.load_registry", lambda _: _reg(
+        stale=["/fake/lonely"], raw={},
+    ))
+    html = client.get("/overview").text
+    assert '<nav class="card quick-nav">' not in html

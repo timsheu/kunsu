@@ -36,6 +36,15 @@ _SCRIPTS: list[tuple[str, str]] = [
     ("scan-reports.sh",      "NEW_REPORT:"),
 ]
 
+# 看板用：只掃申請與上報兩信箱。看板不使用新回覆清單，而 scan-replies.sh 會寫
+# 掃描統計檔並推進歷史夾帶偵測基線（一次性 HISTORY_WARN 會被看板靜默消耗），
+# 且逐 commit 檢視是三支腳本中最慢者（ebook 實測看板載入 5–6 秒）。回覆側的
+# tripwire 仍由 /overview、kunsu-inbox 與 SessionStart hook 呈現。
+MAILBOX_ONLY_SCRIPTS: list[tuple[str, str]] = [
+    ("scan-applications.sh", "NEW_APPLICATION:"),
+    ("scan-reports.sh",      "NEW_REPORT:"),
+]
+
 
 @dataclass(frozen=True)
 class KunsuScanResult:
@@ -66,14 +75,20 @@ class KunsuScanResult:
     script_error: Optional[str] = None
 
 
-def scan_kunsu(kunsu_path: str) -> KunsuScanResult:
-    """對單一軍師路徑依序呼叫三支掃描腳本，解析輸出並回傳結構化結果。
+def scan_kunsu(
+    kunsu_path: str,
+    scripts: Optional[list[tuple[str, str]]] = None,
+) -> KunsuScanResult:
+    """對單一軍師路徑依序呼叫掃描腳本（預設三支），解析輸出並回傳結構化結果。
 
     Args:
         kunsu_path: 軍師根目錄的絕對路徑（U1 load_registry 判定為 healthy 者）。
                     呼叫前提：路徑存在且為有效 git repo 根，由呼叫端（U4）保證。
                     腳本內部亦會自行核驗；若不符則腳本以 exit 1 結束，
                     scan_kunsu 會將其歸類為 script_error。
+
+        scripts:    要執行的 (腳本名, 預期前綴) 清單；None 為全部三支，看板傳
+                    MAILBOX_ONLY_SCRIPTS 跳過 scan-replies.sh。
 
     Returns:
         KunsuScanResult，含新回覆／新申請／新上報清單，以及 tripwire 與腳本錯誤狀態。
@@ -100,7 +115,7 @@ def scan_kunsu(kunsu_path: str) -> KunsuScanResult:
         "NEW_REPORT:":      new_reports,
     }
 
-    for script_name, expected_prefix in _SCRIPTS:
+    for script_name, expected_prefix in (_SCRIPTS if scripts is None else scripts):
         script_path = _SCRIPTS_DIR / script_name
 
         try:
