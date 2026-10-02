@@ -2,7 +2,8 @@
 board_html.py — 軍師沙盤看板頁（/）與 archive 頁（/archive）的 HTML 渲染
 
 輸入為 board_model.Board 與 handoff_graph 結果，輸出完整 HTML 頁面字串；
-不讀 registry、不呼叫掃描。零 JS：卡片全文以原生 <details> 展開。
+不讀 registry、不呼叫掃描。零 JS：卡片與 archive 列表只放連結，全文由
+獨立全文頁（/handoff）伺服器端渲染 Markdown 呈現。
 
 CSS class 一律用 `kb-` 前綴，避開原彙整頁負向測試針對的 badge／chip／tlabel／
 dlabel／reply-excerpt 字面（看板化計畫 KTD5）。本模組不得匯入 app.main，
@@ -27,20 +28,18 @@ from app.board_model import (
     Board,
     Card,
 )
+from app.handoff_detail import KIND_LABELS, HandoffDetail
 from app.handoff_graph import LOCATION_ARCHIVE, HandoffGraphResult
 from app.html_common import (
     VERIFY_LABELS,
     days_since,
     nav_anchor_id,
     page_shell,
-    read_related_file,
 )
+from app.markdown_render import render_document
 
 # 單一格子常態顯示的卡片上限，其餘收進「另有 N 筆」（KTD6）
 CELL_VISIBLE_LIMIT = 8
-# archive 頁內嵌可展開全文的筆數上限（KTD10）
-ARCHIVE_EMBED_LIMIT = 50
-
 # HTML 屬性用的軍師泳道識別：@ 不屬於角色代碼字元集，不與任何角色同名
 _KUNSU_ATTR = "@kunsu"
 
@@ -102,12 +101,37 @@ BOARD_CSS = (
     ".kb-days{color:#e65100}"
     ".kb-wait{font-size:.78em;color:#6d4c41;margin-top:.15em}"
     ".kb-excerpt{font-size:.78em;color:#555;margin-top:.15em}"
-    ".kb-fulltitle{font-weight:600;font-size:.85em;margin:.3em 0}"
-    ".kb-section{font-size:.78em;color:#777;margin-top:.4em}"
     ".kb-more>summary{color:#555}"
     ".kb-archive li{margin:.35em 0}"
     ".kb-archive-meta{font-size:.82em;color:#666}"
     ".kb-path{font-size:.8em;color:#888}"
+    ".kb-open{font-size:.8em;white-space:nowrap}"
+    ".kb-doc{max-width:900px}"
+    ".kb-doc h2{font-size:1.3em;margin:.6em 0 .3em}"
+    ".kb-doc-meta{font-size:.85em;color:#666;margin:.2em 0 .8em}"
+    ".kb-fm{border-collapse:collapse;font-size:.82em;margin:.5em 0 1em}"
+    ".kb-fm th{text-align:left;color:#555;font-weight:600;padding:.15em .8em .15em 0;"
+    "vertical-align:top;white-space:nowrap}"
+    ".kb-fm td{padding:.15em 0;word-break:break-all}"
+    ".kb-md{font-size:.95em}"
+    ".kb-md h1{font-size:1.25em;border:0;padding:0;margin:1em 0 .4em}"
+    ".kb-md h2{font-size:1.12em;margin:1em 0 .4em}"
+    ".kb-md h3{font-size:1em;margin:.9em 0 .3em}"
+    ".kb-md table{border-collapse:collapse;margin:.5em 0;font-size:.9em}"
+    ".kb-md th,.kb-md td{border:1px solid #cfd8dc;padding:.2em .5em;vertical-align:top}"
+    ".kb-md th{background:#eceff1}"
+    ".kb-md blockquote{border-left:3px solid #cfd8dc;margin:.5em 0;padding:.1em .8em;"
+    "color:#555}"
+    ".kb-md code{background:#f3f3f3;padding:0 .25em;border-radius:3px;font-size:.9em}"
+    ".kb-md pre{max-height:none}"
+    ".kb-md pre code{background:none;padding:0}"
+    ".kb-md-notice{background:#fff8e1;border:1px solid #ffcc80;padding:.3em .6em;"
+    "border-radius:4px;font-size:.85em}"
+    ".kb-reply{border-top:1px solid #cfd8dc;margin-top:1.2em;padding-top:.6em}"
+    ".kb-reply-head{font-size:.85em;color:#555;margin-bottom:.4em;display:flex;"
+    "flex-wrap:wrap;gap:.1em .6em;align-items:center}"
+    ".kb-doc-section{font-weight:700;margin:1.2em 0 .3em;color:#37474f}"
+    ".kb-deps li{margin:.15em 0}"
 )
 
 
@@ -139,6 +163,15 @@ def _verify_tag(verify: Optional[str]) -> str:
     if known:
         return f'<span class="kb-tag {_VERIFY_CSS.get(key, "")}">{known[0]}</span>'
     return f'<span class="kb-tag">{escape(verify)}</span>'
+
+
+def handoff_href(kunsu_path: str, rel_path: str) -> str:
+    """全文頁連結：`/handoff?k=<軍師目錄名>&f=<相對路徑>`（兩值皆 URL 編碼）。"""
+    return f"/handoff?k={quote(kunsu_label(kunsu_path))}&f={quote(rel_path)}"
+
+
+def _open_link(kunsu_path: str, rel_path: str, text: str = "全文") -> str:
+    return f'<a class="kb-open" href="{escape(handoff_href(kunsu_path, rel_path))}">{text}</a>'
 
 
 def _nav(
@@ -233,32 +266,13 @@ def _card_html(card: Card, kunsu_path: str) -> str:
         else ""
     )
 
-    body = (
-        card.body
-        if card.body is not None
-        else read_related_file(kunsu_path, card.body_rel_path)[0]
-    )
-    expand = [f'<div class="kb-fulltitle">{escape(card.title)}</div>']
-    if card.unresolved_waiting:
-        expand.append(
-            '<div class="kb-section">無法解析的依賴：'
-            f'{escape("、".join(card.unresolved_waiting))}</div>'
-        )
-    expand.append(
-        '<div class="kb-section">'
-        f'{"交接本體" if card.kind == CARD_HANDOFF else "全文"}</div>'
-        f"<pre>{escape(body)}</pre>"
-    )
-    if card.reply_rel_path:
-        reply, _ = read_related_file(kunsu_path, card.reply_rel_path)
-        expand.append(f'<div class="kb-section">最新回覆</div><pre>{escape(reply)}</pre>')
+    meta.append(_open_link(kunsu_path, card.body_rel_path))
 
     return (
         f'<div class="{" ".join(classes)}">'
         f'<div class="kb-title">{escape(card.title)}</div>'
         f'<div class="kb-meta">{"".join(meta)}</div>'
         f"{wait}{excerpt}"
-        f'<details><summary>展開全文</summary>{"".join(expand)}</details>'
         "</div>"
     )
 
@@ -349,7 +363,7 @@ def render_archive_page(
     not_found: Optional[str] = None,
     stale: bool = False,
 ) -> str:
-    """archive 頁：依檔名日期新到舊列出已歸檔交接，最近 N 份內嵌全文（KTD10）。
+    """archive 頁：依檔名日期新到舊列出已歸檔交接，每筆連結至全文頁。
 
     軍師路徑失聯時無法讀取 archive，顯示失聯說明而非「沒有已歸檔的交接」，
     避免把無法判定的狀態誤呈現為歷史資料不存在。
@@ -373,28 +387,131 @@ def render_archive_page(
         return page_shell("".join(parts), BOARD_CSS)
 
     items: list[str] = []
-    for i, node in enumerate(nodes):
+    for node in nodes:
         rel = f"docs/handoffs/archive/{node.filename}"
         meta = [f"收件：{escape(node.to_role or '（未知）')}"]
         if not node.is_done:
             meta.append('<span class="kb-tag kb-tag-status">已歸檔未標 done</span>')
         if node.corrected_by:
             meta.append(f"已由 {escape('、'.join(node.corrected_by))} 更正")
-        head = (
-            f"<strong>{escape(node.title or node.filename)}</strong> "
-            f'<span class="kb-archive-meta">{" ・ ".join(meta)}</span>'
+        title_link = (
+            f'<a href="{escape(handoff_href(selected, rel))}">'
+            f"<strong>{escape(node.title or node.filename)}</strong></a>"
         )
-        if i < ARCHIVE_EMBED_LIMIT:
-            body, _ = read_related_file(selected, rel)
-            items.append(
-                f"<li>{head}<details><summary>展開全文</summary>"
-                f"<pre>{escape(body)}</pre></details></li>"
-            )
-        else:
-            items.append(f'<li>{head} <span class="kb-path">{escape(rel)}</span></li>')
-    parts.append(
-        f'<p class="kb-archive-meta">共 {len(nodes)} 份；最近 {ARCHIVE_EMBED_LIMIT} '
-        "份可展開全文，其餘僅列標題與路徑。</p>"
-    )
+        items.append(
+            f'<li>{title_link} <span class="kb-archive-meta">{" ・ ".join(meta)}</span></li>'
+        )
+    parts.append(f'<p class="kb-archive-meta">共 {len(nodes)} 份，點標題開啟全文。</p>')
     parts.append(f'<ul class="kb-archive">{"".join(items)}</ul>')
     return page_shell("".join(parts), BOARD_CSS)
+
+
+# ── 全文頁 ──────────────────────────────────────────────────────────────────────
+
+def _back_links(kunsu_path: str, detail: HandoffDetail) -> str:
+    k = quote(kunsu_label(kunsu_path))
+    links = [f'<a href="/?k={escape(k)}">← 看板</a>']
+    if detail.location == LOCATION_ARCHIVE:
+        links.append(f'<a href="/archive?k={escape(k)}">已完成（archive）</a>')
+    links.append('<a href="/overview">完整彙整頁</a>')
+    return f'<nav class="kb-nav">{"".join(links)}</nav>'
+
+
+def _deps_section(detail: HandoffDetail, graph: Optional[HandoffGraphResult]) -> str:
+    """依賴區塊：宣告的 depends_on、尚未滿足者與 corrected_by；全無則不渲染。"""
+    if graph is None or detail.kind != "handoff":
+        return ""
+    node = graph.nodes.get(detail.filename)
+    if node is None:
+        return ""
+    waiting = set(graph.waiting_on.get(detail.filename, ()))
+    items: list[str] = []
+    for dep in node.depends_on:
+        target = graph.nodes.get(dep)
+        if target is None:
+            items.append(f"<li>{escape(dep)}（無法解析）</li>")
+            continue
+        state = "等待中" if dep in waiting else ("已完成" if target.is_done else "未完成")
+        items.append(
+            f"<li>{escape(target.title or dep)}（{state}）"
+            f' <span class="kb-path">{escape(dep)}</span></li>'
+        )
+    if node.corrected_by:
+        items.append(f"<li>已由 {escape('、'.join(node.corrected_by))} 更正</li>")
+    if not items:
+        return ""
+    return f'<div class="kb-doc-section">依賴</div><ul class="kb-deps">{"".join(items)}</ul>'
+
+
+def render_handoff_page(
+    *,
+    kunsu_path: str,
+    detail: HandoffDetail,
+    graph: Optional[HandoffGraphResult] = None,
+) -> str:
+    """全文頁：frontmatter 鍵值表、本體 Markdown、同串回覆（舊→新）。
+
+    Markdown 渲染與 frontmatter 表由 markdown_render 負責（html=False，
+    原文 HTML 一律轉義）；graph 可省略，省略時不渲染依賴區塊。
+    """
+    kind_label = KIND_LABELS.get(detail.kind, detail.kind)
+    parts = [_back_links(kunsu_path, detail), '<div class="kb-doc">']
+    parts.append(f"<h2>{escape(detail.title)}</h2>")
+    meta = [kind_label, escape(kunsu_label(kunsu_path))]
+    if detail.location == LOCATION_ARCHIVE:
+        meta.append("已歸檔")
+    meta.append(f'<span class="kb-path">{escape(detail.rel_path)}</span>')
+    parts.append(f'<div class="kb-doc-meta">{" ・ ".join(meta)}</div>')
+    if detail.read_error:
+        parts.append(f'<div class="kb-alert">{escape(detail.read_error)}</div>')
+    else:
+        _, html = render_document(detail.content)
+        parts.append(html)
+    parts.append(_deps_section(detail, graph))
+
+    if detail.kind == "handoff":
+        if detail.replies:
+            parts.append(f'<div class="kb-doc-section">回覆（{len(detail.replies)} 份，舊→新）</div>')
+        else:
+            parts.append('<div class="kb-doc-section">尚無回覆</div>')
+        for i, reply in enumerate(detail.replies, start=1):
+            head = [f"<strong>第 {i} 份</strong>"]
+            if reply.status:
+                head.append(
+                    f'<span class="kb-tag kb-tag-status">status: {escape(reply.status)}</span>'
+                )
+            head.append(_verify_tag(reply.verify))
+            if reply.created:
+                head.append(f"<span>{escape(reply.created)}</span>")
+            head.append(f'<span class="kb-path">{escape(reply.filename)}</span>')
+            _, reply_html = render_document(reply.content)
+            parts.append(
+                f'<div class="kb-reply" id="reply-{i}">'
+                f'<div class="kb-reply-head">{"".join(head)}</div>{reply_html}</div>'
+            )
+    parts.append("</div>")
+    return page_shell("".join(parts), BOARD_CSS)
+
+
+def render_handoff_stale_page(kunsu_path: str) -> str:
+    """全文頁：軍師路徑失聯時的說明頁（HTTP 200，比照看板與 archive 頁）。"""
+    k = quote(kunsu_label(kunsu_path))
+    body = (
+        f'<nav class="kb-nav"><a href="/?k={escape(k)}">← 看板</a></nav>'
+        '<div class="kb-alert">⚠ 軍師路徑失聯：'
+        f"<code>{escape(kunsu_path)}</code>（路徑不存在或非有效 git repo），"
+        '無法讀取文件。<a href="/overview">到完整彙整頁查看</a></div>'
+    )
+    return page_shell(body, BOARD_CSS)
+
+
+def render_handoff_not_found_page(kunsu_path: Optional[str], f: Optional[str]) -> str:
+    """全文頁 404：不回顯原始 f 以外的任何路徑資訊（f 經轉義）。"""
+    k = quote(kunsu_label(kunsu_path)) if kunsu_path else ""
+    back = f'<a href="/?k={escape(k)}">← 看板</a>' if kunsu_path else '<a href="/">← 看板</a>'
+    body = (
+        f'<nav class="kb-nav">{back}</nav>'
+        '<div class="kb-alert">找不到這份文件。</div>'
+        f'<p class="kb-path">f={escape(f or "")}</p>'
+    )
+    return page_shell(body, BOARD_CSS)

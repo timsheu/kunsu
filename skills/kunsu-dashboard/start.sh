@@ -16,8 +16,8 @@ PORT="${1:-8000}"
 
 cd "$SCRIPT_DIR"
 
-if ! python3 -c "import fastapi, uvicorn, yaml" >/dev/null 2>&1; then
-  echo "錯誤：缺少必要 pip 依賴（fastapi／uvicorn／PyYAML）。" >&2
+if ! python3 -c "import fastapi, uvicorn, yaml, markdown_it" >/dev/null 2>&1; then
+  echo "錯誤：缺少必要 pip 依賴（fastapi／uvicorn／PyYAML／markdown-it-py）。" >&2
   echo "請先執行：pip install -r requirements.txt" >&2
   exit 1
 fi

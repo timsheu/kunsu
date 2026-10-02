@@ -53,12 +53,16 @@ from app.todo_status import (
     get_todo_status,
 )
 from app.handoff_graph import DERIVED_WAITING, HandoffGraphResult, get_handoff_graph
+from app.handoff_detail import load_handoff_detail
 from app.board_html import (
     kunsu_label,
     render_archive_page,
     render_board_page,
     render_error_page,
     render_no_kunsu_page,
+    render_handoff_not_found_page,
+    render_handoff_page,
+    render_handoff_stale_page,
 )
 from app.board_model import build_board
 from app.html_common import (
@@ -1258,6 +1262,35 @@ def archive(k: Optional[str] = None) -> HTMLResponse:
         content=render_archive_page(
             kunsus=kunsus, selected=selected, graph=graph, not_found=not_found, stale=stale
         )
+    )
+
+
+@app.get("/handoff", response_class=HTMLResponse)
+def handoff_detail(k: Optional[str] = None, f: Optional[str] = None) -> HTMLResponse:
+    """全文頁：單份交接／申請／上報的 Markdown 渲染與同串回覆。
+
+    k 走與看板相同的白名單選軍師（不命中回 404，不退回第一個軍師——全文頁
+    的 f 是相對該軍師的路徑，退回別的軍師會開到不相干的檔案）；f 由
+    handoff_detail.resolve_rel_path 守門。純讀檔，絕不呼叫 scan_kunsu（掃描
+    腳本會推進歷史夾帶基線並寫統計檔）。
+    """
+    reg = load_registry(_get_registry_path())
+    if reg.registry_error:
+        return HTMLResponse(content=render_error_page(reg.registry_error))
+    kunsus = _kunsu_list(reg)
+    if not kunsus:
+        return HTMLResponse(content=render_no_kunsu_page())
+    selected, not_found = _select_kunsu(kunsus, k)
+    if not_found is not None or not k:
+        return HTMLResponse(content=render_handoff_not_found_page(None, f), status_code=404)
+    if selected in set(reg.stale):
+        return HTMLResponse(content=render_handoff_stale_page(selected))
+    detail = load_handoff_detail(selected, f)
+    if detail is None:
+        return HTMLResponse(content=render_handoff_not_found_page(selected, f), status_code=404)
+    graph = get_handoff_graph(selected) if detail.kind == "handoff" else None
+    return HTMLResponse(
+        content=render_handoff_page(kunsu_path=selected, detail=detail, graph=graph)
     )
 
 

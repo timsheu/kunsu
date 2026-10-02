@@ -22,7 +22,7 @@ cd ~/.claude/skills/kunsu-dashboard   # Codex 部署目錄為 ~/.agents/skills/k
 pip install -r requirements.txt
 ```
 
-`install.sh` 本身只負責複製／symlink 這個目錄，不負責安裝上述 pip 依賴——依賴安裝是一次性的手動步驟。
+`install.sh` 本身只負責複製／symlink 這個目錄，不負責安裝上述 pip 依賴——依賴安裝是一次性的手動步驟。依賴共四筆：fastapi、uvicorn、PyYAML、markdown-it-py（全文頁 `/handoff` 的 Markdown 伺服器端渲染；缺席時全文頁降級為純文字，其他頁面不受影響）。
 
 ## 啟動
 

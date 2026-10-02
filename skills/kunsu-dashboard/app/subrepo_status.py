@@ -153,6 +153,11 @@ def _split_frontmatter(content: str) -> tuple[dict, str]:
     return parse_frontmatter(content), body
 
 
+def split_frontmatter(content: str) -> tuple[dict, str]:
+    """公開介面：拆出 frontmatter dict 與本文（全文頁 Markdown 渲染用，見 markdown_render.py）。"""
+    return _split_frontmatter(content)
+
+
 # ── 最新回覆首句摘錄（display-only；規則見計畫 R4）────────────────────────────
 _EXCERPT_MAX_CHARS = 60
 _HEADING_RE = re.compile(r"^\s{0,3}#{1,6}\s")
@@ -270,6 +275,11 @@ def _parse_reply_sort_key(filename: str) -> Optional[tuple[str, int]]:
     date_str = m.group(1)
     n = int(m.group(2)) if m.group(2) else 1
     return (date_str, n)
+
+
+def reply_sort_key(filename: str) -> Optional[tuple[str, int]]:
+    """公開介面：回覆檔名的 (date, n) 排序鍵（全文頁列出回覆序列用，見 handoff_detail.py）。"""
+    return _parse_reply_sort_key(filename)
 
 
 # ── 主函式 ──────────────────────────────────────────────────────────────────────
