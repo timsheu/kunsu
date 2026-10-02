@@ -15,12 +15,11 @@ ADR 010 Decision 1.5：所有端點僅回傳 text/html，不提供任何 JSON／
 from __future__ import annotations
 
 import argparse
-import hashlib
 import os
 import re
 import sys
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date
 from html import escape
 from itertools import groupby
 from pathlib import Path
@@ -54,6 +53,20 @@ from app.todo_status import (
     get_todo_status,
 )
 from app.handoff_graph import DERIVED_WAITING, HandoffGraphResult, get_handoff_graph
+from app.board_html import (
+    render_archive_page,
+    render_board_page,
+    render_error_page,
+    render_no_kunsu_page,
+)
+from app.board_model import build_board
+from app.html_common import (
+    VERIFY_LABELS,
+    format_mtime,
+    nav_anchor_id,
+    page_shell,
+    read_related_file,
+)
 from app.handoff_graph_html import (
     CSS as _DEP_CSS,
     anchor_id as _dep_anchor_id,
@@ -197,20 +210,8 @@ _CSS = (
 # ── HTML 渲染輔助 ─────────────────────────────────────────────────────────────
 
 def _page(body: str) -> str:
-    """以 body 內容組裝完整 HTML 頁面骨架。"""
-    return (
-        '<!DOCTYPE html><html lang="zh-Hant"><head>'
-        '<meta charset="utf-8">'
-        '<meta name="viewport" content="width=device-width,initial-scale=1">'
-        '<title>軍師沙盤（kunsu dashboard）</title>'
-        f'<style>{_CSS}</style>'
-        '</head><body>'
-        '<h1>軍師沙盤（kunsu dashboard）</h1>'
-        f'{body}'
-        '<p style="color:#aaa;font-size:.8em;margin-top:3em">'
-        '重新整理瀏覽器頁面觸發全新掃描。</p>'
-        '</body></html>'
-    )
+    """以 body 內容組裝完整 HTML 頁面骨架（原彙整頁樣式）。"""
+    return page_shell(body, _CSS)
 
 
 def _html_error(msg: str) -> str:
@@ -255,26 +256,8 @@ def _html_subrepo_kunsu_unreachable(path: str, kunsu_path: str) -> str:
     )
 
 
-def _read_related_file(base_path: str, rel_path: str) -> tuple[str, Optional[float]]:
-    """讀取 base_path 底下 rel_path 檔案內容與最後修改時間，供展開式預覽使用。
-
-    讀取失敗（檔案在掃描與渲染之間被搬移／歸檔，或權限問題等競態）不拋例外，
-    回傳錯誤提示字串與 None，避免單一檔案讀取失敗導致整頁渲染中斷。
-    """
-    full_path = Path(base_path) / rel_path
-    try:
-        content = full_path.read_text(encoding="utf-8")
-        mtime = full_path.stat().st_mtime
-    except (OSError, UnicodeDecodeError) as e:
-        return f"（無法讀取檔案內容：{e}）", None
-    return content, mtime
-
-
-def _format_mtime(mtime: Optional[float]) -> str:
-    """將檔案最後修改時間（epoch）格式化為可讀字串；None 時回傳空字串。"""
-    if mtime is None:
-        return ""
-    return datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
+_read_related_file = read_related_file
+_format_mtime = format_mtime
 
 
 def _html_detail(summary_html: str, content: str, anchor_id: Optional[str] = None) -> str:
@@ -335,11 +318,7 @@ def _render_kunsu_category(
 
 # ── verify 標籤對照（ADR 011）──────────────────────────────────────────────
 # 建議代碼 → (中文標籤, CSS class)；其他非空字串原樣顯示為一般標籤（badge-other）
-_VERIFY_LABELS: dict[str, tuple[str, str]] = {
-    "needs-deploy": ("需上線測試 🚀", "badge-deploy"),
-    "testable-now": ("馬上可測 ⚡", "badge-now"),
-    "needs-device": ("需實機測試 📱", "badge-device"),
-}
+_VERIFY_LABELS = VERIFY_LABELS
 
 
 def _html_status_badges(h: HandoffInfo) -> str:
@@ -619,20 +598,7 @@ def _kunsu_group_open_and_label(
     return True, f'軍師：<code>{esc}</code>（{total} 則新訊息）{suffix}'
 
 
-def _nav_anchor_id(kunsu_path: str, sub_path: Optional[str] = None) -> str:
-    """快速導覽錨點 id：`nav-<軍師目錄名>[--<子專案目錄名>]-<6 碼雜湊>`。
-
-    目錄名只保留 `[A-Za-z0-9_-]`（其餘字元折成 `-`）供肉眼辨識；唯一性由
-    完整路徑雜湊保證——同一軍師底下兩個同名 basename 子專案、或巢狀拓撲
-    同一路徑在不同軍師分組各渲染一次，都不會撞 id。
-    """
-    key = f"{kunsu_path}\0{sub_path or ''}"
-    digest = hashlib.sha1(key.encode("utf-8")).hexdigest()[:6]
-    parts = [Path(kunsu_path).name or "root"]
-    if sub_path is not None:
-        parts.append(Path(sub_path).name or "root")
-    slug = "--".join(re.sub(r"[^A-Za-z0-9_-]+", "-", n) for n in parts)
-    return f"nav-{slug}-{digest}"
+_nav_anchor_id = nav_anchor_id
 
 
 @dataclass(frozen=True)
@@ -1217,6 +1183,91 @@ def overview() -> HTMLResponse:
         body_sections.append(_html_empty())
 
     return HTMLResponse(content=_page("".join(body_sections)))
+
+
+# ── 路由：看板 / 與 archive 頁 /archive ───────────────────────────────────────
+
+def _kunsu_list(reg: RegistryResult) -> list[str]:
+    """registry 中健康或失聯的軍師路徑，依路徑排序（看板切換列順序）。"""
+    known = set(reg.healthy) | set(reg.stale)
+    return sorted(p for p in _build_kunsu_paths(reg.raw) if p in known)
+
+
+def _select_kunsu(kunsus: list[str], k: Optional[str]) -> tuple[str, Optional[str]]:
+    """依查詢參數 k（軍師目錄名）以白名單選軍師（KTD4）。
+
+    k 只與 registry 中的軍師目錄名比對，絕不當作路徑使用；不命中時退回第一個
+    軍師並回傳原值供提示列顯示。目錄名重複時取排序在前者。
+    """
+    by_name: dict[str, str] = {}
+    for kp in kunsus:
+        by_name.setdefault(Path(kp).name or kp, kp)
+    if k and k in by_name:
+        return by_name[k], None
+    return kunsus[0], (k or None)
+
+
+@app.get("/", response_class=HTMLResponse)
+def board(k: Optional[str] = None) -> HTMLResponse:
+    """看板：所選軍師的持球者泳道 × 狀態欄（看板化計畫 U4）。
+
+    只掃描所選軍師，不計算其他軍師的卡片數（每次刷新掃描全部軍師會推進
+    掃描統計，見計畫 U4）。registry 讀取失敗仍回 HTTP 200。
+    """
+    reg = load_registry(_get_registry_path())
+    if reg.registry_error:
+        return HTMLResponse(content=render_error_page(reg.registry_error))
+    kunsus = _kunsu_list(reg)
+    if not kunsus:
+        return HTMLResponse(content=render_no_kunsu_page())
+    selected, not_found = _select_kunsu(kunsus, k)
+    known_roles = _get_all_known_roles(reg.raw, selected)
+    if selected in set(reg.stale):
+        model = build_board(
+            kunsu_path=selected,
+            known_roles=known_roles,
+            sub=SubrepoStatusResult(),
+            scan=KunsuScanResult(kunsu_path=selected),
+            graph=HandoffGraphResult(),
+            todo=TodoStatusResult(),
+            stale=True,
+        )
+    else:
+        model = build_board(
+            kunsu_path=selected,
+            known_roles=known_roles,
+            # 以全部已知角色呼叫一次，取得該軍師全部交接（KTD1）
+            sub=get_subrepo_status(selected, known_roles, known_roles, selected),
+            scan=scan_kunsu(selected),
+            graph=get_handoff_graph(selected),
+            todo=get_todo_status(selected),
+            stale=False,
+        )
+    return HTMLResponse(
+        content=render_board_page(
+            kunsus=kunsus, selected=selected, board=model, not_found=not_found
+        )
+    )
+
+
+@app.get("/archive", response_class=HTMLResponse)
+def archive(k: Optional[str] = None) -> HTMLResponse:
+    """archive 頁：所選軍師已歸檔的交接（看板化計畫 U5）。"""
+    reg = load_registry(_get_registry_path())
+    if reg.registry_error:
+        return HTMLResponse(content=render_error_page(reg.registry_error))
+    kunsus = _kunsu_list(reg)
+    if not kunsus:
+        return HTMLResponse(content=render_no_kunsu_page())
+    selected, not_found = _select_kunsu(kunsus, k)
+    graph = (
+        HandoffGraphResult() if selected in set(reg.stale) else get_handoff_graph(selected)
+    )
+    return HTMLResponse(
+        content=render_archive_page(
+            kunsus=kunsus, selected=selected, graph=graph, not_found=not_found
+        )
+    )
 
 
 # ── 程式化啟動 ────────────────────────────────────────────────────────────────
