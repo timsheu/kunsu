@@ -15,7 +15,7 @@ user-invocable: false
 
 ## 安裝
 
-需要 **Python 3.10 以上**（`python3 --version` 確認；FastAPI 0.139.0／uvicorn 0.51.0 皆要求 `>=3.10`）。macOS 內建系統 Python 通常是 3.9，不足時以 Homebrew（`brew install python@3.12`）或 pyenv 安裝較新版本。
+需要 **Python 3.10 以上**（`python3 --version` 確認；現行 FastAPI 與 uvicorn 均要求 `>=3.10`）。macOS 內建系統 Python 通常是 3.9，不足時以 Homebrew（`brew install python@3.12`）或 pyenv 安裝較新版本。
 
 ```bash
 cd ~/.claude/skills/kunsu-dashboard   # Codex 部署目錄為 ~/.agents/skills/kunsu-dashboard；或本 repo 的 skills/kunsu-dashboard/（開發模式）

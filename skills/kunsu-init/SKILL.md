@@ -23,6 +23,7 @@ allowed-tools:
   - Glob
   - Grep
   - AskUserQuestion
+  - Edit
 ---
 
 # kunsu-init — 軍師（規劃協調中心）scaffolding
@@ -257,7 +258,7 @@ find "<PLANNER_ROOT_PATH>" -not -path "*/.git/*" -not -name ".DS_Store" | sort
 ```bash
 cd "<PLANNER_ROOT_PATH>" && git init
 ln -s CLAUDE.md "<PLANNER_ROOT_PATH>/AGENTS.md"
-git -C "<PLANNER_ROOT_PATH>" add .
+git -C "<PLANNER_ROOT_PATH>" add -- CLAUDE.md CONCEPTS.md AGENTS.md docs
 git -C "<PLANNER_ROOT_PATH>" commit -m "feat: 初始化軍師（規劃協調中心）<PLANNER_NAME>"
 ```
 
@@ -271,7 +272,7 @@ git -C "<PLANNER_ROOT_PATH>" commit -m "feat: 初始化軍師（規劃協調中�
 
 ## 步驟 ⑦：登記至 kunsu-registry.json
 
-對每個子專案，呼叫 `registry-merge.sh`（skill 目錄的定位見 Agent 對應表：以本 SKILL.md 所在目錄推算）：
+對每個子專案，呼叫 `registry-merge.sh`：
 
 ```bash
 bash "<skill 目錄>/scripts/registry-merge.sh" \
@@ -313,8 +314,7 @@ bash "<skill 目錄>/scripts/registry-merge.sh" \
 
 ## 設計備註
 
-- **skill 目錄定位**：指向此 skill 部署後所在目錄（例如 `<部署目錄>/kunsu-init/`，部署目錄見 Agent 對應表）；各 agent 是否由 harness 注入環境變數、以及未注入時的推算方式，一律以 Agent 對應表為準——未注入時，以 `Read` 查閱此 SKILL.md 所在路徑後推算。
-- **範本固定段落來源**：初始抽取自 ebook 專案群規劃中心母本（本機私有路徑，略），現行內容為 5 條 Invariants、三信箱協議全文（含 cd 陷阱說明、Method 2 備援、tripwire、不對稱授權）、工作流程段——抽取後隨 ADR 006／008／009 等於本 repo 持續演進，內容以範本現行版本為準，母本僅為初始來源。各軍師自持一份，消除對母本路徑的依賴。
+- **範本固定段落**：5 條 Invariants、三信箱協議全文（含 Method 2 備援、tripwire、不對稱授權）、工作流程段；各軍師自持一份，內容以範本現行版本為準，不依賴母本路徑。
 - **`registry-merge.sh` 的 python3 依賴**：macOS 系統自帶 python3（Xcode CLT），腳本已在缺失時給出安裝提示。不引入 jq 或其他外部依賴。
 - **為何 git commit 允許**：步驟 ⑥ 的 commit 是新建軍師 repo 的初始 commit，不是對既有 repo 的未授權提交，且需使用者明確確認後才執行。add-project 步驟 ⑩ 的確認 commit 同理——依 ADR 009，逐次確認即為使用者明確要求，允許理由擴為「協議流程尾端對自身產出的收斂 commit」。
 - **Obsidian vault 呼叫既有 skill 的腳本**：直接呼叫 `init-vault.sh` 的固定部分（建立 .obsidian/），HOME.md 由本 skill 產生（含 handoffs dataview 附加），不重複執行 init-obsidian-vault 的完整流程。
@@ -380,13 +380,13 @@ test -d "<CURRENT_REPO_ROOT>/docs/applications" && echo "ok" || echo "missing"
        touch "<CURRENT_REPO_ROOT>/docs/applications/.gitkeep"
        touch "<CURRENT_REPO_ROOT>/docs/applications/archive/.gitkeep"
        ```
-    2. **補協議文字**：以 `Read` 讀取 `<skill 目錄>/assets/templates/kunsu-claude.md`（skill 目錄的定位見 Agent 對應表：以本 SKILL.md 所在目錄推算），取出「申請信箱協議」整個章節與雙信箱版的兩條 bullet，以 `Edit` 更新軍師 CLAUDE.md：
+    2. **補協議文字**：以 `Read` 讀取 `<skill 目錄>/assets/templates/kunsu-claude.md`，取出「申請信箱協議」整個章節與現行（三信箱）版的例外授權 bullet，以 `Edit` 更新軍師 CLAUDE.md：
        - 在 `## 文件導航` 標題之前插入「## 申請信箱協議」整段（與範本逐字相同），並在文件導航表補 `docs/applications/` 兩列。
-       - 將回覆信箱協議中「**信箱範圍是唯一的例外授權**」bullet 改寫為範本現行的雙信箱表述；tripwire bullet 的核對範圍同步擴及 `docs/applications/` 頂層。
+       - 將回覆信箱協議中「**信箱範圍是唯一的例外授權**」bullet 改寫為範本現行的三信箱表述；tripwire bullet 的核對範圍同步擴及 `docs/applications/` 與 `docs/reports/` 頂層（②-a 已套三信箱 bullet 時，②-b 的改寫無事可做屬正常）。
        - 任一插入錨點不存在（CLAUDE.md 經手改）→ 略過該處，留待核查回報。
     3. **完成核查（兩條，防半更新）**：
        - `grep -c 'docs/applications/' "<CURRENT_REPO_ROOT>/CLAUDE.md"` 應大於 0（申請信箱協議已插入）。
-       - `grep -c '信箱範圍是唯一的例外授權' "<CURRENT_REPO_ROOT>/CLAUDE.md"` 應為 0（舊單信箱 bullet 已改寫；非零表示協議停在自相矛盾的半更新狀態）。pattern 須用舊 bullet 專屬前綴「信箱範圍是唯一的例外授權」（與上方步驟 2「改寫舊 bullet」所指涉的字串一致）；**勿改回較短的「唯一的例外授權」——範本現行雙信箱 bullet 本身即「兩個信箱是唯一的例外授權…」，含該短子字串，會被命中而把正確遷移誤判成半更新**。
+       - `grep -c '信箱範圍是唯一的例外授權' "<CURRENT_REPO_ROOT>/CLAUDE.md"` 應為 0（舊單信箱 bullet 已改寫；非零表示協議停在自相矛盾的半更新狀態）。pattern 須用舊 bullet 專屬前綴「信箱範圍是唯一的例外授權」（與上方步驟 2「改寫舊 bullet」所指涉的字串一致）；**勿改回較短的「唯一的例外授權」——範本現行 bullet 本身即「三個信箱是唯一的例外授權…」，含該短子字串，會被命中而把正確遷移誤判成半更新**。
        任一條核查失敗 → 明確回報失敗項目：「目錄已補建，但 CLAUDE.md 協議文字補入不完整（申請信箱章節缺失／舊『唯一例外授權』bullet 未改寫）。請對照範本 `kunsu-claude.md` 手動補正。」**不回滾已建目錄**，記錄 `APP_MIGRATION=migrated`（目錄已建），繼續執行 ②-b。
     → 三步執行完畢：記錄 `APP_MIGRATION=migrated`，繼續執行 ②-b。
   - **n → 拒絕遷移**：記錄 `APP_MIGRATION=skipped`，繼續執行 ②-b。
@@ -410,13 +410,13 @@ test -d "<CURRENT_REPO_ROOT>/docs/reports" && echo "ok" || echo "missing"
        touch "<CURRENT_REPO_ROOT>/docs/reports/.gitkeep"
        touch "<CURRENT_REPO_ROOT>/docs/reports/archive/.gitkeep"
        ```
-    2. **補協議文字**：以 `Read` 讀取 `<skill 目錄>/assets/templates/kunsu-claude.md`（skill 目錄的定位見 Agent 對應表：以本 SKILL.md 所在目錄推算），取出「上報信箱協議」整個章節，以 `Edit` 更新軍師 CLAUDE.md：
+    2. **補協議文字**：以 `Read` 讀取 `<skill 目錄>/assets/templates/kunsu-claude.md`，取出「上報信箱協議」整個章節，以 `Edit` 更新軍師 CLAUDE.md：
        - 在 `## 文件導航` 標題之前插入「## 上報信箱協議」整段（置於「申請信箱協議」章節之後，與範本逐字相同），並在文件導航表補 `docs/reports/` 與 `docs/reports/archive/` 兩列。
        - 將回覆信箱協議中「**兩個信箱是唯一的例外授權**」bullet 改寫為範本現行的三信箱表述（「三個信箱是唯一的例外授權…」）；tripwire bullet 的核對範圍同步擴及 `docs/reports/` 頂層，並更新授權歸檔括號說明列入上報信箱。
        - 任一插入錨點不存在（CLAUDE.md 經手改）→ 略過該處，留待核查回報。
     3. **完成核查（兩條，防半更新）**：
        - `grep -c 'docs/reports/' "<CURRENT_REPO_ROOT>/CLAUDE.md"` 應大於 0（上報信箱協議已插入）。
-       - `grep -c '兩個信箱是唯一的例外授權' "<CURRENT_REPO_ROOT>/CLAUDE.md"` 應為 0（雙信箱 bullet 已改寫為三信箱表述；此為軍師 CLAUDE.md 雙信箱版 bullet 的專屬前綴，三信箱改寫後不復存在）。**勿縮短核查字串為「唯一的例外授權」——三信箱新 bullet 本身即「三個信箱是唯一的例外授權…」，含該短子串，會把正確遷移誤判成半更新**；並注意此處核查的是軍師 CLAUDE.md 的 bullet 文字，與 kunsu-inbox SKILL.md 的「兩個信箱是唯讀邊界的唯一例外」措辭不同，請勿混用。
+       - `grep -c '兩個信箱是唯一的例外授權' "<CURRENT_REPO_ROOT>/CLAUDE.md"` 應為 0（雙信箱 bullet 已改寫為三信箱表述；此為軍師 CLAUDE.md 雙信箱版 bullet 的專屬前綴，三信箱改寫後不復存在）。**勿縮短核查字串為「唯一的例外授權」——三信箱新 bullet 本身即「三個信箱是唯一的例外授權…」，含該短子串，會把正確遷移誤判成半更新**。
        任一條核查失敗 → 明確回報失敗項目：「目錄已補建，但 CLAUDE.md 協議文字補入不完整（上報信箱章節缺失／雙信箱 bullet 未改寫為三信箱表述）。請對照範本 `kunsu-claude.md` 手動補正。」**不回滾已建目錄**，記錄 `REPORT_MIGRATION=migrated`（目錄已建），繼續（見下方統一跳轉）。
     → 三步執行完畢：記錄 `REPORT_MIGRATION=migrated`，繼續（見下方統一跳轉）。
   - **n → 拒絕遷移**：記錄 `REPORT_MIGRATION=skipped`，繼續（見下方統一跳轉）。
@@ -504,7 +504,7 @@ git -C "<path>" rev-parse --show-toplevel 2>/dev/null || echo "invalid"
 
 ### ⑤：訪談（fallback——無待審申請或未遷移時）
 
-以單次阻塞式確認（見 Agent 對應表）**分題**收集新子專案資訊（分題取代舊版一行式輸入，避免長字串在終端機輸入的顯示問題）：
+以單次阻塞式確認（見 Agent 對應表）**分題**收集新子專案資訊（長字串在終端機一行輸入會有顯示問題）：
 
 1. **顯示名稱**：出現在關聯專案表的名稱，可含空格。
 2. **絕對路徑**：子 repo 的絕對路徑（隨後查證存在）。
@@ -553,7 +553,7 @@ git -C "<path>" rev-parse --show-toplevel 2>/dev/null || echo "invalid"
 
 ### ⑦：登記至 kunsu-registry.json
 
-呼叫 `registry-merge.sh`（skill 目錄的定位見 Agent 對應表：以本 SKILL.md 所在目錄推算）：
+呼叫 `registry-merge.sh`：
 
 ```bash
 bash "<skill 目錄>/scripts/registry-merge.sh" \
@@ -697,7 +697,7 @@ PYEOF
 3. 對每筆符合者判斷「是否未完成」：
    - 先以 `Glob` 列出 `<CURRENT_REPO_ROOT>/docs/handoffs/replies/*.md` 全部實體檔案（不依賴 git status，含 untracked），逐一以 `Read` 讀取 frontmatter，篩選 `in_reply_to` 字面等於該交接檔名（含 `.md` 後綴）者為其回覆。
    - **無任何對應回覆** → 未完成。
-   - **有對應回覆** → 取最新一份（依檔名 `(date, n)` 降序，不可用字串排序——同日多份回覆時，無數值後綴視為 `n=1`，字串排序會把無後綴的基礎檔名誤判為排在有後綴版本之後而誤取（即誤取較舊的一份），同 `add-project` 步驟⑨的提醒）讀其 `status`：`done` = 完成；`partial`／`blocked`／`submitted`／其他未知值 = 未完成。
+   - **有對應回覆** → 取最新一份（依檔名 `(date, n)` 數值降序；規則與理由見 add-project ④-1）讀其 `status`：`done` = 完成；`partial`／`blocked`／`submitted`／其他未知值 = 未完成。
 
 **有未完成交接** → 以阻塞式確認（見 Agent 對應表）列出警告清單（每筆顯示：標題、建立日期、觸發的角色代碼、最新 status 或「無回覆」），並提示：「移除後，上述交接文件在軍師沙盤將被歸類為『to: 不符清單』，需手動歸檔。」選項「繼續」／「取消」：
 
@@ -744,7 +744,7 @@ PYEOF
 
 **⑤-b：registry**
 
-呼叫 `registry-remove.sh`（skill 目錄的定位見 Agent 對應表：以本 SKILL.md 所在目錄推算）：
+呼叫 `registry-remove.sh`：
 
 ```bash
 bash "<skill 目錄>/scripts/registry-remove.sh" \

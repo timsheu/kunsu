@@ -175,7 +175,7 @@ printf '%s' "$BODY" | bash "<skill 目錄>/scripts/new-report.sh" \
 或發起新交接。
 ```
 
-不主動 commit 任何變更。
+不 commit 投遞結果：未 commit 的新檔本身就是軍師信箱的新件訊號，commit 由軍師在歸檔時執行（ADR 009 不對稱設計）。
 
 ---
 
@@ -190,4 +190,4 @@ printf '%s' "$BODY" | bash "<skill 目錄>/scripts/new-report.sh" \
 | 信箱目錄 | `docs/reports/`（一律在軍師 repo 內，頂層投遞、`archive/` 歸檔） |
 | 軟依賴 | `~/.claude/kunsu-registry.json`（缺失時硬停於步驟 3）；目標軍師已遷移的 `docs/reports/`（缺失時硬停於步驟 6） |
 | 掃描端 | 軍師 session 的 kunsu-inbox skill（軍師模式）；`scan-reports.sh` 回報新上報份數 |
-| 歸檔 | 由軍師 session 手動執行四步驟：Edit `status` → `git add` → `git mv` 至 `archive/` → 確認 commit（untracked 檔案須先 `git add` 才能 `git mv`，順序不可顛倒） |
+| 歸檔 | 軍師 session 以 kunsu-inbox 的 `scripts/archive-report.sh "<上報檔名>"` 完成 status Edit → git add → git mv → add 目的地，再依腳本印出的帶 pathspec 指令確認 commit（ADR 018）；協議全文以軍師 CLAUDE.md 上報信箱協議為準 |

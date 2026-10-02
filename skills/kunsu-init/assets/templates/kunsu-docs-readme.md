@@ -6,18 +6,18 @@
 
 | 目錄 | 內容 | 產出指令 |
 |------|------|----------|
-| `brainstorms/` | 功能發想、需求釐清紀錄 | `/ce-brainstorm` |
-| `plans/` | 跨專案功能規劃（含各端拆分與介接規格） | `/ce-plan` |
+| `brainstorms/` | 功能發想、需求釐清紀錄 | ce-brainstorm skill |
+| `plans/` | 跨專案功能規劃（含各端拆分與介接規格） | ce-plan skill |
 | `handoffs/` | 交給各子專案 session 的交接文件 | handoff skill |
 | `handoffs/replies/` | 接手方 session 的回覆信箱（唯讀，對方寫） | — |
 | `applications/` | 子專案申請信箱（頂層對方寫，待審不可變） | kunsu-apply skill（子專案端） |
 | `applications/archive/` | 已處理申請歸檔（軍師管理） | — |
 | `reports/` | 子專案上報信箱（頂層對方寫，軍師審閱歸檔） | kunsu-report skill（子專案端） |
 | `reports/archive/` | 已處理上報歸檔（軍師管理） | — |
-| `adr/` | 跨專案架構決策紀錄與候選 | 手動 / `/ce-plan` 產出 ADR Candidate |
+| `adr/` | 跨專案架構決策紀錄與候選 | 手動 / ce-plan skill 產出 ADR Candidate |
 | `modules/` | 跨專案模組地圖、資料流向說明 | 手動維護 |
-| `solutions/` | 可重用學習與解法 | `/ce-compound` |
-| `ideas/` | 靈感速記 inbox | `/idea` |
+| `solutions/` | 可重用學習與解法 | ce-compound skill |
+| `ideas/` | 靈感速記 inbox | idea skill |
 | `todos/` | 已知待辦、明確排除於當前範圍外的技術債 | todo skill |
 
 ## 目前狀態

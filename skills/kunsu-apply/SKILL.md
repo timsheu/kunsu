@@ -143,6 +143,8 @@ bash "<skill 目錄>/scripts/new-application.sh" \
 
 若技術棧為「待補充」，一併提醒可於子專案補齊 CLAUDE.md 技術棧小節後再投遞，或由軍師核准後自行補註。
 
+不 commit 投遞結果：未 commit 的新檔本身就是軍師信箱的新件訊號，commit 由軍師在審核歸檔時執行（ADR 009 不對稱設計）。
+
 ---
 
 ## 依賴聲明

@@ -188,7 +188,7 @@ Glob("{kunsu_path}/docs/handoffs/replies/*.md")
    `app/subrepo_status.py` 唯讀擷取，display-only）——僅供顯示，不是分類依據、
    不參與任何比對；本 skill 手動輸出表格不列此欄。
 
-**4a-3b. 交接依賴圖推導態（handoff v0.23.0 起，advisory）：**
+**4a-3b. 交接依賴圖推導態（advisory）：**
 
 不手算依賴——執行同 toolkit 的 CLI 取推導態（單一推導來源為沙盤 `app/handoff_graph.py`，兩 agent 呼叫形相同）：
 
@@ -292,7 +292,7 @@ bash "<skill 目錄>/scripts/scan-reports.sh" "{CURRENT_ROOT}"
 
 `<skill 目錄>` 為本 skill 部署後所在目錄（定位見 Agent 對應表：以本 SKILL.md 所在目錄推算）。依序執行，各自記錄 stdout 輸出與 exit code。`scan-applications.sh` 對無 `docs/applications/` 的舊版軍師輸出零筆、exit 0（向後相容，不報錯）；`scan-reports.sh` 對無 `docs/reports/` 的舊版軍師同樣輸出零筆、exit 0（向後相容設計）。任一腳本以非 0 且非 2 的 exit code 結束（如 1：參數錯誤或非 git 根）→ 停下回報該腳本的 stderr，不繼續彙整。
 
-**4b-1b. 交接依賴圖摘要（handoff v0.23.0 起，advisory，獨立於 tripwire 之外）：**
+**4b-1b. 交接依賴圖摘要（advisory，獨立於 tripwire 之外）：**
 
 ```bash
 python3 "<skill 目錄>/scripts/handoff-graph.py" "{CURRENT_ROOT}"
@@ -371,7 +371,7 @@ Edit 與 git mv 之間，頂層 ` M` 中間態亦會觸發，續行完成歸檔�
   或當場補閱讀處理。
 - `BATCH_REPLY_ADD`：任意單一 commit 新增 ≥6 份頂層回覆（啟發式）。批次處理合
   法，但請確認非 `git add -A` 之類的整批掃入。
-- `MISDECLARED_ARCHIVE_ADD`：訊息不以白名單前綴（`docs: 歸檔交接`、`docs: 歸檔上報`、`docs: 審核申請`——2026-09-01 ADR 018 修訂自寬前綴 `docs: 歸檔` 收窄，防 `docs: 歸檔 todo` 繼承信箱豁免）
+- `MISDECLARED_ARCHIVE_ADD`：訊息不以白名單前綴（`docs: 歸檔交接`、`docs: 歸檔上報`、`docs: 審核申請`；`docs: 歸檔 todo` 刻意不在內，todo 歸檔不享信箱豁免）
   開頭的 commit **新增**了任一信箱 `archive/`（handoffs／reports／applications）
   檔案——commit 內容疑似超出訊息宣告範圍（ADR 018 的事故形狀：無 pathspec 的
   commit 把前一流程的歸檔暫存一併吞入）。請核對該 commit 是否夾帶：確屬夾帶時以
@@ -433,7 +433,7 @@ context——長駐 session 按 `/clear` 即攤開信箱，不必再手動觸發
   缺失）輸出單行降級提示。
 - **依賴**：軍師沙盤已部署（`install.sh` 一併部署）且其 PyYAML 依賴已安裝
   （見 kunsu-dashboard SKILL.md）。
-- **skill 版號變動提示**（機制觸及率三件套之一）：身分確認後比對部署
+- **skill 版號變動提示**：身分確認後比對部署
   handoff SKILL.md 版號與狀態檔 `~/.claude/kunsu-hook-state.json`（機器層級，
   不進任何 repo），版號變動時於信箱摘要前輸出一行「handoff skill 已更新至
   vX（自 vY）……」並更新狀態檔；首次執行靜默建檔不提示、相同零輸出、任何
@@ -562,7 +562,7 @@ Codex——其 hook 設定檔的 `hooks.UserPromptSubmit` 陣列**尾端**加一
 ## PreToolUse git add 守門（ADR 017，選用）
 
 `scripts/pretooluse_git_guard.py`：軍師 repo 內攔截寬範圍 `git add` 的 PreToolUse
-hook——kunsu 首個行為強制機制（ADR 017 accepted，2026-08-29）。攔截判準凍結為
+hook（ADR 017）。攔截判準凍結為
 三形狀（增列須 ADR 修訂）：`-A`／`--all`、`.`／`:/`、涵蓋信箱路徑
 （`docs/handoffs`、`docs/applications`、`docs/reports`——含其祖先與子目錄）的
 整目錄參數。deny 訊息內嵌正確做法（逐檔列名、歸檔改用 `archive-handoff.sh`）；
@@ -614,7 +614,7 @@ Codex——其 hook 設定檔的 `hooks.PreToolUse` 陣列**尾端**加一組（
 
 > **掛載順序**：先 `install.sh` 部署、後掛載。順序顛倒時腳本檔不存在，hook 以
 > 錯誤結束（`python3 <不存在的檔案>` exit 2 且 stderr 非空）——Claude Code 對
-> PreToolUse hook 錯誤是 fail-closed，**所有 Bash 指令**都會被擋（2026-08-29 實測）；
+> PreToolUse hook 錯誤是 fail-closed，**所有 Bash 指令**都會被擋；
 > Codex 對 exit 2＋stderr 非空同樣視為 Blocked（原始碼查證，試點實測為準），兩
 > agent 在此形狀一致。與腳本內部的 fail-open 是兩回事；此時以非 Bash 途徑補上
 > 腳本檔即解。Codex 另有一形 Claude Code 沒有：條目**未信任或位置索引漂移**時
@@ -628,7 +628,7 @@ Codex——其 hook 設定檔的 `hooks.PreToolUse` 陣列**尾端**加一組（
 
 ```toml
 # ~/.codex/config.toml
-# 必要：軍師 CLAUDE.md 常超過預設 32 KiB 專案文件預算（ebook 軍師 34,581 bytes），超限只在 log 留 warn、靜默截尾末段
+# 必要：軍師 CLAUDE.md 常超過預設 32 KiB 專案文件預算（live 軍師已有超限實例），超限只在 log 留 warn、靜默截尾末段
 project_doc_max_bytes = 65536
 
 # 選用：軍師 repo 由 kunsu-init scaffold 內建 AGENTS.md → CLAUDE.md symlink，Codex 原生讀到憲章；
@@ -642,7 +642,7 @@ project_doc_max_bytes = 65536
 # [sandbox_workspace_write]
 # writable_roots = ["/path/to/軍師", "/Users/<you>/.claude"]
 
-# 選用：在 default mode 啟用阻塞式提問（0.142.5 under development、預設關）；開啟後 Agent 對應表「阻塞式確認」列的 Codex 欄自動改為可用即用
+# 選用：在 default mode 啟用阻塞式提問（部分 Codex 版本預設關，以本機版本為準）；開啟後 Agent 對應表「阻塞式確認」列的 Codex 欄自動改為可用即用
 # [features]
 # default_mode_request_user_input = true
 ```
@@ -653,7 +653,7 @@ project_doc_max_bytes = 65536
 
 ## 依賴聲明
 
-本 skill 依賴同 toolkit 內建的 `handoff` skill（v0.24.0，原始碼位於本 repo `skills/handoff/`）所定義的下列慣例。兩者共同發版、慣例定義以本 repo 為準；更新 handoff 的以下行為時需同步核查本 skill（v0.10.0 的沉澱訊號查核為 done 流程內部指引、v0.11.0 的派發即推播／回覆即推播為 add／reply 流程收尾通知、v0.12.0 的反向路由查核與 todo 殘項清點為 done 流程內部指引、v0.13.0 的矛盾回報指引為 reply 流程內部指引、v0.14.0 的更正交接與 `corrected_by` 為 add 流程內部慣例（corrected_by 為 display-only frontmatter 欄位；其 Edit 中間態頂層屬既有 catch-all tripwire、archive 內屬既有靜默略過分支，皆無新豁免）、v0.15.0 的斷言層級紀律與 done 斷言自查為 add／done 流程內部指引、v0.16.0 的產檔腳本 stderr 指路行不改變產出檔內容與 stdout 路徑契約、v0.17.0 的 session 命名慣例 slot 變體（`kc --slot`，推播精確比對納入 `<慣例名>.<後綴>`、多重命中仍降級）為 add／reply 推播匹配規則、v0.17.1 的產檔腳本專案根定位「往上找到家目錄即停」為腳本內部防呆（不改變產出檔內容與 stdout 路徑契約）、v0.18.0 的歸檔腳本 `archive-handoff.sh` 為 done 步驟 5–7 的腳本化執行（其 rename 產物即本 skill 掃描豁免的既有兩形狀，`git add` 僅限具體路徑與確認 commit 協議零改動，無新豁免需求）、v0.19.0 的確認 commit 宣告範圍契約（ADR 018——定型指令改帶兩形 pathspec、add 與 commit 路徑集合一致，不改變掃描豁免形狀與「未 commit 即未處理」訊號，無新豁免需求）、v0.20.0 的產檔查重（stderr advisory，不改產出檔內容、exit code 與 stdout 路徑契約）與 done 查核腳本附掛（archive-handoff.sh `--precheck` 印來源 todo 候選、歸檔執行掃 index 聚合 todo 三形進 commit 宣告、尾端印引用偵測——todo 歸檔路徑不在本 skill 掃描範圍，無新豁免需求）、v0.21.0 的回覆修改檔案清單條款（reply 流程內部指引；回覆方式定型文字多一行、new-handoff-reply.sh 多一行 stderr——**確實改變交接本體產出內容**，但 frontmatter、stdout 路徑契約、掃描慣例與豁免形狀不變，無新豁免需求）、v0.22.0 的 SKILL 字面 agent 中性化與 Agent 對應表（ADR 019——阻塞式確認改依 agent 身分判定、跨 session 推播工具不可用時整步跳過；回覆方式定型文字的 reply 呼叫形改為 Claude Code／Codex 兩形並列——**確實改變交接本體產出內容**，但 frontmatter、stdout 路徑契約、掃描慣例與豁免形狀不變，無新豁免需求）、v0.23.0 的交接依賴圖 `depends_on`（產檔腳本第 6 參數——**確實改變交接本體產出內容**（僅給參數時 frontmatter 多一個選填欄位），stdout 路徑契約、掃描慣例與豁免形狀不變，無新豁免需求；推導由沙盤 `app/handoff_graph.py` 單一模組提供，本 skill 4a／4b 經 `scripts/handoff-graph.py` 呼叫）、v0.24.0 的線別欄 `series` 與線總表提醒（產檔腳本第 7 參數——**確實改變交接本體產出內容**（僅給參數時 frontmatter 多一個選填純量欄位），stderr advisory 訊號不改 stdout 路徑契約、exit code、掃描慣例與豁免形狀，無新豁免需求；消費端僅產檔腳本自身，本 skill 不讀此欄）——皆不涉掃描慣例；回覆即推播不改變「未 commit 即新回覆」訊號）：
+本 skill 依賴同 toolkit 內建的 `handoff` skill（v0.24.0，原始碼位於本 repo `skills/handoff/`）所定義的下列慣例。兩者共同發版、慣例定義以本 repo 為準；handoff 改動若觸及下表任一列須同步核查本 skill，未觸及者不需。
 
 | 項目 | 慣例 |
 |------|------|
@@ -663,7 +663,7 @@ project_doc_max_bytes = 65536
 | `verify` 欄位 | 選填，驗收方式（ADR 011）。建議代碼 `needs-deploy`／`testable-now`／`needs-device`（全小寫 kebab-case，顯示端查找前正規化為小寫），開放值域（其他字串原樣顯示）、缺省不顯示（純空白字串視同缺省）；不跨回覆繼承（只讀最新回覆）；display-only，不參與任何比對邏輯與 tripwire |
 | 信箱目錄 | `docs/handoffs/replies/`（一律在軍師 repo 內）|
 | `in_reply_to` 比對方式 | 精確字串比對，含後綴 |
-| done 歸檔搬移 | 頂層交接→`archive/`、其回覆→`archive/replies/` 成對搬移，即 `scan-replies.sh` 授權豁免的兩個 rename 形狀（可攜帶 `status: done` 修改，porcelain 呈現 `RM`）；v0.8.0 起 done 亦可能一併搬移來源 todo（`docs/todos/`→`docs/todos/archive/`，不在本 skill 掃描範圍，無豁免需求）|
+| done 歸檔搬移 | 頂層交接→`archive/`、其回覆→`archive/replies/` 成對搬移，即 `scan-replies.sh` 授權豁免的兩個 rename 形狀（可攜帶 `status: done` 修改，porcelain 呈現 `RM`）；done 亦可能一併搬移來源 todo（`docs/todos/`→`docs/todos/archive/`，不在本 skill 掃描範圍，無豁免需求）|
 | 流程尾端確認 commit | add／done／reply（本地語境）經阻塞式確認後 commit（ADR 009；Codex 以文字回合確認，ADR 019）；commit 帶與 add 同一組 pathspec（宣告範圍契約，ADR 018）；kunsu 語境 reply 不 commit——未 commit 即本 skill 的新回覆偵測訊號 |
 
 另依賴同 toolkit 內建的 `kunsu-apply` skill 所定義的申請信箱目錄慣例

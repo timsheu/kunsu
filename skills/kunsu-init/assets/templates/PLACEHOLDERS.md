@@ -2,7 +2,7 @@
 
 本文件列出 `skills/kunsu-init/assets/templates/` 中所有使用的 `{{...}}` 佔位符、語意說明、出現位置，以及 kunsu-init 的 SKILL.md 應在哪一個訪談問題中取得填充值。
 
-供 U2（SKILL.md 撰寫）使用：每個佔位符皆需對應 SKILL.md 訪談流程的某一題，保證無孤兒佔位符。
+每個佔位符皆對應 SKILL.md 訪談流程的某一題，保證無孤兒佔位符。
 
 ---
 
@@ -40,7 +40,7 @@ U2 撰寫 SKILL.md 訪談流程時，應確保以下問題涵蓋所有佔位符�
 
 | 範本檔案 | 說明 |
 |----------|------|
-| `kunsu-concepts.md` | 5 個跨專案協調核心概念的定義逐字保留；複製後即可使用 |
+| `kunsu-concepts.md` | 跨專案協調核心詞彙的定義逐字保留；複製後即可使用 |
 | `home-dataview-handoffs.md` | 附加至 HOME.md 的「交接文件狀態」dataview 區塊；路徑 `"docs/handoffs"` 為通用路徑，直接使用 |
 | `home-dataview-reports.md` | 附加至 HOME.md 的「上報狀態」dataview 區塊；路徑 `"docs/reports"` 為通用路徑，直接使用 |
 

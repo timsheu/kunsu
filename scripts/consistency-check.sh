@@ -262,7 +262,7 @@ if command -v python3 >/dev/null; then
 import re
 files = ["skills/handoff/SKILL.md","skills/todo/SKILL.md","skills/kunsu-init/SKILL.md","skills/kunsu-inbox/SKILL.md",
          "skills/kunsu-apply/SKILL.md","skills/kunsu-report/SKILL.md","skills/kunsu-list/SKILL.md",
-         "skills/kunsu-init/assets/templates/kunsu-claude.md","skills/kunsu-init/assets/templates/kunsu-concepts.md"]
+         "skills/kunsu-init/assets/templates/kunsu-claude.md","skills/kunsu-init/assets/templates/kunsu-concepts.md","skills/kunsu-init/assets/templates/kunsu-docs-readme.md"]
 LITERALS = ["AskUserQuestion","ListAgents","SendMessage","$CLAUDE_SKILL_DIR","~/.claude/settings.json","~/.claude/skills"]
 SLASH = re.compile(r'(?:^|[\s（「：(])/(?:handoff|todo|kunsu-(?:init|inbox|apply|report|list)|kb|ce-[a-z-]+)(?:[\s）」、。)]|$)', re.M)
 bad = []
