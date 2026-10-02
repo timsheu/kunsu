@@ -380,3 +380,16 @@ def test_script_output_only_matched_against_its_own_prefix():
 
     assert result.new_replies == ["docs/handoffs/replies/real-reply.md"]
     assert result.new_applications == []
+
+
+def test_scripts_parameter_limits_which_scripts_run():
+    """傳入 MAILBOX_ONLY_SCRIPTS 時只呼叫申請／上報兩支，scan-replies.sh 不執行。"""
+    from app.kunsu_scan import MAILBOX_ONLY_SCRIPTS, scan_kunsu
+    with patch("app.kunsu_scan.subprocess.run") as mock_run:
+        mock_run.return_value = _make_proc(0, "NEW_REPORT:docs/reports/x.md\n")
+        result = scan_kunsu("/fake/kunsu", MAILBOX_ONLY_SCRIPTS)
+    called = [c.args[0][1] for c in mock_run.call_args_list]
+    assert len(called) == 2
+    assert all(not path.endswith("scan-replies.sh") for path in called)
+    assert result.new_reports == ["docs/reports/x.md"]
+    assert result.new_replies == []

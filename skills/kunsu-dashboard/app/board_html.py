@@ -253,8 +253,9 @@ def _nav(
                 f'<a href="/overview#{escape(anchor)}">技術債 {todo_count} 筆</a>'
             )
     parts.append('<a href="/overview">完整彙整頁</a>')
+    note = "；看板不掃回覆信箱，回覆側 tripwire 見完整彙整頁" if page == "/" else ""
     parts.append(
-        f'<span class="kb-scan-time">掃描時間 {datetime.now().strftime("%H:%M:%S")}</span>'
+        f'<span class="kb-scan-time">掃描時間 {datetime.now().strftime("%H:%M:%S")}{note}</span>'
     )
     return f'<nav class="kb-nav">{"".join(parts)}</nav>'
 

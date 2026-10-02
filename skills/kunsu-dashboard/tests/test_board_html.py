@@ -70,11 +70,12 @@ def _install(monkeypatch, kunsus: dict[str, list[str]], stale: tuple[str, ...] =
         if kunsu_path not in stale:
             healthy.append(kunsu_path)
     reg = RegistryResult(healthy=healthy, stale=list(stale), registry_error=None, raw=raw)
-    monkeypatch.setattr("app.main.load_registry", lambda _p: reg)
+    monkeypatch.setattr("app.board_routes.load_registry", lambda _p: reg)
     scans = scans or {}
+    # 看板以 scan_kunsu(path, MAILBOX_ONLY_SCRIPTS) 呼叫，替身接受第二參數
     monkeypatch.setattr(
-        "app.main.scan_kunsu",
-        lambda kp: scans.get(kp, KunsuScanResult(kunsu_path=kp)),
+        "app.board_routes.scan_kunsu",
+        lambda kp, scripts=None: scans.get(kp, KunsuScanResult(kunsu_path=kp)),
     )
 
 
@@ -160,7 +161,7 @@ def test_no_k_selects_first_sorted_kunsu(client, monkeypatch, tmp_path, ebook):
 
 def test_empty_registry(client, monkeypatch):
     reg = RegistryResult(healthy=[], stale=[], registry_error=None, raw={})
-    monkeypatch.setattr("app.main.load_registry", lambda _p: reg)
+    monkeypatch.setattr("app.board_routes.load_registry", lambda _p: reg)
     resp = client.get("/")
     assert resp.status_code == 200
     assert "尚無已登記的軍師" in resp.text
@@ -279,7 +280,7 @@ def test_card_shows_unknown_status_kind_tag_and_three_day_states(client, monkeyp
 def test_registry_error_renders_200_with_message_on_board_and_archive(client, monkeypatch):
     """registry 讀取失敗：/ 與 /archive 皆 HTTP 200 並顯示錯誤訊息（PR #1 review）。"""
     reg = RegistryResult(healthy=[], stale=[], registry_error="JSON 損壞：模擬", raw={})
-    monkeypatch.setattr("app.main.load_registry", lambda _p: reg)
+    monkeypatch.setattr("app.board_routes.load_registry", lambda _p: reg)
     for path in ("/", "/archive", "/handoff?k=x&f=docs/handoffs/a.md"):
         resp = client.get(path)
         assert resp.status_code == 200, path
@@ -329,7 +330,7 @@ def test_archive_stale_kunsu_shows_notice_not_empty(client, monkeypatch, ebook):
     """軍師失聯時 archive 頁不得誤報「沒有已歸檔的交接」（code review #2）。"""
     _install(monkeypatch, {str(ebook): ["android"]}, stale=(str(ebook),))
     monkeypatch.setattr(
-        "app.main.get_handoff_graph",
+        "app.board_routes.get_handoff_graph",
         lambda _kp: pytest.fail("失聯軍師不應讀取依賴圖"),
     )
     html = client.get("/archive?k=ebook").text
@@ -469,7 +470,8 @@ def test_handoff_page_stale_kunsu_shows_notice(client, monkeypatch, ebook):
 def test_handoff_page_never_runs_mailbox_scan(client, monkeypatch, ebook):
     _handoff(ebook, "2026-09-01-a.md", "存在的交接")
     _install(monkeypatch, {str(ebook): ["android"]})
-    monkeypatch.setattr("app.main.scan_kunsu", lambda kp: pytest.fail("全文頁不得呼叫掃描"))
+    monkeypatch.setattr("app.board_routes.scan_kunsu",
+                        lambda kp, scripts=None: pytest.fail("全文頁不得呼叫掃描"))
     assert _detail(client, "docs/handoffs/2026-09-01-a.md").status_code == 200
 
 
@@ -499,3 +501,18 @@ def test_handoff_page_does_not_repeat_title_from_frontmatter_or_leading_h1(clien
     assert "<h1>" not in doc
     assert "<h2>第一節</h2>" in doc
     assert "<th>title</th>" not in doc
+
+
+def test_board_scans_mailboxes_only_not_replies(client, monkeypatch, ebook):
+    """看板跳過 scan-replies.sh：scan_kunsu 收到 MAILBOX_ONLY_SCRIPTS（PR #1 效率項，使用者定案）。"""
+    from app.kunsu_scan import MAILBOX_ONLY_SCRIPTS
+    seen: list = []
+    _install(monkeypatch, {str(ebook): ["android"]})
+    monkeypatch.setattr(
+        "app.board_routes.scan_kunsu",
+        lambda kp, scripts=None: (seen.append(scripts), KunsuScanResult(kunsu_path=kp))[1],
+    )
+    client.get("/?k=ebook")
+    assert seen == [MAILBOX_ONLY_SCRIPTS]
+    assert all(name != "scan-replies.sh" for name, _ in MAILBOX_ONLY_SCRIPTS)
+    assert "回覆側 tripwire" in client.get("/?k=ebook").text
