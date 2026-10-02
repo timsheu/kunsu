@@ -2,8 +2,9 @@
 board_html.py — 軍師沙盤看板頁（/）與 archive 頁（/archive）的 HTML 渲染
 
 輸入為 board_model.Board 與 handoff_graph 結果，輸出完整 HTML 頁面字串；
-不讀 registry、不呼叫掃描。零 JS：卡片與 archive 列表只放連結，全文由
-獨立全文頁（/handoff）伺服器端渲染 Markdown 呈現。
+不讀 registry、不呼叫掃描。卡片與 archive 列表只放連結，全文由獨立全文頁
+（/handoff）伺服器端渲染 Markdown 呈現。頁面唯一的 JS 是主題切換（html_common.
+THEME_SCRIPT）：選擇存於瀏覽器 localStorage，伺服器不持有主題狀態。
 
 CSS class 一律用 `kb-` 前綴，避開原彙整頁負向測試針對的 badge／chip／tlabel／
 dlabel／reply-excerpt 字面（看板化計畫 KTD5）。本模組不得匯入 app.main，
@@ -52,18 +53,69 @@ _VERIFY_CSS = {
 }
 
 BOARD_CSS = (
-    # 色票：看板與全文頁共用的語意色，集中於 :root 以便兩頁一致
-    ":root{--kb-ink:#1f2933;--kb-muted:#52606d;--kb-faint:#6b7280;"
-    "--kb-line:#dbe1e7;--kb-line-strong:#b8c2cc;--kb-surface:#f5f7f9;"
-    "--kb-surface-2:#eceff3;--kb-accent:#1456b0;--kb-kunsu:#4527a0;"
+    # 色票：:root 為預設主題「墨與朱」；html[data-kb-theme] 覆寫為另三個主題
+    # （沙盤／青瓷／夜戰）。切換存在瀏覽器 localStorage，伺服器不持有任何主題狀態
+    # （ADR 010 第 1 條零改動）。欄位色一律綁狀態（等待中／待辦／進行中／待驗收）。
+    ":root{--kb-ink:#17191c;--kb-muted:#4f5560;--kb-faint:#767c86;"
+    "--kb-line:#e1e3e7;--kb-line-strong:#c3c7cd;--kb-canvas:#fff;--kb-card:#fff;"
+    "--kb-surface:#f6f6f7;--kb-surface-2:#ededf0;--kb-accent:#1d4ed8;--kb-kunsu:#c2410c;"
+    "--kb-col-wait:#f1f2f4;--kb-col-wait-ink:#555b66;--kb-col-todo:#e0ecff;--kb-col-todo-ink:#1d4ed8;"
+    "--kb-col-doing:#fff0d6;--kb-col-doing-ink:#b45309;--kb-col-review:#dcfce7;--kb-col-review-ink:#15803d;"
+    "--kb-cell-wait:#f8f8f9;--kb-cell-todo:#f6f9ff;--kb-cell-doing:#fffaf0;--kb-cell-review:#f4fcf6;"
+    "--kb-mail-bg:#fff7ed;--kb-mail-line:#fdba74;--kb-tag-bg:#ededf0;--kb-tag-ink:#4f5560;"
+    "--kb-tag-kind-bg:#ffedd5;--kb-tag-kind-ink:#c2410c;--kb-deploy-bg:#ffedd5;--kb-deploy-ink:#9a3412;"
+    "--kb-now-bg:#dcfce7;--kb-now-ink:#15803d;--kb-device-bg:#ede9fe;--kb-device-ink:#6d28d9;"
+    "--kb-status-bg:#fae8ff;--kb-status-ink:#86198f;--kb-days:#b45309;--kb-wait-ink:#78350f;"
     "--kb-warn-bg:#fff6e0;--kb-warn-line:#f0c36d;--kb-warn-ink:#8a5a00;"
-    "--kb-danger-bg:#fdecec;--kb-danger-line:#f1a9a9;--kb-danger-ink:#a32d2d;"
-    "--kb-selection:#dbe7fb}"
+    "--kb-danger-bg:#fff1f1;--kb-danger-line:#fca5a5;--kb-danger-ink:#b91c1c;"
+    "--kb-selection:#dbe7fb;--kb-card-shadow:none;--kb-radius:6px;--kb-lane-kunsu-line:var(--kb-kunsu)}"
+    # 沙盤：作戰地圖的沙色與硃砂
+    "html[data-kb-theme=a]{--kb-ink:#2a2420;--kb-muted:#5f564e;--kb-faint:#7a716a;"
+    "--kb-line:#dcd3c4;--kb-line-strong:#c4b89f;--kb-canvas:#f4efe4;--kb-card:#fffdf8;"
+    "--kb-surface:#ebe4d4;--kb-surface-2:#e3dbc8;--kb-accent:#8a3a1c;--kb-kunsu:#b3261e;"
+    "--kb-col-wait:#e3dfd6;--kb-col-wait-ink:#5f5a52;--kb-col-todo:#e9dcb8;--kb-col-todo-ink:#5a4a14;"
+    "--kb-col-doing:#e8cfa6;--kb-col-doing-ink:#7a4306;--kb-col-review:#cfdcc6;--kb-col-review-ink:#2f5a2a;"
+    "--kb-cell-wait:#ece8df;--kb-cell-todo:#f1ead6;--kb-cell-doing:#f3e5d0;--kb-cell-review:#e6ede0;"
+    "--kb-mail-bg:#e9e6dc;--kb-mail-line:#c9c2ad;--kb-tag-bg:#e8e1d2;--kb-tag-ink:#5f564e;"
+    "--kb-tag-kind-bg:#d9d3c3;--kb-tag-kind-ink:#4a4234;--kb-deploy-bg:#f1d9b3;--kb-deploy-ink:#7a4306;"
+    "--kb-now-bg:#d5e3c7;--kb-now-ink:#2f5a2a;--kb-device-bg:#e1d6e6;--kb-device-ink:#5a3a6e;"
+    "--kb-status-bg:#e6dcd0;--kb-status-ink:#6b4a2b;--kb-days:#8a3a1c;--kb-wait-ink:#6b4a2b;"
+    "--kb-warn-bg:#f3e6c4;--kb-warn-line:#d9bd7a;--kb-warn-ink:#6b4a00;"
+    "--kb-danger-bg:#f7dcd6;--kb-danger-line:#e7a79b;--kb-danger-ink:#8d2416;"
+    "--kb-selection:#e9d7c2;--kb-radius:8px;--kb-lane-kunsu-line:var(--kb-line-strong)}"
+    # 青瓷：冷色作業台，欄首為色帶
+    "html[data-kb-theme=b]{--kb-ink:#1b2730;--kb-muted:#4f6270;--kb-faint:#6f8290;"
+    "--kb-line:#d5dee3;--kb-line-strong:#b4c4cc;--kb-canvas:#f3f6f7;--kb-card:#fff;"
+    "--kb-surface:#e9eff1;--kb-surface-2:#dfe8eb;--kb-accent:#0f6e8c;--kb-kunsu:#2b3a8f;"
+    "--kb-col-wait:#c9d3d9;--kb-col-wait-ink:#2f3f49;--kb-col-todo:#bcd9ea;--kb-col-todo-ink:#0f4d6b;"
+    "--kb-col-doing:#f2d9a6;--kb-col-doing-ink:#6b4500;--kb-col-review:#b9e3d4;--kb-col-review-ink:#115c45;"
+    "--kb-cell-wait:#eceff2;--kb-cell-todo:#e6f1f7;--kb-cell-doing:#f9f1e1;--kb-cell-review:#e4f3ee;"
+    "--kb-mail-bg:#e8eefb;--kb-mail-line:#bfcdee;--kb-tag-bg:#e2e9ed;--kb-tag-ink:#4f6270;"
+    "--kb-tag-kind-bg:#d6def6;--kb-tag-kind-ink:#2b3a8f;--kb-deploy-bg:#f6dfb8;--kb-deploy-ink:#7a4e00;"
+    "--kb-now-bg:#cfeadf;--kb-now-ink:#115c45;--kb-device-bg:#dcdcf3;--kb-device-ink:#3b3b9c;"
+    "--kb-status-bg:#e6dff2;--kb-status-ink:#5b3f8a;--kb-days:#9a4a00;--kb-wait-ink:#5b4a3a;"
+    "--kb-danger-bg:#fbe3e3;--kb-danger-line:#efb0b0;--kb-danger-ink:#9b2c2c;"
+    "--kb-selection:#cfe3ee;--kb-card-shadow:0 1px 2px rgba(27,39,48,.08);--kb-radius:10px;"
+    "--kb-lane-kunsu-line:var(--kb-line-strong)}"
+    # 夜戰：深色作戰室，狀態色發光
+    "html[data-kb-theme=c]{color-scheme:dark;--kb-ink:#e6eaef;--kb-muted:#a7b1bd;--kb-faint:#8b95a1;"
+    "--kb-line:#2c343d;--kb-line-strong:#3a4450;--kb-canvas:#14181d;--kb-card:#1e242c;"
+    "--kb-surface:#1b2027;--kb-surface-2:#232a33;--kb-accent:#7fb4ff;--kb-kunsu:#f2c66d;"
+    "--kb-col-wait:#2a3038;--kb-col-wait-ink:#b7bfc9;--kb-col-todo:#1d3a52;--kb-col-todo-ink:#9fd1ff;"
+    "--kb-col-doing:#4a3416;--kb-col-doing-ink:#ffcf7a;--kb-col-review:#173a2e;--kb-col-review-ink:#8fe3b9;"
+    "--kb-cell-wait:#191d23;--kb-cell-todo:#171f27;--kb-cell-doing:#1f1b16;--kb-cell-review:#16201c;"
+    "--kb-mail-bg:#1c2535;--kb-mail-line:#34507a;--kb-tag-bg:#2a313a;--kb-tag-ink:#b7bfc9;"
+    "--kb-tag-kind-bg:#263552;--kb-tag-kind-ink:#a9c6ff;--kb-deploy-bg:#4a3416;--kb-deploy-ink:#ffcf7a;"
+    "--kb-now-bg:#173a2e;--kb-now-ink:#8fe3b9;--kb-device-bg:#302a4a;--kb-device-ink:#cbb9ff;"
+    "--kb-status-bg:#3a2a44;--kb-status-ink:#e3b6ff;--kb-days:#ffb067;--kb-wait-ink:#d6b38f;"
+    "--kb-warn-bg:#3a2f14;--kb-warn-line:#7a6428;--kb-warn-ink:#ffd98a;"
+    "--kb-danger-bg:#3a1c1c;--kb-danger-line:#7a3434;--kb-danger-ink:#ff9e9e;"
+    "--kb-selection:#2c4a6e;--kb-radius:10px;--kb-lane-kunsu-line:var(--kb-line-strong)}"
     "*{box-sizing:border-box}"
     "::selection{background:var(--kb-selection);color:var(--kb-ink)}"
     ":focus-visible{outline:2px solid var(--kb-accent);outline-offset:2px;border-radius:3px}"
     "body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:var(--kb-ink);"
-    "background:#fff;max-width:1400px;margin:1.25em auto;padding:0 1em;line-height:1.5;"
+    "background:var(--kb-canvas);max-width:1400px;margin:1.25em auto;padding:0 1em;line-height:1.5;"
     "font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}"
     "h1{font-size:1.3em;font-weight:700;letter-spacing:-.01em;margin:0 0 .5em;"
     "padding-bottom:.45em;border-bottom:1px solid var(--kb-line)}"
@@ -81,8 +133,8 @@ BOARD_CSS = (
     ".kb-switch{display:inline-flex;gap:.25em;padding:.15em;background:var(--kb-surface-2);"
     "border-radius:8px}"
     ".kb-switch a,.kb-switch span{padding:.15em .65em;border-radius:6px}"
-    ".kb-switch a:hover{background:#fff;text-decoration:none}"
-    ".kb-switch-current{font-weight:600;color:var(--kb-ink);background:#fff;"
+    ".kb-switch a:hover{background:var(--kb-card);text-decoration:none}"
+    ".kb-switch-current{font-weight:600;color:var(--kb-ink);background:var(--kb-card);"
     "box-shadow:0 1px 2px rgba(31,41,51,.12)}"
     ".kb-scan-time{color:var(--kb-faint);font-size:.85em;margin-left:auto}"
     ".kb-notice{background:var(--kb-warn-bg);border:1px solid var(--kb-warn-line);"
@@ -97,33 +149,42 @@ BOARD_CSS = (
     "gap:.5em;align-items:start;min-width:62em}"
     ".kb-colhead{font-weight:600;font-size:.9em;background:var(--kb-surface-2);"
     "padding:.35em .5em;border-radius:6px;text-align:center;position:sticky;top:0}"
-    ".kb-colhead b{font-weight:600;color:var(--kb-muted);margin-left:.25em}"
+    ".kb-colhead b{font-weight:600;opacity:.75;margin-left:.3em}"
+    ".kb-colhead[data-col=waiting]{background:var(--kb-col-wait);color:var(--kb-col-wait-ink)}"
+    ".kb-colhead[data-col=todo]{background:var(--kb-col-todo);color:var(--kb-col-todo-ink)}"
+    ".kb-colhead[data-col=doing]{background:var(--kb-col-doing);color:var(--kb-col-doing-ink)}"
+    ".kb-colhead[data-col=review]{background:var(--kb-col-review);color:var(--kb-col-review-ink)}"
     ".kb-lane{font-weight:600;font-size:.9em;padding:.5em .3em;"
     "border-top:1px solid var(--kb-line-strong);word-break:break-all;color:var(--kb-muted)}"
-    ".kb-lane-kunsu{color:var(--kb-kunsu)}"
-    ".kb-cell{border-top:1px solid var(--kb-line-strong);padding-top:.5em;min-height:2.6em}"
-    ".kb-cell-empty{background:var(--kb-surface);border-radius:0 0 6px 6px}"
+    ".kb-lane-kunsu{color:var(--kb-kunsu);border-top-color:var(--kb-lane-kunsu-line)}"
+    ".kb-cell{border-top:1px solid var(--kb-line-strong);padding:.5em .35em 0;min-height:2.6em;"
+    "border-radius:0 0 6px 6px}"
+    ".kb-cell[data-col=waiting]{background:var(--kb-cell-wait)}"
+    ".kb-cell[data-col=todo]{background:var(--kb-cell-todo)}"
+    ".kb-cell[data-col=doing]{background:var(--kb-cell-doing)}"
+    ".kb-cell[data-col=review]{background:var(--kb-cell-review)}"
     # 卡片
-    ".kb-card{border:1px solid var(--kb-line);border-radius:10px;padding:.55em .7em .6em;"
-    "margin:0 0 .5em;background:#fff;transition:border-color .15s ease-out}"
+    ".kb-card{border:1px solid var(--kb-line);border-radius:var(--kb-radius);padding:.55em .7em .6em;"
+    "margin:0 0 .5em;background:var(--kb-card);box-shadow:var(--kb-card-shadow);"
+    "transition:border-color .15s ease-out}"
     ".kb-card:hover{border-color:var(--kb-line-strong)}"
     ".kb-card-blocked{background:var(--kb-danger-bg);border-color:var(--kb-danger-line)}"
-    ".kb-card-mail{background:#f3f8ff;border-color:#c7dbf5}"
+    ".kb-card-mail{background:var(--kb-mail-bg);border-color:var(--kb-mail-line)}"
     ".kb-title{font-weight:600;font-size:.92em;line-height:1.35;display:-webkit-box;"
     "-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;"
     "text-wrap:balance}"
     ".kb-meta{font-size:.78em;color:var(--kb-muted);margin-top:.35em;display:flex;"
     "flex-wrap:wrap;gap:.2em .55em;align-items:center}"
     ".kb-tag{display:inline-block;padding:.05em .5em;border-radius:999px;"
-    "background:var(--kb-surface-2);color:var(--kb-muted);white-space:nowrap;line-height:1.5}"
-    ".kb-tag-kind{background:#e3eefc;color:#1456b0}"
-    ".kb-tag-blocked{background:#f8d2d2;color:var(--kb-danger-ink);font-weight:600}"
-    ".kb-tag-deploy{background:#fde8d2;color:#9a3b00}"
-    ".kb-tag-now{background:#dcf2e1;color:#1f6b33}"
-    ".kb-tag-device{background:#e8e1f7;color:var(--kb-kunsu)}"
-    ".kb-tag-status{background:#f0e1f5;color:#6e1f8f}"
-    ".kb-days{color:#9a3b00}"
-    ".kb-wait{font-size:.78em;color:#6d4c41;margin-top:.25em}"
+    "background:var(--kb-tag-bg);color:var(--kb-tag-ink);white-space:nowrap;line-height:1.5}"
+    ".kb-tag-kind{background:var(--kb-tag-kind-bg);color:var(--kb-tag-kind-ink)}"
+    ".kb-tag-blocked{background:var(--kb-danger-line);color:var(--kb-danger-ink);font-weight:600}"
+    ".kb-tag-deploy{background:var(--kb-deploy-bg);color:var(--kb-deploy-ink)}"
+    ".kb-tag-now{background:var(--kb-now-bg);color:var(--kb-now-ink)}"
+    ".kb-tag-device{background:var(--kb-device-bg);color:var(--kb-device-ink)}"
+    ".kb-tag-status{background:var(--kb-status-bg);color:var(--kb-status-ink)}"
+    ".kb-days{color:var(--kb-days)}"
+    ".kb-wait{font-size:.78em;color:var(--kb-wait-ink);margin-top:.25em}"
     ".kb-excerpt{font-size:.78em;color:var(--kb-muted);margin-top:.25em;line-height:1.45}"
     ".kb-more>summary{color:var(--kb-muted)}"
     ".kb-open{font-size:.78em;white-space:nowrap;margin-left:auto;font-weight:500}"
@@ -173,13 +234,26 @@ BOARD_CSS = (
     "color:var(--kb-warn-ink);padding:.35em .7em;border-radius:6px;font-size:.85em}"
     ".kb-doc-section{font-weight:600;margin:1.6em 0 .4em;color:var(--kb-muted);"
     "font-size:.85em;text-transform:none;letter-spacing:.02em}"
-    ".kb-reply{border:1px solid var(--kb-line);border-radius:10px;padding:.7em .9em;"
-    "margin:.6em 0;background:#fff}"
+    ".kb-reply{border:1px solid var(--kb-line);border-radius:var(--kb-radius);padding:.7em .9em;"
+    "margin:.6em 0;background:var(--kb-card)}"
     ".kb-reply-head{font-size:.82em;color:var(--kb-muted);margin-bottom:.5em;display:flex;"
     "flex-wrap:wrap;gap:.2em .6em;align-items:center}"
     ".kb-reply-head strong{color:var(--kb-ink)}"
     ".kb-deps{margin:.3em 0;padding-left:1.2em}"
     ".kb-deps li{margin:.2em 0}"
+    # 主題切換器
+    ".kb-theme{display:inline-flex;gap:.2em;align-items:center;font-size:.8em;color:var(--kb-faint)}"
+    ".kb-theme button{font:inherit;color:var(--kb-muted);background:none;border:1px solid transparent;"
+    "border-radius:999px;padding:.05em .55em;cursor:pointer;line-height:1.6}"
+    ".kb-theme button:hover{border-color:var(--kb-line-strong)}"
+    ".kb-theme button i{display:inline-block;width:.6em;height:.6em;border-radius:50%;margin-right:.3em;"
+    "vertical-align:baseline;border:1px solid rgba(0,0,0,.15)}"
+    ":root:not([data-kb-theme]) .kb-theme button[data-kb-set=d],"
+    "html[data-kb-theme=a] .kb-theme button[data-kb-set=a],"
+    "html[data-kb-theme=b] .kb-theme button[data-kb-set=b],"
+    "html[data-kb-theme=c] .kb-theme button[data-kb-set=c],"
+    "html[data-kb-theme=d] .kb-theme button[data-kb-set=d]"
+    "{color:var(--kb-ink);border-color:var(--kb-line-strong);background:var(--kb-card)}"
     "@media (max-width:640px){body{margin:.75em auto}.kb-nav{font-size:.85em}"
     ".kb-scan-time{margin-left:0;flex-basis:100%}.kb-grid{grid-template-columns:6em "
     "repeat(4,minmax(12em,1fr))}}"
@@ -225,6 +299,25 @@ def _open_link(kunsu_path: str, rel_path: str, text: str = "全文") -> str:
     return f'<a class="kb-open" href="{escape(handoff_href(kunsu_path, rel_path))}">{text}</a>'
 
 
+# 主題代碼 → (顯示名, 切換鈕色點)。代碼即 html[data-kb-theme] 的值，CSS 與 JS 共用。
+THEMES: tuple[tuple[str, str, str], ...] = (
+    ("d", "墨與朱", "#c2410c"),
+    ("a", "沙盤", "#b3261e"),
+    ("b", "青瓷", "#0f6e8c"),
+    ("c", "夜戰", "#f2c66d"),
+)
+
+
+def _theme_switch() -> str:
+    """主題切換鈕列；點擊由 page_shell 注入的 script 處理，選擇存於 localStorage。"""
+    buttons = "".join(
+        f'<button type="button" data-kb-set="{code}" aria-label="主題：{name}">'
+        f'<i style="background:{dot}"></i>{name}</button>'
+        for code, name, dot in THEMES
+    )
+    return f'<span class="kb-theme" role="group" aria-label="配色主題">{buttons}</span>'
+
+
 def _nav(
     kunsus: Sequence[str],
     selected: Optional[str],
@@ -253,6 +346,7 @@ def _nav(
                 f'<a href="/overview#{escape(anchor)}">技術債 {todo_count} 筆</a>'
             )
     parts.append('<a href="/overview">完整彙整頁</a>')
+    parts.append(_theme_switch())
     note = "；看板不掃回覆信箱，回覆側 tripwire 見完整彙整頁" if page == "/" else ""
     parts.append(
         f'<span class="kb-scan-time">掃描時間 {datetime.now().strftime("%H:%M:%S")}{note}</span>'
@@ -340,7 +434,7 @@ def _cell_html(lane: str, column: str, cards: Sequence[Card], kunsu_path: str) -
         else ""
     )
     return (
-        f'<div class="{cls}" data-cell="{escape(_lane_attr(lane))}|{column}">'
+        f'<div class="{cls}" data-col="{column}" data-cell="{escape(_lane_attr(lane))}|{column}">'
         f"{visible}{more}</div><!--cell-->"
     )
 
@@ -349,7 +443,7 @@ def _grid(board: Board, kunsu_path: str) -> str:
     head = ['<div></div>']
     for col in COLUMNS:
         n = sum(len(board.cells.get((lane, col), ())) for lane, _ in board.lanes)
-        head.append(f'<div class="kb-colhead">{COLUMN_LABELS[col]}<b>{n}</b></div>')
+        head.append(f'<div class="kb-colhead" data-col="{col}">{COLUMN_LABELS[col]}<b>{n}</b></div>')
     rows: list[str] = []
     for lane, label in board.lanes:
         lane_cls = "kb-lane kb-lane-kunsu" if lane == LANE_KUNSU else "kb-lane"
@@ -468,6 +562,7 @@ def _back_links(kunsu_path: str, detail: HandoffDetail) -> str:
     if detail.location == LOCATION_ARCHIVE:
         links.append(f'<a href="/archive?k={escape(k)}">已完成（archive）</a>')
     links.append('<a href="/overview">完整彙整頁</a>')
+    links.append(_theme_switch())
     return f'<nav class="kb-nav">{"".join(links)}</nav>'
 
 

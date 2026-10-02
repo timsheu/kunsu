@@ -2,8 +2,8 @@
 markdown_render.py — 交接／回覆／信箱檔的 Markdown 伺服器端渲染（全文頁用）
 
 輸入是來自軍師 repo 的 Markdown 原文（frontmatter＋本文），輸出為可直接嵌入
-text/html 頁面的 HTML 片段。渲染在伺服器端以 Python 完成，頁面維持零 JS、
-端點仍只回 text/html（ADR 010 Decision 1.5 零改動）。
+text/html 頁面的 HTML 片段。渲染在伺服器端以 Python 完成，頁面除主題切換外
+無 JS、端點仍只回 text/html（ADR 010 Decision 1.5 零改動）。
 
 安全邊界：原文由子專案 session 寫入、不可信任。
 - `html=False`：原文中的任何 HTML 標籤一律轉義為文字，不會成為 DOM。

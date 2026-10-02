@@ -25,18 +25,38 @@ VERIFY_LABELS: dict[str, tuple[str, str]] = {
 }
 
 
+# 主題切換：唯一的頁面 JS。<head> 內先讀 localStorage 設定 html[data-kb-theme]（避免
+# 先畫預設再閃一下），再以事件委派接 [data-kb-set] 按鈕。localStorage 不可用（隱私
+# 視窗、被封鎖）時 try/catch 吞掉，頁面照常以預設主題顯示；伺服器不持有任何主題狀態。
+THEME_STORAGE_KEY = "kunsu-dashboard-theme"
+THEME_CODES = ("a", "b", "c", "d")
+THEME_SCRIPT = (
+    "<script>(function(){"
+    f"var K={THEME_STORAGE_KEY!r},V={list(THEME_CODES)!r},d=document.documentElement;"
+    "function apply(t){if(V.indexOf(t)<0)return;if(t==='d'){d.removeAttribute('data-kb-theme')}"
+    "else{d.setAttribute('data-kb-theme',t)}}"
+    "try{apply(localStorage.getItem(K))}catch(e){}"
+    "document.addEventListener('click',function(ev){"
+    "var b=ev.target.closest&&ev.target.closest('[data-kb-set]');if(!b)return;"
+    "var t=b.getAttribute('data-kb-set');apply(t);"
+    "try{localStorage.setItem(K,t)}catch(e){}});"
+    "})();</script>"
+)
+
+
 def page_shell(body: str, css: str) -> str:
-    """以 body 內容與頁面 CSS 組裝完整 HTML 頁面骨架。"""
+    """以 body 內容與頁面 CSS 組裝完整 HTML 頁面骨架（含主題切換 script）。"""
     return (
         '<!DOCTYPE html><html lang="zh-Hant"><head>'
         '<meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
         f'<title>{PAGE_TITLE}</title>'
         f'<style>{css}</style>'
+        f'{THEME_SCRIPT}'
         '</head><body>'
         f'<h1>{PAGE_TITLE}</h1>'
         f'{body}'
-        '<p style="color:#6b7280;font-size:.8em;margin-top:3em">'
+        '<p style="color:var(--kb-faint,#6b7280);font-size:.8em;margin-top:3em">'
         '重新整理瀏覽器頁面觸發全新掃描。</p>'
         '</body></html>'
     )
