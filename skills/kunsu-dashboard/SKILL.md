@@ -39,7 +39,7 @@ pip install -r requirements.txt
 python3 app/main.py --port 8000
 ```
 
-兩種方式都是使用者自己觸發，沒有背景常駐或開機自動啟動機制（見 [ADR 010](../../docs/adr/2026-07-11-adr-candidate-010-dashboard-service-exception.md) Decision 第 1 項第 3 條）。伺服器綁定 `127.0.0.1:8000`（port 可自訂），只服務本機、單一使用者。開啟瀏覽器造訪 `http://127.0.0.1:8000/`。
+兩種方式都是使用者自己觸發，沒有背景常駐或開機自動啟動機制（見 [ADR 010](../../docs/adr/2026-07-11-adr-candidate-010-dashboard-service-exception.md) Decision 第 1 項第 3 條）。伺服器綁定 `127.0.0.1:8000`（port 可自訂），只服務本機、單一使用者。開啟瀏覽器造訪 `http://127.0.0.1:8000/`：首頁是看板（每軍師一張，持球者泳道 × 狀態欄），`/overview` 是完整彙整頁，`/archive` 列出已歸檔交接；頁面說明見 `docs/playbooks/dashboard.md`。
 
 **重新整理瀏覽器頁面即重新掃描全部已登記的軍師與子專案**——不需要重啟伺服器。伺服器本身不會自動重新掃描、不跑背景排程；關閉終端機視窗即停止服務，下次要用再手動啟動一次。
 
