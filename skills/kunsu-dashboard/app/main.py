@@ -1,7 +1,9 @@
 """
 main.py — 軍師沙盤（kunsu dashboard）FastAPI 應用
 
-GET / 路由彙整全域反向註冊表所有軍師與子專案的訊息狀態，渲染為單頁 HTML。
+三個端點皆回傳 HTML：GET / 為看板（每軍師一張，持球者泳道 × 狀態欄）；
+GET /overview 為原彙整頁（全域反向註冊表所有軍師與子專案的訊息狀態、
+異常與依賴圖）；GET /archive 列出指定軍師已歸檔的交接。
 
 ADR 010 Decision 1.5：所有端點僅回傳 text/html，不提供任何 JSON／XML
 等結構化格式端點，確保本工具不構成機器對機器介面。
@@ -1009,11 +1011,15 @@ def _html_subrepo(
     return "".join(parts)
 
 
-# ── 路由（唯一端點） ──────────────────────────────────────────────────────────
+# ── 路由：原彙整頁 /overview ──────────────────────────────────────────────────
 
-@app.get("/", response_class=HTMLResponse)
-def index() -> HTMLResponse:
-    """彙整全部軍師與子專案訊息狀態，渲染為 text/html。
+# 原彙整頁頂端連回看板（看板化計畫 U3）
+_BACK_TO_BOARD = '<p class="back-to-board"><a href="/">← 回看板</a></p>'
+
+
+@app.get("/overview", response_class=HTMLResponse)
+def overview() -> HTMLResponse:
+    """彙整全部軍師與子專案訊息狀態，渲染為 text/html（原首頁，看板化後搬至 /overview）。
 
     遵守 ADR 010 Decision 1.5：本函式及 app 內所有路由僅回傳 text/html。
     registry 讀取失敗時仍回傳 HTTP 200（計畫明確要求），
@@ -1024,11 +1030,11 @@ def index() -> HTMLResponse:
 
     # ── 錯誤狀態：registry 無法讀取 ─────────────────────────────────────────
     if reg.registry_error:
-        return HTMLResponse(content=_page(_html_error(reg.registry_error)))
+        return HTMLResponse(content=_page(_BACK_TO_BOARD + _html_error(reg.registry_error)))
 
     # ── 空登記狀態：healthy 與 stale 皆空 ─────────────────────────────────
     if not reg.healthy and not reg.stale:
-        return HTMLResponse(content=_page(_html_empty()))
+        return HTMLResponse(content=_page(_BACK_TO_BOARD + _html_empty()))
 
     # ── 身分判斷（軍師 vs 子專案） ─────────────────────────────────────────
     # reg.raw 是 load_registry 內部已解析的同一份資料，不再次開檔讀取——
@@ -1183,7 +1189,7 @@ def index() -> HTMLResponse:
     ]
 
     # ── 組裝頁面 ───────────────────────────────────────────────────────────
-    body_sections: list[str] = []
+    body_sections: list[str] = [_BACK_TO_BOARD]
     quick_nav = _html_quick_nav(nav_entries)
     if quick_nav:
         body_sections.append(quick_nav)
@@ -1206,7 +1212,7 @@ def index() -> HTMLResponse:
             '<section><h2>Stale 路徑</h2>'
             f'{"".join(_html_stale(p) for p in leftover_stale)}</section>'
         )
-    if not body_sections:
+    if len(body_sections) == 1:
         # healthy/stale 非空但身分未能識別（理論上不應發生）
         body_sections.append(_html_empty())
 
