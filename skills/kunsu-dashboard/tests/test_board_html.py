@@ -372,7 +372,8 @@ def test_handoff_page_escapes_raw_html_and_blocks_javascript_links(client, monke
     )
     _install(monkeypatch, {str(ebook): ["android"]})
     html = _detail(client, "docs/handoffs/2026-09-01-x.md").text
-    assert "<script>" not in html
+    # 頁面唯一的 <script> 是 page_shell 的主題切換；原文的 <script>alert 須被轉義
+    assert html.count("<script>") == 1 and "<script>alert" not in html
     assert "&lt;script&gt;" in html
     assert "<img" not in html
     assert 'href="javascript:' not in html
@@ -516,3 +517,27 @@ def test_board_scans_mailboxes_only_not_replies(client, monkeypatch, ebook):
     assert seen == [MAILBOX_ONLY_SCRIPTS]
     assert all(name != "scan-replies.sh" for name, _ in MAILBOX_ONLY_SCRIPTS)
     assert "回覆側 tripwire" in client.get("/?k=ebook").text
+
+
+@pytest.mark.parametrize("path", ["/?k=ebook", "/archive?k=ebook", "/handoff?k=ebook&f=docs/handoffs/2026-09-01-a.md"])
+def test_theme_switcher_and_script_present_on_every_board_page(client, monkeypatch, ebook, path):
+    """四個主題鈕與 localStorage 切換 script 出現在看板、archive 與全文頁；伺服器不持有主題狀態。"""
+    from app.board_html import THEMES
+    from app.html_common import THEME_STORAGE_KEY
+    _handoff(ebook, "2026-09-01-a.md", "有主題的交接")
+    _install(monkeypatch, {str(ebook): ["android"]})
+    html = client.get(path).text
+    for code, name, _ in THEMES:
+        assert f'data-kb-set="{code}"' in html and name in html
+    assert THEME_STORAGE_KEY in html
+    assert "localStorage.getItem(K)" in html and "catch(e){}" in html
+    assert "html[data-kb-theme=c]{color-scheme:dark" in html
+
+
+def test_columns_carry_state_attribute_for_theme_colors(client, monkeypatch, ebook):
+    _handoff(ebook, "2026-09-01-a.md", "待辦交接")
+    _install(monkeypatch, {str(ebook): ["android"]})
+    html = client.get("/?k=ebook").text
+    for col in ("waiting", "todo", "doing", "review"):
+        assert f'class="kb-colhead" data-col="{col}"' in html
+    assert 'data-col="todo" data-cell="android|todo"' in html

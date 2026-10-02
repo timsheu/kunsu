@@ -54,13 +54,17 @@ pip install -r requirements.txt    # 首次安裝，需 Python 3.10+
 
 沒有任何待處理項目且沒有異常時，看板只顯示一行「目前沒有待處理的項目」。
 
+### 配色主題
+
+頁首導覽列右側有四個主題鈕：**墨與朱**（預設，白底、色只給欄首與軍師泳道）、**沙盤**（沙色畫布與硃砂）、**青瓷**（冷色作業台、欄首色帶）、**夜戰**（深色）。四個主題的欄首與格子底色都綁狀態（等待中／待辦／進行中／待驗收），軍師泳道有自己的指揮色。選擇存在瀏覽器 localStorage（鍵 `kunsu-dashboard-theme`），看板、archive 與全文頁共用，重新整理後沿用；伺服器不持有任何主題狀態，換瀏覽器或清除網站資料即回到預設。這是沙盤頁面唯一的 JS（約十行，localStorage 不可用時靜默退回預設）。
+
 ## 已完成（archive）頁
 
 依檔名日期由新到舊列出已歸檔交接的標題、收件角色、更正交接（`corrected_by`）與「已歸檔未標 done」異常標記。每筆標題即全文頁連結，列表本身不內嵌全文。
 
 ## 全文頁（/handoff）
 
-看板卡片與 archive 列表的「全文」連結開啟 `/handoff?k=<軍師目錄名>&f=<相對軍師根目錄的路徑>`：上方為 frontmatter 鍵值表，中段為交接本體的 Markdown 伺服器端渲染（markdown-it-py，CommonMark＋表格），交接另列依賴區塊（`depends_on` 各項的標題與是否已完成、`corrected_by`）與同串回覆（依 `in_reply_to` 比對，舊→新，各附 status／verify／created）；申請與上報只渲染本文。頁面維持零 JS、只回 text/html。
+看板卡片與 archive 列表的「全文」連結開啟 `/handoff?k=<軍師目錄名>&f=<相對軍師根目錄的路徑>`：上方為 frontmatter 鍵值表，中段為交接本體的 Markdown 伺服器端渲染（markdown-it-py，CommonMark＋表格），交接另列依賴區塊（`depends_on` 各項的標題與是否已完成、`corrected_by`）與同串回覆（依 `in_reply_to` 比對，舊→新，各附 status／verify／created）；申請與上報只渲染本文。頁面只回 text/html；唯一的 JS 是主題切換（見下）。
 
 - `f` 只接受四個目錄（`docs/handoffs/`、`docs/handoffs/archive/`、`docs/applications/`、`docs/reports/`）底下的單層 `.md` 檔名，含 `..`、反斜線、多層目錄、其他目錄或不存在的檔案一律回 404，並以實體路徑核對擋 symlink 逃逸；`k` 不命中軍師也回 404（不像看板會退回第一個軍師）。
 - 原文中的 HTML 標籤一律轉義為文字，`javascript:` 等協定的連結不會成為可點連結。
