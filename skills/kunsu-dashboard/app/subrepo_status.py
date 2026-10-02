@@ -37,6 +37,7 @@ class _ReplyEntry(NamedTuple):
     status: str
     verify: Optional[str]
     body: str
+    filename: str
 
 
 @dataclass(frozen=True)
@@ -54,6 +55,8 @@ class HandoffInfo:
     latest_reply_excerpt: Optional[str] = None  # 最新回覆首句摘錄（display-only）；None 表示無回覆或無可用文字段
     raw_content: str = ""               # 檔案原始內容，供軍師沙盤展開式預覽使用
     mtime: Optional[float] = None       # 檔案最後修改時間（epoch），供時間軸排序／顯示
+    series: Optional[str] = None        # 線別（display-only，str 正規化；缺省／空白為 None）
+    latest_reply_filename: Optional[str] = None  # 最新回覆檔名（display-only，供看板展開全文）；None 表示無回覆
 
 
 @dataclass(frozen=True)
@@ -351,7 +354,7 @@ def get_subrepo_status(
             # 本文留在索引內供勝出（最新）回覆萃取首句：同一次讀取、不第二次讀檔，
             # 讀檔失敗維持上方 continue（KTD1）；未勝出的回覆不付萃取成本。
             replies_index[in_reply_to].append(
-                _ReplyEntry(date_str, n, str(status), verify, reply_body)
+                _ReplyEntry(date_str, n, str(status), verify, reply_body, reply_file.name)
             )
 
     # ── 4a-2. 掃描軍師交接文件頂層（不遞迴） ─────────────────────────────────
@@ -385,6 +388,10 @@ def get_subrepo_status(
         to_role = str(fm["to"])
         # YAML 可能將 YYYY-MM-DD 解析為 datetime.date；str() 可安全轉回字串
         created = str(fm["created"])
+        # series 為選填線別（display-only）：YAML 可能轉型為 bool／int，一律 str()；
+        # 缺省、空值與純空白正規化為 None
+        series_raw = fm.get("series")
+        series = (str(series_raw).strip() or None) if series_raw is not None else None
 
         # ── 4a-2 步驟 3：依 to: 值分類（三路分支） ────────────────────────────
         if to_role in our_roles:
@@ -404,6 +411,7 @@ def get_subrepo_status(
         latest_reply_date: Optional[str] = None
         latest_reply_verify: Optional[str] = None
         latest_reply_excerpt: Optional[str] = None
+        latest_reply_filename: Optional[str] = None
 
         if reply_entries:
             # 依 (date, n) 數值取最大者為最新（等價於降序排序取首筆）
@@ -413,6 +421,7 @@ def get_subrepo_status(
             latest_reply_date = best.date
             latest_reply_verify = best.verify
             latest_reply_excerpt = _extract_reply_excerpt(best.body)
+            latest_reply_filename = best.filename
 
         info = HandoffInfo(
             filename=filename,
@@ -426,6 +435,8 @@ def get_subrepo_status(
             latest_reply_excerpt=latest_reply_excerpt,
             raw_content=content,
             mtime=mtime,
+            series=series,
+            latest_reply_filename=latest_reply_filename,
         )
 
         # ── 依 SKILL.md 4a-3 表格分類 ─────────────────────────────────────────
