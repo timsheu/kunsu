@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # start.sh — 一鍵啟動 kunsu dashboard
 #
-# 仍是手動觸發（使用者自己執行這支腳本），不涉及 launchd／cron／開機自動啟動，
-# 符合 docs/adr/2026-07-11-adr-candidate-010-dashboard-service-exception.md
-# Decision 第 1 項第 3 條（啟動停止須使用者手動掌握）。
+# 手動觸發（使用者自己執行這支腳本）的前景啟動；登入自動啟動是另一條由使用者親手
+# 安裝的選用路徑，見 SKILL.md「登入自動啟動（選用）」一節（ADR 020 修訂 ADR 010
+# Decision 第 1 項第 3 條）。兩者不要共用同一個 port。
 #
 # 用法：
 #   ./start.sh              # 預設 port 8000
