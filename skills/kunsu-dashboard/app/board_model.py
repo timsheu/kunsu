@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 from typing import Iterable, Optional
 
@@ -32,7 +33,7 @@ from app.kunsu_scan import KunsuScanResult
 from app.subrepo_status import (
     HandoffInfo,
     SubrepoStatusResult,
-    _parse_frontmatter,
+    parse_frontmatter,
 )
 from app.todo_status import TodoStatusResult
 
@@ -112,6 +113,7 @@ class Card:
     unknown_status: Optional[str] = None   # 最新回覆為未知 status 時的原值
     excerpt: Optional[str] = None          # 最新回覆首句摘錄（display-only）
     reply_rel_path: Optional[str] = None   # 最新回覆相對路徑；無回覆為 None
+    body: Optional[str] = None             # 掃描時已讀到的本文；None 表示渲染時再讀檔
     waiting_titles: tuple[str, ...] = ()   # 所等待交接的標題
     unresolved_waiting: tuple[str, ...] = ()  # 無法解析的依賴目標（檔名，只供展開區）
 
@@ -147,10 +149,18 @@ class Board:
 # ── 內部輔助 ────────────────────────────────────────────────────────────────────
 
 def _valid_date(value: Optional[str]) -> Optional[str]:
-    """回傳 YYYY-MM-DD 開頭的日期字串；格式不符為 None。"""
-    if value and _DATE_RE.match(value):
-        return value[:10]
-    return None
+    """回傳有效的 YYYY-MM-DD 日期字串；格式不符或日期不存在（如 2026-13-01）為 None。
+
+    與顯示端 html_common.days_since 採同一判準（fromisoformat），避免排序視為
+    有效、顯示卻是「日期不明」；未來日期仍視為有效，依日期排序。
+    """
+    if not value or not _DATE_RE.match(value):
+        return None
+    try:
+        date.fromisoformat(value[:10])
+    except ValueError:
+        return None
+    return value[:10]
 
 
 def _sort_key(card: Card) -> tuple[int, str, str]:
@@ -200,6 +210,7 @@ def _handoff_card(
         blocked=status == _STATUS_BLOCKED,
         unknown_status=unknown,
         excerpt=h.latest_reply_excerpt,
+        body=h.raw_content or None,
         reply_rel_path=(
             f"docs/handoffs/replies/{h.latest_reply_filename}"
             if h.latest_reply_filename
@@ -215,9 +226,10 @@ def _mailbox_card(kunsu_path: str, rel_path: str, kind: str) -> Card:
     rel = rel_path.strip()
     path = Path(kunsu_path) / rel
     try:
-        fm = _parse_frontmatter(path.read_text(encoding="utf-8"))
+        content: Optional[str] = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
-        fm = {}
+        content = None
+    fm = parse_frontmatter(content) if content is not None else {}
     title_raw = fm.get("title")
     created_raw = fm.get("created")
     title = str(title_raw).strip() if title_raw is not None else ""
@@ -230,6 +242,7 @@ def _mailbox_card(kunsu_path: str, rel_path: str, kind: str) -> Card:
         base_date=str(created_raw) if created_raw is not None else None,
         base_label=BASE_SUBMITTED,
         body_rel_path=rel,
+        body=content,
     )
 
 

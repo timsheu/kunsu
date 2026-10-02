@@ -54,6 +54,7 @@ from app.todo_status import (
 )
 from app.handoff_graph import DERIVED_WAITING, HandoffGraphResult, get_handoff_graph
 from app.board_html import (
+    kunsu_label,
     render_archive_page,
     render_board_page,
     render_error_page,
@@ -256,10 +257,6 @@ def _html_subrepo_kunsu_unreachable(path: str, kunsu_path: str) -> str:
     )
 
 
-_read_related_file = read_related_file
-_format_mtime = format_mtime
-
-
 def _html_detail(summary_html: str, content: str, anchor_id: Optional[str] = None) -> str:
     """展開式預覽卡片（原生 <details>/<summary>，無需 JS）。
 
@@ -291,7 +288,7 @@ def _html_summary_line(mtime_str: str, name_html: str) -> str:
 
 def _html_latest_badge(mtime: Optional[float]) -> str:
     """分類標題列的「最新」時間標示；mtime 為 None 時回傳空字串。"""
-    s = _format_mtime(mtime)
+    s = format_mtime(mtime)
     return f' <span class="mtime">最新 {escape(s)}</span>' if s else ""
 
 
@@ -306,19 +303,17 @@ def _render_kunsu_category(
     items_html: list[str] = []
     mtimes: list[float] = []
     for rel_path in rel_paths:
-        content, mtime = _read_related_file(base_path, rel_path)
+        content, mtime = read_related_file(base_path, rel_path)
         if mtime is not None:
             mtimes.append(mtime)
-        mtime_str = _format_mtime(mtime)
+        mtime_str = format_mtime(mtime)
         summary = _html_summary_line(mtime_str, f'<code>{escape(rel_path)}</code>')
         items_html.append(_html_detail(summary, content))
     latest = max(mtimes) if mtimes else None
     return "".join(items_html), latest
 
 
-# ── verify 標籤對照（ADR 011）──────────────────────────────────────────────
-# 建議代碼 → (中文標籤, CSS class)；其他非空字串原樣顯示為一般標籤（badge-other）
-_VERIFY_LABELS = VERIFY_LABELS
+# verify 標籤對照（ADR 011）見 app.html_common.VERIFY_LABELS；其他非空字串原樣顯示為一般標籤（badge-other）
 
 
 def _html_status_badges(h: HandoffInfo) -> str:
@@ -342,7 +337,7 @@ def _html_status_badges(h: HandoffInfo) -> str:
         # 建議代碼為全小寫 kebab-case；查找前正規化為小寫（ADR 011），
         # 大小寫變體（Needs-Deploy 等）仍命中彩色標籤，不靜默降格。
         # 未命中的自由字串一律原樣顯示「原始值」，不顯示正規化後的字串。
-        known = _VERIFY_LABELS.get(verify.lower())
+        known = VERIFY_LABELS.get(verify.lower())
         if known:
             label, css = known
             badges.append(f'<span class="badge {css}">{label}</span>')
@@ -362,7 +357,7 @@ def _verify_sort_key(h: HandoffInfo) -> tuple:
     做顯式子分組（見下方）。
     """
     verify = h.latest_reply_verify
-    if verify and verify.lower() in _VERIFY_LABELS:
+    if verify and verify.lower() in VERIFY_LABELS:
         group, value = 0, verify.lower()
     elif verify:
         group, value = 1, verify
@@ -417,7 +412,7 @@ def _html_handoff_detail(
     graph 給定時附交接依賴圖的推導態標籤（可開工／等依賴／已被更正／異常；
     孤立節點不附）並掛錨點供 SVG 節點連結；與 ⛔ 卡關等既有 badge 並列不互抑。
     """
-    mtime_str = _format_mtime(h.mtime)
+    mtime_str = format_mtime(h.mtime)
     name_html = (
         f'{escape(h.title)} '
         f'<span class="filename">({escape(h.filename)})</span>'
@@ -596,9 +591,6 @@ def _kunsu_group_open_and_label(
     if total == 0:
         return force_open, f'軍師：<code>{esc}</code>（無新訊息）{suffix}'
     return True, f'軍師：<code>{esc}</code>（{total} 則新訊息）{suffix}'
-
-
-_nav_anchor_id = nav_anchor_id
 
 
 @dataclass(frozen=True)
@@ -828,7 +820,7 @@ def _html_kunsu(path: str, result: KunsuScanResult) -> str:
 
 def _html_todo_item(t: TodoInfo, *, orphaned: bool = False) -> str:
     """單一待辦技術債的展開式預覽卡片，摘要列含標題、檔名、狀態與 severity 標籤。"""
-    mtime_str = _format_mtime(t.mtime)
+    mtime_str = format_mtime(t.mtime)
     labels: list[str] = []
     if orphaned:
         labels.append('<span class="tlabel tlabel-orphaned">看似完成但未歸檔</span>')
@@ -1058,7 +1050,7 @@ def overview() -> HTMLResponse:
                 # 所屬軍師本身 stale，呼叫 get_subrepo_status 只會靜默回傳
                 # 空結果，誤導使用者以為「無待處理交接文件」——改為明確告知
                 # 軍師不可達，不呼叫 get_subrepo_status。
-                sub_anchor = _nav_anchor_id(kunsu_path, sp)
+                sub_anchor = nav_anchor_id(kunsu_path, sp)
                 nested_parts.append(
                     f'<div id="{sub_anchor}">'
                     f'{_html_subrepo_kunsu_unreachable(sp, kunsu_path)}</div>'
@@ -1091,7 +1083,7 @@ def overview() -> HTMLResponse:
             sub_results: list[SubrepoStatusResult] = []
             for sp in sub_paths:
                 covered.add(sp)
-                sub_anchor = _nav_anchor_id(kunsu_path, sp)
+                sub_anchor = nav_anchor_id(kunsu_path, sp)
                 if sp in stale_set:
                     nested_parts.append(
                         f'<div id="{sub_anchor}">'
@@ -1134,7 +1126,7 @@ def overview() -> HTMLResponse:
         open_attr = " open" if is_open else ""
         # 軍師錨點掛在 <summary> 之後的內容區：fragment navigation 只對「藏在
         # <details> 收合內容裡」的目標自動展開分組，掛在 <details> 本身不會。
-        kunsu_anchor = _nav_anchor_id(kunsu_path)
+        kunsu_anchor = nav_anchor_id(kunsu_path)
         group_parts.append(
             f'<details class="kunsu-group"{open_attr}>'
             f'<summary>{summary_label}</summary>'
@@ -1155,7 +1147,7 @@ def overview() -> HTMLResponse:
     ]
 
     # ── 組裝頁面 ───────────────────────────────────────────────────────────
-    body_sections: list[str] = [_BACK_TO_BOARD]
+    body_sections: list[str] = []
     quick_nav = _html_quick_nav(nav_entries)
     if quick_nav:
         body_sections.append(quick_nav)
@@ -1178,11 +1170,11 @@ def overview() -> HTMLResponse:
             '<section><h2>Stale 路徑</h2>'
             f'{"".join(_html_stale(p) for p in leftover_stale)}</section>'
         )
-    if len(body_sections) == 1:
+    if not body_sections:
         # healthy/stale 非空但身分未能識別（理論上不應發生）
         body_sections.append(_html_empty())
 
-    return HTMLResponse(content=_page("".join(body_sections)))
+    return HTMLResponse(content=_page(_BACK_TO_BOARD + "".join(body_sections)))
 
 
 # ── 路由：看板 / 與 archive 頁 /archive ───────────────────────────────────────
@@ -1201,7 +1193,7 @@ def _select_kunsu(kunsus: list[str], k: Optional[str]) -> tuple[str, Optional[st
     """
     by_name: dict[str, str] = {}
     for kp in kunsus:
-        by_name.setdefault(Path(kp).name or kp, kp)
+        by_name.setdefault(kunsu_label(kp), kp)
     if k and k in by_name:
         return by_name[k], None
     return kunsus[0], (k or None)
@@ -1260,12 +1252,11 @@ def archive(k: Optional[str] = None) -> HTMLResponse:
     if not kunsus:
         return HTMLResponse(content=render_no_kunsu_page())
     selected, not_found = _select_kunsu(kunsus, k)
-    graph = (
-        HandoffGraphResult() if selected in set(reg.stale) else get_handoff_graph(selected)
-    )
+    stale = selected in set(reg.stale)
+    graph = HandoffGraphResult() if stale else get_handoff_graph(selected)
     return HTMLResponse(
         content=render_archive_page(
-            kunsus=kunsus, selected=selected, graph=graph, not_found=not_found
+            kunsus=kunsus, selected=selected, graph=graph, not_found=not_found, stale=stale
         )
     )
 

@@ -284,3 +284,15 @@ def test_archive_empty_and_invalid_k(client, monkeypatch, ebook):
     assert resp.status_code == 200
     assert "找不到軍師" in resp.text
     assert "沒有已歸檔的交接" in resp.text
+
+
+def test_archive_stale_kunsu_shows_notice_not_empty(client, monkeypatch, ebook):
+    """軍師失聯時 archive 頁不得誤報「沒有已歸檔的交接」（code review #2）。"""
+    _install(monkeypatch, {str(ebook): ["android"]}, stale=(str(ebook),))
+    monkeypatch.setattr(
+        "app.main.get_handoff_graph",
+        lambda _kp: pytest.fail("失聯軍師不應讀取依賴圖"),
+    )
+    html = client.get("/archive?k=ebook").text
+    assert "路徑失聯" in html
+    assert "沒有已歸檔的交接" not in html

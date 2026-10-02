@@ -1183,7 +1183,8 @@ def test_awaiting_confirm_hint_outside_details(monkeypatch, client):
 def test_next_step_hints_keys_match_verify_labels():
     """_NEXT_STEP_HINTS 與 _VERIFY_LABELS 鍵集合必須一致——新增建議代碼時
     兩個對照表須同步，否則新代碼會顯示彩色 badge 卻靜默降格為通用提示。"""
-    from app.main import _NEXT_STEP_HINTS, _VERIFY_LABELS
+    from app.main import _NEXT_STEP_HINTS
+    from app.html_common import VERIFY_LABELS as _VERIFY_LABELS
 
     assert set(_NEXT_STEP_HINTS.keys()) == set(_VERIFY_LABELS.keys())
 
@@ -1304,7 +1305,8 @@ def test_awaiting_subgroup_pure_function():
 def test_awaiting_subgroups_keys_match_verify_labels():
     """_AWAITING_SUBGROUPS 與 _VERIFY_LABELS 鍵集合必須一致——新增建議代碼時
     兩個對照表須同步，否則新代碼會顯示彩色 badge 卻靜默落入自由字串子分組。"""
-    from app.main import _AWAITING_SUBGROUPS, _VERIFY_LABELS
+    from app.main import _AWAITING_SUBGROUPS
+    from app.html_common import VERIFY_LABELS as _VERIFY_LABELS
 
     assert set(_AWAITING_SUBGROUPS.keys()) == set(_VERIFY_LABELS.keys())
 

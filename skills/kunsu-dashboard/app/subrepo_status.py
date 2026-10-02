@@ -100,7 +100,7 @@ class SubrepoStatusResult:
 def _find_frontmatter_end(content: str) -> Optional[int]:
     """回傳 frontmatter 結束分隔符的位置（'\n---' 的起點）；無 frontmatter 時為 None。
 
-    分隔符判定只此一處（_parse_frontmatter 與 _split_frontmatter 共用），
+    分隔符判定只此一處（parse_frontmatter 與 _split_frontmatter 共用），
     避免兩套邊界規則各切一次。
     """
     # 開頭分隔符須為獨立一行（'---\n' 或整份內容恰為 '---'），
@@ -122,7 +122,7 @@ def _find_frontmatter_end(content: str) -> Optional[int]:
         search_from = after
 
 
-def _parse_frontmatter(content: str) -> dict:
+def parse_frontmatter(content: str) -> dict:
     """從 Markdown 檔案內容中提取並解析 YAML frontmatter。
 
     僅支援以 '---' 開頭的標準 frontmatter 格式。
@@ -150,7 +150,7 @@ def _split_frontmatter(content: str) -> tuple[dict, str]:
     body = content[end + len("\n---"):]
     if body.startswith("\n"):
         body = body[1:]
-    return _parse_frontmatter(content), body
+    return parse_frontmatter(content), body
 
 
 # ── 最新回覆首句摘錄（display-only；規則見計畫 R4）────────────────────────────
@@ -370,7 +370,7 @@ def get_subrepo_status(
             errors.append(ErrorItem(filename=filename, error=f"read error: {e}"))
             continue
 
-        fm = _parse_frontmatter(content)
+        fm = parse_frontmatter(content)
 
         # ── 必要欄位完整性核查 ───────────────────────────────────────────────
         missing = [k for k in ("title", "from", "to", "created") if not fm.get(k)]

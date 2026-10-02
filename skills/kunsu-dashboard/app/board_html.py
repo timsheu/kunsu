@@ -137,7 +137,7 @@ def _verify_tag(verify: Optional[str]) -> str:
     key = verify.lower()
     known = VERIFY_LABELS.get(key)
     if known:
-        return f'<span class="kb-tag {_VERIFY_CSS[key]}">{known[0]}</span>'
+        return f'<span class="kb-tag {_VERIFY_CSS.get(key, "")}">{known[0]}</span>'
     return f'<span class="kb-tag">{escape(verify)}</span>'
 
 
@@ -233,7 +233,11 @@ def _card_html(card: Card, kunsu_path: str) -> str:
         else ""
     )
 
-    body, _ = read_related_file(kunsu_path, card.body_rel_path)
+    body = (
+        card.body
+        if card.body is not None
+        else read_related_file(kunsu_path, card.body_rel_path)[0]
+    )
     expand = [f'<div class="kb-fulltitle">{escape(card.title)}</div>']
     if card.unresolved_waiting:
         expand.append(
@@ -343,8 +347,13 @@ def render_archive_page(
     selected: str,
     graph: HandoffGraphResult,
     not_found: Optional[str] = None,
+    stale: bool = False,
 ) -> str:
-    """archive 頁：依檔名日期新到舊列出已歸檔交接，最近 N 份內嵌全文（KTD10）。"""
+    """archive 頁：依檔名日期新到舊列出已歸檔交接，最近 N 份內嵌全文（KTD10）。
+
+    軍師路徑失聯時無法讀取 archive，顯示失聯說明而非「沒有已歸檔的交接」，
+    避免把無法判定的狀態誤呈現為歷史資料不存在。
+    """
     nodes = sorted(
         (n for n in graph.nodes.values() if n.location == LOCATION_ARCHIVE),
         key=lambda n: n.filename,
@@ -352,6 +361,13 @@ def render_archive_page(
     )
     parts = [_nav(kunsus, selected, "/archive"), _notice(not_found)]
     parts.append(f"<h2>已完成（archive）：{escape(kunsu_label(selected))}</h2>")
+    if stale:
+        parts.append(
+            '<div class="kb-alert">⚠ 軍師路徑失聯：'
+            f"<code>{escape(selected)}</code>（路徑不存在或非有效 git repo），"
+            '無法讀取已歸檔的交接。<a href="/overview">到完整彙整頁查看</a></div>'
+        )
+        return page_shell("".join(parts), BOARD_CSS)
     if not nodes:
         parts.append('<p class="kb-empty">沒有已歸檔的交接。</p>')
         return page_shell("".join(parts), BOARD_CSS)
