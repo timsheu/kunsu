@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!--
+  軍師沙盤（kunsu dashboard）登入自動啟動的 LaunchAgent 範本（ADR 020）。
+
+  使用者親手安裝：填妥四個佔位值後，放到 ~/Library/LaunchAgents/__LABEL__.plist，
+  再依 SKILL.md「登入自動啟動（選用）」一節的指令載入。repo 內任何程式碼都不會
+  代為安裝。
+
+  佔位值：
+    __LABEL__        job 名稱，建議 com.kunsu.dashboard（檔名須與之一致）
+    __PYTHON__       已安裝 fastapi／uvicorn／PyYAML／markdown-it-py 的 python3 絕對路徑
+                     （launchd 不載入 shell 設定，pyenv／conda shims 不可用；以
+                     `python3 -c 'import sys; print(sys.executable)'` 取得）
+    __MAIN_PY__      部署副本的 main.py 絕對路徑，例如
+                     /Users/<你>/.claude/skills/kunsu-dashboard/app/main.py
+                     （指向部署副本而非 repo 工作樹；每次重跑 install.sh 後須 kickstart）
+    __PORT__         監聽 port。不要與 start.sh 預設的 8000 共用，且須是任何介面上
+                     皆無其他服務使用的 port（對方綁 0.0.0.0 時會靜默共存）
+
+  只允許下列五個鍵；不得加入 KeepAlive、StartInterval、StartCalendarInterval、
+  WatchPaths 等任何重啟或排程鍵（scripts/consistency-check.sh 會檢查本範本）。
+-->
+<dict>
+    <key>Label</key>
+    <string>__LABEL__</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>__PYTHON__</string>
+        <string>__MAIN_PY__</string>
+        <string>--port</string>
+        <string>__PORT__</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/tmp/kunsu-dashboard.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/kunsu-dashboard.log</string>
+</dict>
+</plist>

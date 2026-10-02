@@ -26,12 +26,15 @@ CLAUDE.md Invariant 1 明定「純 skill＋範本，不建編譯型工具」—�
 
 1. **例外範圍界定**（缺一則不適用此例外，須回到 Invariant 1 字面規則評估）：
    1. 唯讀查詢工具——不寫入任何被彙整的軍師或子專案 repo；亦不在 `skills/kunsu-dashboard/` 自身目錄以外的任何路徑產生持久性資料（含快取、已讀標記、日誌）。若日後想加入這類寫入或持久化功能（例如「標記已讀」「快取上次掃描結果」），視為新功能提案，須另立 ADR 重新評估，不能直接沿用本例外。
+      > 修訂註記（2026-10-02，[ADR 020](2026-10-01-adr-candidate-020-dashboard-login-autostart.md) Decision 第 3 項）：伺服器 stdout／stderr 寫入 `/tmp/kunsu-dashboard.log` 不屬「持久性資料」（不跨開機）；使用者親手放置的 LaunchAgent plist 屬使用者管理的機器層級設定。僅適用於 `skills/kunsu-dashboard/`。
    2. 資料新鮮度由使用者刷新瀏覽器頁面觸發，伺服器本身不跑背景計時器或背景執行緒做定期掃描。
    3. **啟動與停止必須由使用者手動掌握**——不得有 `launchd`、`cron`、或任何其他 skill／排程觸發的自主重啟路徑。
+      > 修訂註記（2026-10-02，[ADR 020](2026-10-01-adr-candidate-020-dashboard-login-autostart.md) Decision 第 1 項）：放寬為「唯一允許的自動化路徑是使用者親手安裝、只含 `RunAtLoad` 的 macOS LaunchAgent」；`cron`、其他 skill 或排程觸發的啟動／重啟仍不允許，repo 程式碼不得寫入 `~/Library/LaunchAgents/` 或呼叫 `launchctl`。僅適用於 `skills/kunsu-dashboard/`，其他工具比照時以本條原文為準。
    4. 綁定 `127.0.0.1`，不對外部網路開放，不服務多使用者。
    5. **所有端點僅回傳 `text/html`；不得提供任何 JSON、XML 或其他機器可解析結構化格式的端點，也不建立可供程式化呼叫的 API contract。** 這條把「只服務人類使用者、不是給其他程式呼叫的機器對機器介面」從意圖聲明變成可由程式碼直接檢查的技術條件——不依賴「連線的是瀏覽器還是腳本」這種無法技術性驗證的區分。
 
    條件 3、5 具備可證偽性：任何提案若需要背景排程／開機自動啟動（違反 3），或提供結構化資料端點（違反 5），即不適用本例外，須回頭走完整的 Invariant 1 例外評估，不能直接援引本 ADR。
+   > 修訂註記（2026-10-02）：「開機自動啟動（違反 3）」中，僅限 `RunAtLoad` 單一鍵且由使用者親手安裝的登入自動啟動，已經 [ADR 020](2026-10-01-adr-candidate-020-dashboard-login-autostart.md) 走完 Invariant 1 例外評估並適用其修訂；其餘形狀（`KeepAlive`、排程鍵、cron、repo 程式碼代為安裝）仍違反本條。
 
 2. **與 MCP 路線的機制層級區隔**：MCP 與本工具都引入常駐 process，兩者的差異不能只停留在「使用情境不同」這種立場層級的說法，必須是機制層級、且可驗證的區別：
 
@@ -40,6 +43,8 @@ CLAUDE.md Invariant 1 明定「純 skill＋範本，不建編譯型工具」—�
    | 輸出格式 | 結構化資料（JSON-RPC 等），供程式解析 | 僅 `text/html`，供人類閱讀；由 Decision 第 1 項第 5 條強制，非僅意圖聲明 |
    | API contract | 有——MCP 協定本身即定義可程式化呼叫的介面規格 | 無——沒有機器可解析的回應格式，不構成可程式化呼叫的介面 |
    | ADR 002 定義的「觸發層」問題 | 未解決——session 不會自主呼叫 MCP 工具，通知問題依舊；MCP 解決的是傳輸層（信箱已是檔案，不缺存取方式），不是這個問題 | **同樣未解決**——使用者仍須主動開瀏覽器並刷新，沒有任何自主觸發路徑；本工具解決的是另一個問題（人工操作整合：一次刷新涵蓋全部已登記軍師與子專案，取代逐視窗手動查詢），不宣稱解決 ADR 002 所稱的 AI session 自主觸發問題 |
+
+   > 修訂註記（2026-10-02，[ADR 020](2026-10-01-adr-candidate-020-dashboard-login-autostart.md) Decision 第 4 項）：「沒有任何自主觸發路徑」在 process 生命週期層面已不成立（登入自動啟動）。區隔改由兩點支撐：(a) 只回傳 `text/html`、無 API contract；(b) 登入自啟不使任何 AI session 自主取得信箱狀態——掃描仍只在使用者刷新時發生、伺服器不主動通知任何人，並以 consistency-check 的本機 URL 白名單檢查項落地（`skills/` 下除 `kunsu-dashboard/` 外不得出現指向本機的 HTTP URL，白名單僅 `KUNSU_ZOEKT_URL`）。
 
    簡言之：MCP 引入常駐 process 是為了**建立新的機器對機器存取介面**；本 dashboard 引入常駐 process 只是**把既有的人工觸發流程（`/kunsu-inbox`）換一個呈現介面**，且第 1 項第 5 條的 `text/html`-only 約束讓這個區別可由程式碼檢查，不是單憑消費者身分或協定名稱來區分。
 

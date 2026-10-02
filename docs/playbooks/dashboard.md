@@ -2,7 +2,7 @@
 
 同時開多個軍師／子專案視窗時，kunsu-inbox skill 得逐一切換視窗手動執行才知道有沒有新訊息，視窗一多容易顧此失彼。**軍師沙盤**（如統帥推演戰局的沙盤）是一個獨立的本機 FastAPI 服務，首頁是看板：每個軍師一張，每份尚未收尾的交接掛在「下一個要動作的角色」底下，一眼看出球在誰手上；另有完整彙整頁與 archive 頁。
 
-**這不是可觸發的 skill**（Claude Code 與 Codex 皆以 frontmatter 原生旗標停用選用），不透過任何觸發語啟動，純手動啟停（無背景常駐、無開機自動啟動、無背景輪詢，對所有 repo 唯讀）——這是本工具組「純 skill＋範本」原則的唯一例外，例外範圍界定詳見 [ADR 010](../adr/2026-07-11-adr-candidate-010-dashboard-service-exception.md)。
+**這不是可觸發的 skill**（Claude Code 與 Codex 皆以 frontmatter 原生旗標停用選用），不透過任何觸發語啟動，由使用者掌握啟停（前景手動啟動，或使用者親手安裝只含 `RunAtLoad` 的 LaunchAgent 於登入時啟動，見 [ADR 020](../adr/2026-10-01-adr-candidate-020-dashboard-login-autostart.md)；無背景輪詢，對所有 repo 唯讀）——這是本工具組「純 skill＋範本」原則的唯一例外，例外範圍界定詳見 [ADR 010](../adr/2026-07-11-adr-candidate-010-dashboard-service-exception.md)。
 
 ## 安裝與啟動
 
@@ -101,4 +101,4 @@ pip install -r requirements.txt    # 首次安裝，需 Python 3.10+
 
 - **唯讀**：只讀取檔案系統與 git 狀態，不寫入任何 repo。
 - **無背景輪詢**：只有重新整理頁面才掃描。看板只跑申請／上報兩支掃描腳本（不跑 scan-replies.sh——看板不用新回覆清單，而該腳本會推進歷史夾帶偵測基線），回覆側 tripwire 以完整彙整頁、`/kunsu-inbox` 與 SessionStart hook 為準。
-- **手動啟停**：由使用者掌握啟動與停止，不設任何自主重啟路徑。
+- **使用者掌握啟停**：前景手動啟動，或使用者親手安裝的 LaunchAgent 於登入時啟動一次（只允許 `RunAtLoad`，不設 `KeepAlive` 等任何重啟或排程路徑；安裝與解除指令見 SKILL.md「登入自動啟動（選用）」）。

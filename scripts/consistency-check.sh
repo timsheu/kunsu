@@ -40,6 +40,10 @@
 #      SKILL.md 各 hook 節掛載片段引用的腳本檔名須存在於 skills/kunsu-inbox/scripts/（先部署後掛載
 #      的另一半：片段指到不存在的腳本，UserPromptSubmit 會阻擋每句提問）；通知行定型文字兩副本
 #      （腳本 _compose 與 SKILL.md「輸出形狀」）以首尾錨句比對
+#   R. LaunchAgent 約束（ADR 020）：install.sh／skills／頂層 scripts 無 launchctl／LaunchAgents 字面、
+#      plist 範本只含五個白名單鍵且 RunAtLoad true、日誌固定 /tmp/kunsu-dashboard.log
+#   S. 本機 URL 白名單（ADR 020 第二支柱）：skills/（kunsu-dashboard 除外）不得出現本機 HTTP URL，
+#      白名單僅 KUNSU_ZOEKT_URL 所在行
 
 set -u
 cd "$(dirname "$0")/.." || exit 1
@@ -450,6 +454,56 @@ try:
 except Exception:
     pass
 ")
+fi
+
+# --- R. LaunchAgent 約束（ADR 020 Decision 第 1 項可證偽性三條）---
+# R1 install.sh 與 skills/ 下可執行腳本不得出現 launchctl／LaunchAgents（repo 程式碼不代為安裝）
+r1_hits="$( { grep -l -e 'launchctl' -e 'LaunchAgents' install.sh 2>/dev/null; find skills -type f \( -name '*.sh' -o -name '*.py' \) -print0 | xargs -0 grep -l -e 'launchctl' -e 'LaunchAgents' 2>/dev/null; } | sort -u )"
+if [[ -z "${r1_hits}" ]]; then
+  ok "R1 install.sh 與 skills/ 腳本無 launchctl／LaunchAgents 字面"
+else
+  ng "R1 repo 腳本出現 launchctl／LaunchAgents（ADR 020 禁止程式碼代為安裝）：$(echo "${r1_hits}" | tr '\n' ' ')"
+fi
+# R2 plist 範本：可解析、只含五個白名單鍵、RunAtLoad 為 true、日誌路徑固定
+PLIST=skills/kunsu-dashboard/launchd/kunsu-dashboard.plist.template
+if [[ -f "${PLIST}" ]] && python3 - "${PLIST}" <<'PYR'
+import plistlib, sys
+allowed = {"Label", "ProgramArguments", "RunAtLoad", "StandardOutPath", "StandardErrorPath"}
+try:
+    d = plistlib.load(open(sys.argv[1], "rb"))
+except Exception as e:
+    print(f"plist 無法解析：{e}", file=sys.stderr); sys.exit(1)
+extra = set(d) - allowed
+if extra:
+    print(f"plist 含白名單外的鍵：{sorted(extra)}", file=sys.stderr); sys.exit(1)
+if d.get("RunAtLoad") is not True:
+    print("RunAtLoad 不為 true", file=sys.stderr); sys.exit(1)
+for k in ("StandardOutPath", "StandardErrorPath"):
+    if d.get(k) != "/tmp/kunsu-dashboard.log":
+        print(f"{k} 不等於 /tmp/kunsu-dashboard.log", file=sys.stderr); sys.exit(1)
+PYR
+then
+  ok "R2 LaunchAgent plist 範本只含五個白名單鍵、RunAtLoad true、日誌導向 /tmp/kunsu-dashboard.log"
+else
+  ng "R2 LaunchAgent plist 範本不符 ADR 020 約束（缺檔、無法解析、白名單外鍵、RunAtLoad 或日誌路徑）"
+fi
+# R3 頂層 scripts/（排除本腳本）不得出現 launchctl／LaunchAgents
+r3_hits="$(find scripts -type f \( -name '*.sh' -o -name '*.fish' -o -name '*.py' \) ! -name 'consistency-check.sh' -print0 | xargs -0 grep -l -e 'launchctl' -e 'LaunchAgents' 2>/dev/null | sort -u)"
+if [[ -z "${r3_hits}" ]]; then
+  ok "R3 頂層 scripts/ 無 launchctl／LaunchAgents 字面"
+else
+  ng "R3 頂層 scripts/ 出現 launchctl／LaunchAgents：$(echo "${r3_hits}" | tr '\n' ' ')"
+fi
+
+# --- S. 本機 URL 白名單（ADR 020 Decision 第 4 項第二支柱）---
+# skills/ 下除 kunsu-dashboard/ 以外的腳本、hook 與 SKILL.md 不得出現指向本機的 HTTP URL；
+# 白名單僅限既有 tshehtu zoekt 查詢（該行含 KUNSU_ZOEKT_URL）。新增白名單須修訂 ADR 020。
+s_hits="$(find skills -path 'skills/kunsu-dashboard' -prune -o -type f \( -name '*.sh' -o -name '*.py' -o -name '*.md' -o -name '*.fish' \) -print0 \
+  | xargs -0 grep -n -e 'http://127\.0\.0\.1' -e 'http://localhost' 2>/dev/null | grep -v 'KUNSU_ZOEKT_URL' || true)"
+if [[ -z "${s_hits}" ]]; then
+  ok "S  skills/（kunsu-dashboard 除外）無指向本機的 HTTP URL（白名單僅 KUNSU_ZOEKT_URL）"
+else
+  ng "S  skills/ 出現本機 HTTP URL（ADR 020 第二支柱——AI session 不得自主取得沙盤狀態）：$(echo "${s_hits}" | head -3 | tr '\n' ' ')"
 fi
 
 echo "---"
