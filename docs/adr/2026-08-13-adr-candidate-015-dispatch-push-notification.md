@@ -22,10 +22,12 @@ status: accepted
 
 1. **掛載點**：handoff skill add 流程新增收尾步驟（確認 commit 之後），僅 kunsu 語境（當前 repo 為註冊表任一條目的 `kunsu` 值）適用；一般 repo 的交接不受影響。
 2. **目標定位**：以註冊表反查 `to:` 角色代碼對應的子專案路徑，再以 ListAgents 列出本機 session、以名稱啟發式匹配（正規化後 session 名稱與子專案目錄 basename 對應）。**唯一且明確才發送**；找不到、多重命中、或 ListAgents／SendMessage 工具不可用時一律降級跳過——不重試、不排隊，由 SessionStart hook（ADR 014）於該視窗下次 `/clear` 兜底。
+   > 修訂註記（2026-10-03，推播匹配排除 offline session）：候選集於兩層匹配之前先排除狀態為 offline 的 session——ListAgents 清單中 `Remote Control · offline` 列是已關閉 session 留下的殘影，不是收件目標；本機實測 21 筆 peer 有 19 筆 offline，同名殘影最多疊 4 筆，使活的目標 session 被判多重命中而永遠漏發。排除後「唯一且明確才發送」只以 online 候選計數；命中列連同其 `[ref]` 記下並以該 ref 定址，避免同名殘影並存時裸名歧義把通知送進殘影。清單未提供狀態資訊時不過濾、維持本條原行為。兩層匹配（精確慣例名、slot 變體）與啟發式 fallback 的規則本文見 handoff SKILL.md add 6-2（2026-08-21 定案），本 ADR 本文原僅載啟發式匹配。
 3. **通知訊息自足（Invariant 2 零觸碰）**：定型文案含軍師名、角色代碼、份數、檔名清單（上限 5 筆），並**自帶收方指令**——請只向使用者回顯重點、勿開始任何工作、勿讀取交接檔內文、勿回覆本訊息或軍師。收方行為規則以訊息本身承載，不在任何子 repo 寫入設定或規則。
 4. **只告知不開工**：本步驟只發送訊息，不等待、不確認收方回應；接手與否、何時開工，仍由使用者在目標 session 明確指示（ADR 002 Decision 5 人工閘門零改動）。
 5. **試點閘門**：全面啟用前，先以單一子專案完成試點，驗證需求文件的三項推斷——收方 session 依訊息內指令僅回顯（推斷一）、busy session 收訊排隊時機（推斷二）、軍師 session 具備傳訊工具（推斷三）；試點結論補記於需求文件。
 6. **回覆方向對稱納入**（2026-08-13 同日修訂：原訂「試點成功後另行補上」，試點當日即由使用者確認派發方向實測可用——軍師 session 實發至 ios-app session 觸發成功——遂依需求文件 Open Questions 3 定案納入同批）：子專案投遞回覆（含暫離回報）落入軍師信箱後，反向通知軍師 session（handoff reply 步驟 6）；目標匹配採同一套兩層規則，軍師 session 慣例名 `<軍師目錄名>-kunsu`，降級由軍師端 SessionStart hook 與 `scan-replies.sh` 兜底；「未 commit 即新回覆訊號」的掃描機制零改動。
+   > 修訂註記（2026-10-03）：回覆方向同樣於兩層匹配之前先排除狀態為 offline 的 session，只對 online 候選判唯一並以命中列 ref 定址（handoff reply 6-1／6-2，同 Decision 2 修訂註記）；`ebook-kunsu` 慣例名在本機累積 4 筆 offline 殘影，是本修訂的直接觸發案例。
 
 ## Consequences
 

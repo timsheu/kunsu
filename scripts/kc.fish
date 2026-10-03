@@ -12,8 +12,20 @@
 # 分隔符固定為 `.`（角色代碼為 kebab-case 不含 `.`，解析唯一）；後綴限
 # 英數、`-`、`_`。不同名稱使 /park 與 /unpark 各持一份停車格（slot 取
 # session 名稱）。推播匹配會把帶後綴的 session 一併列入候選，但仍維持
-# 「唯一命中才發送」——同慣例名前綴的 session 開了兩個以上時降級跳過，
+# 「唯一命中才發送」——同慣例名前綴的 online session 開了兩個以上時降級跳過，
 # 由 SessionStart hook 或手動 /kunsu-inbox 兜底。
+#
+# 每次 kc 都是 `claude -n` 新開一個 session（名字只是標籤，不是 session 身分，
+# 續接舊 session 要走 --resume）；session 關掉後，清單裡可能留下一筆同名、
+# 狀態為 offline 的殘影（推斷：Claude Code settings.json 的
+# remoteControlAtStartup 為 true 時，每個 session 啟動即註冊 Remote Control，
+# process 結束後該登記留存為 offline；本機 2026-10-03 實測 21 筆 peer 有 19 筆
+# 是 Remote Control · offline，但未做過「開關一次 session 再重列」的對照）。
+# 推播匹配已於匹配前排除狀態為 offline 的列（handoff add 6-2／reply 6-1，
+# 2026-10-03 定案），殘影不再使活 session 被判多重命中。若想減少清單噪訊，可把
+# remoteControlAtStartup 設為 false、需要遠端接管時在 session 內以 /remote-control
+# （/rc）按需開啟；代價是每個要遠端接管的 session 都得手動開，且此設定只影響
+# 清單長度，不影響推播正確性。
 #
 # 未登記、非 git 目錄、自帶 -n／--name、或帶 --resume／-r 時不命名，行為同
 # 直接執行 claude（--slot 此時一併忽略並提示）。

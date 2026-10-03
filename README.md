@@ -88,7 +88,7 @@ cd kunsu
 
 - **SessionStart hook**：session 啟動（含 `/clear`）時以確定性腳本掃描信箱、把摘要注入開場 context——長駐視窗按 `/clear` 即攤開待接手清單。零 token、未登記 repo 靜默、fail-open 絕不阻斷 session 啟動。Claude Code 與 Codex 皆可掛載（Codex 掛於 `~/.codex/hooks.json`、須於 TUI 信任）。
 - **派發即推播／回覆即推播**：軍師派發完成、子專案回覆投遞（含暫離回報）的當下，向對方的已開啟長駐 session 發送一次性告知訊息——事件驅動、零輪詢、零常駐服務，訊息自帶「僅回顯、勿開工」收方指令，子專案 repo 零注入。Claude Code 限定：Codex 沒有跨 session 傳訊的對應物，這一步整個跳過，由 SessionStart hook 與掃描兜底。
-- **session 命名慣例**：子專案 `<軍師目錄名>-<角色代碼>`（如 `ebook-android`）、軍師 `<軍師目錄名>-kunsu`，以及兩者再接上 `.` 與後綴的 slot 變體（如 `ebook-android.auth`，`kc --slot` 產生）——以 Claude Code 的 `/rename` 一次設定（持久化）或以 `kc` 啟動函式自動帶入，使推播匹配走精確比對；無慣例名時退回名稱啟發式，兩層皆唯一命中才發送、寧漏發不誤發（同一慣例名的多個 slot 變體並存即多重命中、一律降級），未推播由 hook 與掃描兜底。
+- **session 命名慣例**：子專案 `<軍師目錄名>-<角色代碼>`（如 `ebook-android`）、軍師 `<軍師目錄名>-kunsu`，以及兩者再接上 `.` 與後綴的 slot 變體（如 `ebook-android.auth`，`kc --slot` 產生）——以 Claude Code 的 `/rename` 一次設定（持久化）或以 `kc` 啟動函式自動帶入，使推播匹配走精確比對；無慣例名時退回名稱啟發式；匹配前先排除狀態為 offline 的 session（已關閉 session 留下的殘影），online 候選中兩層皆唯一命中才發送、以命中列的 `[ref]` 定址、寧漏發不誤發（同一慣例名的多個 online slot 變體並存即多重命中、一律降級），未推播由 hook 與掃描兜底。
 
 三者皆屬知悉層：接手、開工、查核、done 收尾的決策閘門一律留在使用者手上。
 

@@ -23,7 +23,7 @@ docs/
   playbooks/           → 操作教學（端到端工作流程、軍師沙盤導覽；手工維護，自 README 拆出的教學唯一落點）
   history/             → 開發日誌（已完成條目自 CLAUDE.md 遷出，新條目追加於此）
 skills/                → skill 原始碼
-  handoff/             → 通用交接原語（v0.24.0，見 ADR 003）
+  handoff/             → 通用交接原語（v0.24.1，見 ADR 003）
     SKILL.md           → add／reply／list／done 子指令（add 含引用檔名權威慣例、斷言層級紀律與更正交接子節（corrected_by 補記）；done 回報含斷言自查兩態附句；reply 含 kunsu 語境分支、verify 驗收方式選填欄位、逐項回答附證據指引、矛盾回報指引與暫離回報最小 partial 回覆；done 含收尾口語觸發、發起方守門、歸檔前逐項驗收查核、沉澱訊號查核、反向路由查核與來源 todo 查核一併收尾（todo 收尾含殘項清點）；done 步驟 5–7 歸檔執行腳本化（archive-handoff.sh）；add 產檔查重（時間窗清單＋tshehtu 關鍵詞層，advisory）、done 步驟 3 以 `--precheck` 印候選、步驟 4 以 archive-todo.sh 執行；add／done／本地 reply 尾端確認 commit——宣告範圍契約：帶兩形 pathspec、`&&` 串接與排序規則，ADR 018）
     scripts/           → new-handoff.sh（產檔＋查重＋第 6 參數 `depends_on` 依賴宣告——flow 形置 tags 後、stderr 印宣告筆數或未宣告提醒；本地時間窗清單＋tshehtu zoekt 關鍵詞層，stderr advisory、降級與零命中顯式；第 7 參數 `series` 線別——YAML 敏感字元寫檔前拒收、frontmatter 純量欄，產檔後 stderr 印同線本體計數與線總表訊號：有總表印路徑、同線 ≥3 份無總表印可貼上的骨架、多檔標 ⚠、讀檔錯誤顯式略過）、new-handoff-reply.sh、archive-handoff.sh（done 歸檔執行：status Edit→成對 git mv→僅具體路徑暫存，掃 index 聚合 todo 三形進訊息與 pathspec、尾端印引用偵測，印出帶兩形 pathspec 的待確認 commit 指令、不 commit；`--precheck` 印來源 todo 雙向比對候選）
   todo/                → CE 副作用 TODO 清單管理原語（v0.4.0，見 ADR 013）

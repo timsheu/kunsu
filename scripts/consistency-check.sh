@@ -506,6 +506,24 @@ else
   ng "S  skills/ 出現本機 HTTP URL（ADR 020 第二支柱——AI session 不得自主取得沙盤狀態）：$(echo "${s_hits}" | head -3 | tr '\n' ' ')"
 fi
 
+# --- T. 推播匹配 offline 排除錨句（2026-10-03）：規則本體兩處與四份副本皆須載明，防單側漂移 ---
+# 錨句整句同行、每處只出現一次（grep -cF 以行計數）；SKILL.md 恰 2（add 6-2、reply 6-1），
+# CONCEPTS／README／kc.fish 各 ≥1，ADR 015 ≥2（Decision 2、6 各一段修訂註記）。
+t_anchor='排除狀態為 offline'
+t_fail=""
+t_skill="$(grep -cF "${t_anchor}" skills/handoff/SKILL.md || true)"
+[[ "${t_skill}" -eq 2 ]] || t_fail+="skills/handoff/SKILL.md=${t_skill}(須恰 2) "
+for spec in "CONCEPTS.md:1" "README.md:1" "scripts/kc.fish:1" "docs/adr/2026-08-13-adr-candidate-015-dispatch-push-notification.md:2"; do
+  tf="${spec%%:*}"; tmin="${spec##*:}"
+  tc="$(grep -cF "${t_anchor}" "${tf}" || true)"
+  [[ "${tc}" -ge "${tmin}" ]] || t_fail+="${tf}=${tc}(須 ≥${tmin}) "
+done
+if [[ -z "${t_fail}" ]]; then
+  ok "T  推播匹配 offline 排除錨句：SKILL.md 恰 2、CONCEPTS／README／kc.fish ≥1、ADR 015 ≥2"
+else
+  ng "T  推播匹配 offline 排除錨句缺漏：${t_fail}（活 session 會被同名 offline 殘影拖成多重命中而漏發，規則副本須同步載明排除）"
+fi
+
 echo "---"
 echo "pass=${pass} fail=${fail} warn=${warn}"
 [[ "${fail}" -eq 0 ]] || exit 1

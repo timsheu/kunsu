@@ -653,7 +653,7 @@ project_doc_max_bytes = 65536
 
 ## 依賴聲明
 
-本 skill 依賴同 toolkit 內建的 `handoff` skill（v0.24.0，原始碼位於本 repo `skills/handoff/`）所定義的下列慣例。兩者共同發版、慣例定義以本 repo 為準；handoff 改動若觸及下表任一列須同步核查本 skill，未觸及者不需。
+本 skill 依賴同 toolkit 內建的 `handoff` skill（v0.24.1，原始碼位於本 repo `skills/handoff/`）所定義的下列慣例。兩者共同發版、慣例定義以本 repo 為準；handoff 改動若觸及下表任一列須同步核查本 skill，未觸及者不需。
 
 | 項目 | 慣例 |
 |------|------|
