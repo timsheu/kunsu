@@ -23,3 +23,7 @@ mod 是純 Claude Code adapter（ADR 019 第三類配件，與 kc.fish 同級）
 ## 下一步
 
 - [ ] 成形後以 `/ce-brainstorm` 推進至 docs/brainstorms/
+
+## 結論（2026-10-03 試作後放棄）
+
+已實作為 dev-mod（validate／tsc／plugin test 6 案全過）並在 ebook 軍師 session 實看：band 顯示「回覆 23｜最新：兩個檔名」，長檔名撐成兩行。使用者裁決不採用——要看細節一律開沙盤，TUI 本來就不適合閱讀信箱內容（以前 inbox 走 TUI 就很難讀）；band 作為存量顯示沒有價值，作為「新到門鈴」則與 UserPromptSubmit hook 注入模型的訊號重疊。mod 已自 dev-mods 刪除。若日後重啟，只做「自上次提問後新到 N 份」的單行門鈴，不列存量。
