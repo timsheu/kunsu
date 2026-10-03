@@ -29,7 +29,7 @@ status: accepted
 ## Consequences
 
 - **正面**：無工具鏈依賴（不需 cargo／pip）；skill 由 Claude 執行，可在 scaffold 過程中即時查證子專案路徑與 CLAUDE.md 內容（編譯工具做不到）；子 repo 零污染，repo 搬家只改中心的一張表與註冊表一處。
-- **負面／限制**：範本渲染由模型執行，確定性低於程式渲染（緩解：範本檔案隨 skill 附帶，指令要求逐字複製固定段落）；無法服務不跑 Claude Code 的使用情境（接受——目前唯一使用者的工作流即 Claude Code）。
+- **負面／限制**：範本渲染由模型執行，確定性低於程式渲染（緩解：範本檔案隨 skill 附帶，指令要求逐字複製固定段落）；無法服務不跑 Claude Code 的使用情境（接受——目前唯一使用者的工作流即 Claude Code）。**修訂註記（2026-10-03，ADR 019 Decision 4 翻案）**：使用者工作流已同時含 Codex；同一份原始碼多一個部署目標（`~/.agents/skills/`）與一組字面對應即可服務第二 agent，Decision 1 零改動。本限制自此限縮於「指引與部署層的字面」，對編譯型工具與 MCP 的否決不變。
 - **結構不變量**：scaffold 產出必須保留以下結構，供 `/inbox`（見 ADR Candidate 002）正常運作：(1) `docs/handoffs/` 目錄，交接文件含 `to:` frontmatter；(2) `docs/handoffs/replies/` 目錄（內含 `.gitkeep` 佔位檔——git 不追蹤空目錄，無佔位檔則 clone／換機後目錄不會重建），回覆文件含 `in_reply_to:` frontmatter；(3) 規劃中心根目錄為 git repo（供 git status tripwire 使用）。`/init-planner` 的驗收步驟應逐項核查上述三項，而非僅目測輸出正確。
 
 ## Alternatives considered

@@ -1,12 +1,12 @@
 # kunsu
 
-kunsu（軍師，台語 kun-su）——為多 repo AI 協作建立「軍師」（規劃協調中心）的 scaffolding 工具組：以純 skill＋範本快速建立唯讀的軍師 repo（軍師沙盤為唯一例外，見 [ADR 010](docs/adr/2026-07-11-adr-candidate-010-dashboard-service-exception.md)），並以全域反向註冊表自動化跨 session 傳令。本專案是工具母體——skill 原始碼在此開發與版控，部署目標為 `~/.claude/skills/`。
+kunsu（軍師，台語 kun-su）——為多 repo AI 協作建立「軍師」（規劃協調中心）的 scaffolding 工具組：以純 skill＋範本快速建立唯讀的軍師 repo（軍師沙盤為唯一例外，見 [ADR 010](docs/adr/2026-07-11-adr-candidate-010-dashboard-service-exception.md)），並以全域反向註冊表自動化跨 session 傳令。本專案是工具母體——skill 原始碼在此開發與版控，部署目標為各 agent 的 skill 目錄（Claude Code `~/.claude/skills/`、Codex `~/.agents/skills/`，見 ADR 019）。
 
 ## 核心規範（Invariants）
 
 1. **純 skill＋範本，不建編譯型工具** — 交付物是 markdown 範本、skill 指令文件與少量膠水腳本（shell），不建立 Rust／Go／Python 等需要獨立維護的工具專案。理由見 [docs/adr/2026-07-06-adr-candidate-001-pure-skill-no-injection.md](docs/adr/2026-07-06-adr-candidate-001-pure-skill-no-injection.md)。
 2. **絕不注入子 repo** — 工具產出的軍師對其子專案唯讀；本工具本身也不在任何目標 repo 寫入 managed section 或設定。所有機器路徑的**常設登記**只存在於兩處：各軍師自己 CLAUDE.md 的關聯專案表，以及全域註冊表 `~/.claude/kunsu-registry.json`（申請信箱中待審申請的 `path` 欄位為暫態投遞內容，核准即轉入上述正式登記、歸檔後僅為歷史紀錄；上報信箱中上報檔的情報內容同屬暫態投遞，不構成機器路徑的常設登記，見 ADR 006、ADR 008）。
-3. **開發與部署分離** — skill 原始碼在本 repo 版控，經 `install.sh` 部署（symlink 或 copy）至 `~/.claude/skills/`，不直接在 `~/.claude` 內開發。與 `~/.claude/rules` 既有的 install.sh 模式一致。
+3. **開發與部署分離** — skill 原始碼在本 repo 版控，經 `install.sh` 部署（symlink 或 copy）至各 agent 的 skill 目錄（Claude Code `~/.claude/skills/`、Codex `~/.agents/skills/`，ADR 019），不直接在任何部署目錄內開發。與 `~/.claude/rules` 既有的 install.sh 模式一致。
 4. **範本母本唯讀參考** — 抽象化來源為 ebook 專案群規劃中心（本機私有路徑，略），僅唯讀查閱，不回頭修改母本。
 
 ## 專案結構
@@ -18,7 +18,7 @@ docs/
   README.md            → 文件中心主索引
   brainstorms/         → 需求（種子：2026-07-06 需求彙整）
   plans/               → 實作計畫（/ce-plan 產出）
-  adr/                 → ADR（001–015、017–018、020 accepted；016、019 proposed）
+  adr/                 → ADR（001–015、017–020 accepted；016 proposed）
   solutions/           → 可重用學習與解法（/ce-compound 產出，YAML frontmatter 依 module/tags/problem_type 可搜尋）
   playbooks/           → 操作教學（端到端工作流程、軍師沙盤導覽；手工維護，自 README 拆出的教學唯一落點）
   history/             → 開發日誌（已完成條目自 CLAUDE.md 遷出，新條目追加於此）
@@ -60,7 +60,7 @@ skills/                → skill 原始碼
     SKILL.md           → 純安裝／啟動說明，不涉及觸發語
     requirements.txt   → fastapi／uvicorn[standard]／PyYAML／markdown-it-py（唯一 pip 依賴；markdown-it-py 為全文頁渲染，缺席降級）
     app/               → registry.py／kunsu_scan.py／subrepo_status.py（含最新回覆首句摘錄唯讀擷取，display-only）／todo_status.py／handoff_graph.py（交接依賴圖：頂層＋archive 建圖、直接邊推導可開工／等依賴、Tarjan 循環、無法解析與異常顯式回報——三消費端單一來源）／handoff_graph_html.py（inline SVG 分層排版、dlabel 標籤、錨點、活節點 >8 降級文字清單）／board_model.py（看板模型：持球者泳道 × 狀態欄的卡片歸屬與異常彙整，純函式、分類零改動）／board_html.py（看板頁 `/` 與 archive 頁 `/archive` 渲染，`kb-` class 前綴，不匯入 main）／html_common.py（各頁共用輔助：頁面骨架、讀檔、錨點、verify 標籤、停留天數）／markdown_render.py（全文頁 Markdown 伺服器端渲染：markdown-it-py `html=False` 轉義原始 HTML、預設 validateLink 擋 `javascript:`，frontmatter 鍵值表逐值 escape；匯入失敗降級 `<pre>`）／handoff_detail.py（全文頁資料模型：`f` 路徑守門——四允許目錄＋單層 `.md`＋resolve 核對擋 symlink、同串回覆依 `in_reply_to` 舊→新；純讀檔不呼叫掃描）／board_html.py 另含四組配色主題（墨與朱預設／沙盤／青瓷／夜戰，`html[data-kb-theme]` 覆寫 `:root` 色票，欄首與格子底色綁狀態）與主題切換鈕，html_common.THEME_SCRIPT 為頁面唯一 JS（localStorage 持久、伺服器零狀態）／board_routes.py（APIRouter：`/` 看板、`/archive`、`/handoff` 全文頁（`k` 不命中與 `f` 不合法皆 404），看板以 `MAILBOX_ONLY_SCRIPTS` 呼叫 scan_kunsu 跳過 scan-replies.sh；不匯入 main）／registry.py（load_registry 與 registry 路徑、角色輔助，供兩路由模組共用）／main.py（`/overview` 原彙整頁與 include_router；原彙整頁含頁首快速導覽：每軍師一行目錄名連結跳至分組與子專案卡片，錨點 `nav-<軍師>--<子專案>-<雜湊>` 掛 `<details>` 內容區使收合分組自動展開）
-    tests/             → pytest，287 項測試（回覆首句摘錄測試自 test_subrepo_status.py 拆至 test_subrepo_status_reply_excerpt.py）
+    tests/             → pytest（回覆首句摘錄測試自 test_subrepo_status.py 拆至 test_subrepo_status_reply_excerpt.py）
 scripts/kc.fish        → kunsu claude 啟動函式（fish autoload；依 registry 自動以命名慣例 `-n` 啟動，`--slot <後綴>` 產生 `<慣例名>.<後綴>` 區分同資料夾多 session，部署至 ~/.config/fish/functions/）
 scripts/consistency-check.sh → 跨檔案一致性機械檢查（版號鏈、值域副本、定型文字實跑比對、install 覆蓋、分類詞對映、live 軍師 WARN 級抽查）
 install.sh             → 部署至 ~/.claude/skills/ 與 ~/.agents/skills/（Codex，偵測 ~/.codex/ 才啟用；預設 copy 並寫 .kunsu-origin 標記、--link 開發模式、--adopt 採納舊版無標記部署；pre-flight 對非 kunsu 產物整批中止）
@@ -73,12 +73,12 @@ install.sh             → 部署至 ~/.claude/skills/ 與 ~/.agents/skills/（C
 | [docs/README.md](docs/README.md) | 文件中心主索引 |
 | [docs/playbooks/end-to-end-workflow.md](docs/playbooks/end-to-end-workflow.md) | 操作教學：端到端工作流程（README 只留門面摘要） |
 | [docs/playbooks/dashboard.md](docs/playbooks/dashboard.md) | 操作教學：軍師沙盤安裝與頁面導覽 |
-| [docs/adr/](docs/adr/) | ADR 001–020；status 以各檔 frontmatter 為準（現 016、019 為 proposed，其餘 accepted） |
+| [docs/adr/](docs/adr/) | ADR 001–020；status 以各檔 frontmatter 為準（現僅 016 為 proposed，其餘 accepted） |
 
 ## 開發狀態
 
 ### 已完成
-- 已完成條目（2026-07-06 起、49 條功能落地紀錄）已遷至 [docs/history/development-log.md](docs/history/development-log.md)；每條含來源回饋、決策取捨、審查與 dogfooding 結果，規劃前既有盤點請以該檔與 `docs/solutions/` 為起點。
+- 已完成條目（2026-07-06 起的功能落地紀錄）已遷至 [docs/history/development-log.md](docs/history/development-log.md)；每條含來源回饋、決策取捨、審查與 dogfooding 結果，規劃前既有盤點請以該檔與 `docs/solutions/` 為起點。
 - 新完成的工作一律追加至該檔，本區只保留此指標。
 
 ### 尚未實作／後續評估

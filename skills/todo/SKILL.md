@@ -120,8 +120,8 @@ docs/todos/  →（解決後）status 改 已解決，git mv 到 docs/todos/arch
    **不 commit**。多筆可並列一次收尾（同一 basis 套用每筆）；status 已是終態的
    孤兒僅補歸檔、不改終態不補依據；已在 `archive/` 的傳入項自動略過供失敗重跑。
    git 編排細節（pathspec rename 兩側、add 範圍與順序）該被計算而非被記憶——
-   2026-08-31 手動 todo 歸檔曾把 tracked rename 的 pathspec 拆半、來源刪除留在
-   index（`fc143a8`）。腳本失敗或不可用時才手動執行等效步驟：先
+   手動 todo 歸檔曾把 tracked rename 的 pathspec 拆半、來源刪除留在
+   index。腳本失敗或不可用時才手動執行等效步驟：先
    `mkdir -p docs/todos/archive/`；Edit status 與依據行；
    `git status --porcelain` 為 `??` 者先 `git add`；再
    `git mv docs/todos/<slug>.md docs/todos/archive/<slug>.md` 並

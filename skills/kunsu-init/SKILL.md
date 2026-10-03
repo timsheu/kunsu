@@ -66,14 +66,14 @@ allowed-tools:
 
 ### ①-B 子專案清單
 
-以單次阻塞式確認（見 Agent 對應表）收集所有子專案。要求使用者以如下格式逐行提供（每個子專案一行）：
+以阻塞式確認（見 Agent 對應表）**分題**收集子專案（長字串在終端機一行輸入會有顯示問題）：先問子專案數量，再逐一子專案依下列六題收集、每題一次確認；每個子專案六題收齊後以一行摘要回顯供核對：
 
 ```
 顯示名稱 | 絕對路徑 | 角色代碼 | 角色說明 | 環境限制（可留空）| 能否自我驗證（y/n）
 ```
 
 - **顯示名稱**：出現在關聯專案表的名稱，可含空格。
-- **絕對路徑**：`{{PROJECT_ROWS}}` 的來源，SKILL 將以 `ls` 查證存在。
+- **絕對路徑**：`{{PROJECT_ROWS}}` 的來源，SKILL 將以 `test -d` 查證存在。
 - **角色代碼**：短、kebab-case，即交接文件 `to:` 的唯一比對鍵（`{{PROJECT_ROWS}}` 第三欄）；宜 ≤ 20 字、不含軍師名前綴。**同一軍師內須唯一**——見下方唯一性檢查。
 - **角色說明（選填）**：一行職責描述，display-only，只落關聯專案表說明欄、不進註冊表、不比對（`{{PROJECT_ROWS}}` 第四欄）；留空為「無」。
 - **環境限制（選填）**：特殊限制或已知約束；填「無」即不產生限制小節（`{{PROJECT_CONSTRAINTS}}`）。
@@ -158,7 +158,7 @@ mkdir -p "<PLANNER_ROOT_PATH>/docs/solutions/architecture-patterns"
 mkdir -p "<PLANNER_ROOT_PATH>/docs/solutions/conventions"
 ```
 
-> `docs/applications/` 是申請信箱（kunsu-apply skill 投遞、`add-project` 審核），與 `docs/handoffs/replies/` 同屬例外授權信箱。`.gitkeep` 佔位確保 clone 後目錄存在，否則掃描腳本在首份申請抵達前無從核對。`docs/reports/` 是上報信箱（子專案以 kunsu-report skill 主動上報、軍師審閱歸檔）。`.gitkeep` 佔位確保 clone 後目錄存在，否則掃描腳本在首份上報抵達前無從核對。
+> `docs/applications/` 是申請信箱（kunsu-apply skill 投遞、`add-project` 審核），與 `docs/handoffs/replies/` 同屬例外授權信箱。`docs/reports/` 是上報信箱（子專案以 kunsu-report skill 主動上報、軍師審閱歸檔）。三信箱目錄以 `.gitkeep` 佔位，否則 clone 後掃描腳本在首份申請／上報抵達前無目錄可核對。
 
 ### ④-5 複製 solutions 種子文件
 
@@ -588,7 +588,7 @@ bash "<skill 目錄>/scripts/registry-merge.sh" \
 3. 對每筆符合者判斷「是否未完成」：
    - 以 `Glob` 掃描 `<CURRENT_REPO_ROOT>/docs/handoffs/replies/*.md`，篩選 frontmatter `in_reply_to` 對應原交接檔名（含 `.md` 後綴）的回覆。
    - **無任何對應回覆** → 未完成。
-   - **有對應回覆** → 取最新一份（依日期與數值後綴排序，非字串排序），以 `Read` 讀其 `status`：`done` = 完成；`partial`／`blocked`／`submitted` = 未完成。
+   - **有對應回覆** → 取最新一份（依日期與數值後綴排序，非字串排序），以 `Read` 讀其 `status`：`done` = 完成；`partial`／`blocked`／`submitted`／其他未知值 = 未完成。
 4. **有未完成 handoff 持有舊角色代碼**：
    - 列出警告清單（交接文件標題、建立日期、`to:` 欄位值、最新 status 或「無回覆」）。
    - 以阻塞式確認（見 Agent 對應表）提示：「以下 N 份未完成交接文件的 `to:` 仍為舊角色代碼「<舊角色代碼>」，改名後 kunsu-inbox skill 將無法自動篩選到這些交接。請確認處置方式（手動更新 `to:` 欄位 / 保留舊角色代碼不動 / 取消改名）：」

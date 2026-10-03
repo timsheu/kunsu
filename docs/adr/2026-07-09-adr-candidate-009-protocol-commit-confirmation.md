@@ -44,7 +44,7 @@ status: accepted
 ## Decision（proposed）
 
 1. **確認 commit 升格為協議步驟**：kunsu 軍師側／發起側流程尾端的 commit 改為
-   「AskUserQuestion 確認一次 → 執行」。逐次確認即構成「使用者明確要求」，與
+   「阻塞式確認一次 → 執行」（Claude Code 以 AskUserQuestion 實現；不具原生阻塞式工具的 agent 的第二種形態見 ADR 019 Decision 3，2026-10-03 修訂）。逐次確認即構成「使用者明確要求」，與
    全域「不主動 commit」規則**相容而非牴觸**，全域規則零改動。此為 ADR 002
    Decision 5「人工閘門不動」的強化落地，不是新原則；先例為 `kunsu-init`
    步驟 ⑥，本 ADR 把允許理由自「新建 repo 初始 commit」擴為「協議流程尾端對
@@ -96,7 +96,7 @@ status: accepted
 - **取捨（明示接受）**：`docs/handoffs/archive/` 的直接寫入不再被攔——威脅模型
   與 `scan-applications.sh` 已接受的取捨等價（會寫 archive/ 的只有 done 流程，
   投遞腳本只往 `replies/` 寫），於腳本註解記錄。headless／pipeline 情境
-  AskUserQuestion 不可用時退化為「不 commit＋提示」，與現狀相同、不劣化。
+  AskUserQuestion 不可用時退化為「不 commit＋提示」，與現狀相同、不劣化。**修訂註記（2026-10-03，ADR 019 Decision 3）**：阻塞式確認依能力類別判定——具原生阻塞式工具的 agent（Claude Code）工具不可用即視同取消；不具備者（Codex）印出定型指令與狀態宣告後結束回合，僅緊接下一回合的明確同意才執行。此形態屬規範層而非結構關卡，「同意缺席」零觀測，實害邊界由「絕不 push」界定為本地可逆。
 - **連動成本**：三 skill 升版（handoff `0.4.0`、kunsu-init `0.2.0`、kunsu-inbox
   `0.3.0`）、範本三處協議文字、母體文件與 CONCEPTS 詞條、ivm／ebook 兩 live
   軍師 CLAUDE.md 遷移；部署須單次 `install.sh` 原子上線（腳本豁免與 SKILL 確認
