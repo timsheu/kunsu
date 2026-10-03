@@ -534,7 +534,7 @@ hook 只在 session 啟動時跑、回覆即推播依賴回覆方走 skill，兩
 }
 ```
 
-Codex——其 hook 設定檔的 `hooks.UserPromptSubmit` 陣列**尾端**加一組（純文字 stdout 加入 context，與 Claude Code 一致；stdin 是否同時帶 `cwd` 與 `prompt` 以本機版本實跑為準——缺 `prompt` 時斜線靜默不生效但無其他影響）：
+Codex——其 hook 設定檔的 `hooks.UserPromptSubmit` 陣列**尾端**加一組（純文字 stdout 加入 context，與 Claude Code 一致；stdin 是否同時帶 `cwd` 與 `prompt` 以本機版本實跑為準——缺 `prompt` 時斜線靜默不生效但無其他影響；codex-cli 0.154.0 以 `codex exec -c` 注入於 live 軍師 repo 實收，純文字 stdout 已進 context、`cwd` 在）：
 
 ```json
 {

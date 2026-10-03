@@ -112,7 +112,7 @@ cd kunsu
 
 沙盒方面，Codex 預設的 workspace-write 模式下 `.git/` 為唯讀，軍師 session 執行 `done` 歸檔的 git 寫入會觸發核准提示——這是 kunsu 邊界之外的一道附帶關卡，把 `.git` 列入 `writable_roots` 會失去它。確認 commit 在 Codex 側改走文字回合，是規範層而非結構關卡：同意缺席時事後無法從產物觀測，實害邊界由「絕不 push」界定為本地可逆。
 
-驗證狀態：`scripts/codex-pilot.sh`（用法與手動核對清單見 [docs/playbooks/codex-pilot.md](docs/playbooks/codex-pilot.md)）以 `codex exec` 非互動跑完接手方鏈與軍師端鏈共八個驗收例，機制面全部成立過，但 Codex 免費方案額度於第五輪用盡、尚無單輪全綠，ADR 019 因此仍為 proposed，正式生效綁定試點單輪通過。已知邊界：done 收尾的六道查核、斷言層級紀律等多步驟流程在 Codex 上的保真度尚未量測；軍師沙盤讀的是檔案、與 agent 無關，`kc` 啟動函式則為 Claude Code 側配件。
+驗證狀態：`scripts/codex-pilot.sh`（用法與手動核對清單見 [docs/playbooks/codex-pilot.md](docs/playbooks/codex-pilot.md)）以 `codex exec` 非互動跑完接手方鏈與軍師端鏈共八個驗收例，2026-10-03 單輪 25 項全數 PASS（codex-cli 0.154.0），ADR 019 同日審定 accepted。已知邊界：done 收尾的六道查核、斷言層級紀律等多步驟流程在 Codex 上的保真度尚未量測；軍師沙盤讀的是檔案、與 agent 無關，`kc` 啟動函式則為 Claude Code 側配件。
 
 ## 專案結構
 

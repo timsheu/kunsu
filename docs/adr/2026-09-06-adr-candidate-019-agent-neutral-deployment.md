@@ -7,7 +7,7 @@ status: accepted
 
 # ADR 019：kunsu 同一份原始碼雙部署至 Claude Code 與 Codex——Invariant 3 擴張、ADR 009 第二種確認形態、ADR 001 Consequences 翻案
 
-> 狀態：**Accepted**（2026-10-03 使用者審定。生效條件以合併證據視為達成：codex-pilot 八個 AE 於第 3／5 輪全部成立、第九波遷移已依此執行；單輪全綠待 Codex 額度允許時補跑。審定同日落字：Invariant 3 字面、ADR 001／009 修訂註記、ADR 010 Decision 7 措辭。源自 [2026-09-06 需求文件](../brainstorms/2026-09-06-codex-agent-neutral-deployment-requirements.md)，該文件經 5-persona doc review 13 筆修正；實作計畫 [2026-09-06-001](../plans/2026-09-06-001-feat-codex-agent-neutral-deployment-plan.md) 經 4-persona review 14 筆修正。本 ADR 為計畫 U1，依 ADR 010／017 慣例先出 candidate、一輪 doc review（coherence／feasibility／adversarial 三 persona，13 筆修正全數套用）後才動載體。**生效條件**：Decision 6 的「相容」與 Consequences「首次以第二 agent 實證」以實作計畫 U8 試點通過為生效條件；試點證明 Codex 無法執行 handoff 流程（非 sandbox 設定問題）時，本 ADR 退回 candidate、Decision 6 重評）。
+> 狀態：**Accepted**（2026-10-03 使用者審定。生效條件達成：codex-pilot 於審定同日單輪 25 項全數 PASS（codex-cli 0.154.0、gpt-5.5），此前八個 AE 已於第 3／5 輪分別成立、第九波遷移已依合併證據執行。審定同日落字：Invariant 3 字面、ADR 001／009 修訂註記、ADR 010 Decision 7 措辭。源自 [2026-09-06 需求文件](../brainstorms/2026-09-06-codex-agent-neutral-deployment-requirements.md)，該文件經 5-persona doc review 13 筆修正；實作計畫 [2026-09-06-001](../plans/2026-09-06-001-feat-codex-agent-neutral-deployment-plan.md) 經 4-persona review 14 筆修正。本 ADR 為計畫 U1，依 ADR 010／017 慣例先出 candidate、一輪 doc review（coherence／feasibility／adversarial 三 persona，13 筆修正全數套用）後才動載體。**生效條件**：Decision 6 的「相容」與 Consequences「首次以第二 agent 實證」以實作計畫 U8 試點通過為生效條件；試點證明 Codex 無法執行 handoff 流程（非 sandbox 設定問題）時，本 ADR 退回 candidate、Decision 6 重評）。
 
 ## Context
 

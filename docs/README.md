@@ -80,7 +80,7 @@ kunsu 專案的文件集合。專案定位與核心規範見上層 [CLAUDE.md](.
 | [adr/2026-08-31-adr-candidate-018-commit-declared-scope-contract.md](adr/2026-08-31-adr-candidate-018-commit-declared-scope-contract.md) | ADR 018（accepted）：確認 commit 自「提交 index」改為「提交宣告範圍」——pathspec 兩形契約、上報歸檔腳本化、`MISDECLARED_ARCHIVE_ADD` 偵測 |
 | [adr/2026-09-06-adr-candidate-019-agent-neutral-deployment.md](adr/2026-09-06-adr-candidate-019-agent-neutral-deployment.md) | ADR 019（candidate，待審定）：kunsu 通用化——adapter＝部署目標＋字面對應、Invariant 3 擴為各 agent skill 目錄、ADR 009 第二種確認形態、ADR 001 Consequences 翻案 |
 | [brainstorms/2026-09-06-codex-agent-neutral-deployment-requirements.md](brainstorms/2026-09-06-codex-agent-neutral-deployment-requirements.md) | 需求：kunsu 通用化雙部署（R1–R19、AE1–AE8；5-persona review 13 筆） |
-| [plans/2026-09-06-001-feat-codex-agent-neutral-deployment-plan.md](plans/2026-09-06-001-feat-codex-agent-neutral-deployment-plan.md) | 實作計畫：雙部署（U1–U9；4-persona review 14 筆；U8 試點待額度重置後單輪全綠） |
+| [plans/2026-09-06-001-feat-codex-agent-neutral-deployment-plan.md](plans/2026-09-06-001-feat-codex-agent-neutral-deployment-plan.md) | 實作計畫：雙部署（U1–U9；4-persona review 14 筆；U8 試點 2026-10-03 單輪全綠、ADR 019 accepted） |
 | [playbooks/codex-pilot.md](playbooks/codex-pilot.md) | 操作教學：Codex 雙端試點腳本用法、可觀測面與手動核對清單 |
 | [plans/2026-07-11-001-feat-kunsu-dashboard-plan.md](plans/2026-07-11-001-feat-kunsu-dashboard-plan.md) | 實作計畫：軍師沙盤（R1–R10、六個實作單元，已執行完畢） |
 | [plans/2026-07-12-001-feat-reply-verify-field-plan.md](plans/2026-07-12-001-feat-reply-verify-field-plan.md) | 實作計畫：回覆 verify 欄位與沙盤「部分完成」子分類（U0–U7，已執行完畢） |
