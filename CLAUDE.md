@@ -33,7 +33,7 @@ skills/                → skill 原始碼
     SKILL.md           → 訪談→查證→產檔→vault→git→註冊表主流程＋add-project（申請審核制）＋remove-project（整筆移除）子指令
     scripts/registry-merge.sh → 註冊表 read-merge-write（python3）
     scripts/registry-remove.sh → 註冊表 read-remove-write，獨立 exit code 區分冪等略過與成功移除（python3）
-    assets/templates/  → 軍師範本（CLAUDE.md／CONCEPTS.md／README／HOME dataview 區塊＋PLACEHOLDERS.md；工作流程第 3 步為條件式線總表——單／兩份交接不立 plan、同線 ≥3 份才由軍師自寫 `docs/plans/` 輕量總表、frontmatter `series` 與交接對齊）
+    assets/templates/  → 軍師範本（CLAUDE.md／CONCEPTS.md／README／HOME dataview 區塊＋PLACEHOLDERS.md；工作流程第 3 步為條件式線總表——單／兩份交接不立 plan、同線 ≥3 份才由軍師自寫 `docs/plans/` 輕量總表、frontmatter `series` 與交接對齊；「Context 成本紀律」段——蒐集預設派副官、主線程輸出上限、一線一 session、brief 寫法配合委派路由器；工作流程第 1 步問「目標背後的目標」與同類問題第二次出現時提一次收口選項、第 5 步驗收標準優先指名外部裁判＋選附「拉高檢核」四問）
     assets/solutions/  → 兩篇種子沉澱文件（自母本通用化）
   kunsu-inbox/         → 跨 session 傳令自動化
     SKILL.md           → 模式偵測（獨立雙判斷）＋子 repo／軍師雙模式（軍師模式含收尾與分流提示行）
@@ -63,6 +63,7 @@ skills/                → skill 原始碼
     tests/             → pytest（回覆首句摘錄測試自 test_subrepo_status.py 拆至 test_subrepo_status_reply_excerpt.py）
 scripts/kc.fish        → kunsu claude 啟動函式（fish autoload；依 registry 自動以命名慣例 `-n` 啟動，`--slot <後綴>` 產生 `<慣例名>.<後綴>` 區分同資料夾多 session，部署至 ~/.config/fish/functions/）
 scripts/consistency-check.sh → 跨檔案一致性機械檢查（版號鏈、值域副本、定型文字實跑比對、install 覆蓋、分類詞對映、live 軍師 WARN 級抽查）
+scripts/session-cost.sh → 單一 session transcript 的 token 流向分析（主線程 cache 讀／寫／輸出、各工具回傳文字佔比、副官在 opus／sonnet／haiku 三價位的等值費用），供檢核範本「Context 成本紀律」是否被遵守
 install.sh             → 部署至 ~/.claude/skills/ 與 ~/.agents/skills/（Codex，偵測 ~/.codex/ 才啟用；預設 copy 並寫 .kunsu-origin 標記、--link 開發模式、--adopt 採納舊版無標記部署；pre-flight 對非 kunsu 產物整批中止）
 ```
 

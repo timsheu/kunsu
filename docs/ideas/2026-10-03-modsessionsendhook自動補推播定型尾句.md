@@ -23,3 +23,7 @@ mod hook `session.send`：收方 session 名稱命中 registry 的 `<軍師>-<�
 ## 下一步
 
 - [ ] 成形後以 `/ce-brainstorm` 推進至 docs/brainstorms/
+
+## 進度
+
+- 2026-10-05：已試作為 mod（`~/.claude/mods/`，經 `CLAUDE_CODE_PLUGIN_DIRS` 載入；見 docs/history/development-log.md 同日條目），試用後再決定是否納入 repo 與 install.sh。
