@@ -1,6 +1,6 @@
 ---
 name: kunsu-init
-version: 0.10.0
+version: 0.11.0
 description: |
   為多 repo AI 協作場景 scaffold 一個「軍師」（規劃協調中心）：以訪談收集子專案清單，
   自動查證路徑並讀取技術棧，填入固定不變量（5 條 Invariants、回覆信箱、申請信箱
@@ -16,6 +16,8 @@ description: |
   「新增子專案」「add project to planner」「把子專案加入規劃中心」.
   Use remove-project sub-command when asked to「remove-project」「移除子專案」
   「刪除子專案登記」「移除子專案登記」「把子專案從軍師移除」「remove project from planner」.
+  Use sync-rules sub-command when asked to「sync-rules」「補範本規則」「同步範本規則」
+  「補上環境版本規則」「補環境版本規則」「軍師補規則」「sync rules from template」.
 allowed-tools:
   - Bash
   - Read
@@ -316,7 +318,7 @@ bash "<skill 目錄>/scripts/registry-merge.sh" \
 
 - **範本固定段落**：5 條 Invariants、三信箱協議全文（含 Method 2 備援、tripwire、不對稱授權）、工作流程段；各軍師自持一份，內容以範本現行版本為準，不依賴母本路徑。
 - **`registry-merge.sh` 的 python3 依賴**：macOS 系統自帶 python3（Xcode CLT），腳本已在缺失時給出安裝提示。不引入 jq 或其他外部依賴。
-- **為何 git commit 允許**：步驟 ⑥ 的 commit 是新建軍師 repo 的初始 commit，不是對既有 repo 的未授權提交，且需使用者明確確認後才執行。add-project 步驟 ⑩ 的確認 commit 同理——依 ADR 009，逐次確認即為使用者明確要求，允許理由擴為「協議流程尾端對自身產出的收斂 commit」。
+- **為何 git commit 允許**：步驟 ⑥ 的 commit 是新建軍師 repo 的初始 commit，不是對既有 repo 的未授權提交，且需使用者明確確認後才執行。add-project 步驟 ⑩、remove-project 與 sync-rules 收尾的確認 commit 同理——依 ADR 009，逐次確認即為使用者明確要求，允許理由擴為「協議流程尾端對自身產出的收斂 commit」。
 - **Obsidian vault 呼叫既有 skill 的腳本**：直接呼叫 `init-vault.sh` 的固定部分（建立 .obsidian/），HOME.md 由本 skill 產生（含 handoffs dataview 附加），不重複執行 init-obsidian-vault 的完整流程。
 
 ---
@@ -421,11 +423,97 @@ test -d "<CURRENT_REPO_ROOT>/docs/reports" && echo "ok" || echo "missing"
     → 三步執行完畢：記錄 `REPORT_MIGRATION=migrated`，繼續（見下方統一跳轉）。
   - **n → 拒絕遷移**：記錄 `REPORT_MIGRATION=skipped`，繼續（見下方統一跳轉）。
 
-**②-b 完成後統一跳轉**：
+---
+
+### ②-c：環境版本規則遷移偵測
+
+> **本段與 ②-a、②-b 各自獨立、依序執行；單處失敗回報後，後續照常執行。** 本段也是 `sync-rules` 子指令的執行本體——步驟只寫在這裡，子指令引用本段、不另寫一份。
+
+舊版範本建立的軍師沒有「環境版本以正本為起點」這條規則（副官慣例）與交接撰寫步驟的指向句。本段沒有目錄可偵測（環境版本正本是條件式自建），改以 CLAUDE.md 內的錨句判斷，因此天然冪等：已補上的軍師再跑一次不會重複插入，上次補失敗的會重試。
+
+**②-c-1 偵測（兩處文字各自判斷）：**
+
+```bash
+grep -cF '**環境版本以正本為起點**' "<CURRENT_REPO_ROOT>/CLAUDE.md"
+grep -cF '環境版本引用：' "<CURRENT_REPO_ROOT>/CLAUDE.md"
+```
+
+第一條對應規則 bullet（記錄於 `RULE_MIGRATION`），第二條對應交接撰寫步驟的指向句（記錄於 `POINTER_MIGRATION`）。**勿把第一條的核查字串縮短為不含粗體標記的字面**——說明文字可能以引號提及這句話，含 `**` 的字面才是規則 bullet 本身的專屬前綴，縮短後會把「只被提及、規則本體不在」誤判成已具備。
+
+- 計數 ≥ 1 → 該處記錄 `ok`，不改檔。
+- 兩處皆 `ok` → 跳至 ②-c-3。
+- 任一處為 0 → 以阻塞式確認（見 Agent 對應表）一次提議補上缺少的文字：「本軍師的 CLAUDE.md 尚無環境版本規則（缺：<規則 bullet／交接撰寫指向句>）。是否補上？補上後，引用某環境正在執行的版本時會先讀環境版本正本並標明查證日期與來源層級，不再把版本號抄進環境限制段或交接。（y/n）」
+  - **n** → 缺少的各處記錄 `skipped`，跳至 ②-c-3。
+  - **y** → 對缺少的各處執行 ②-c-2。
+
+**②-c-2 插入與核查（每一處各做一次）：**
+
+以 `Read` 讀取 `<skill 目錄>/assets/templates/kunsu-claude.md`，取出該處的整行文字，以 `Edit` 插入軍師 CLAUDE.md，內容與範本逐字相同：
+
+| 處 | 自範本取出的行 | 插入錨點（須恰中一次） | 插入位置 |
+|---|---|---|---|
+| 規則 bullet | 以 `- **環境版本以正本為起點**` 開頭的整行 | `**子專案實作現況以原始碼為準**` | 錨點所在行的下一行 |
+| 指向句 | 以 `   - 環境版本引用：` 開頭的整行（保留縮排） | `撰寫指引（斷言層級紀律、引用檔名權威、更正交接）` | 錨點所在行的下一行 |
+
+1. **插入前確認錨點恰中一次**：`grep -cF '<插入錨點>' "<CURRENT_REPO_ROOT>/CLAUDE.md"`。
+   - **恰為 1** → 插入。
+   - **0 或 ≥ 2**（該段經在地改寫或重複）→ **不插入**，該處記錄 `manual`，向使用者印出自範本取出的整行文字，並說明「插入錨點無法唯一定位，請將上列文字手動放入 <副官慣例章節／工作流程第 5 步的清單>」。硬插會把規則放進不相干的段落。
+2. **插入後核查**：重跑 ②-c-1 中該處的 `grep -cF`，應恰為 1。
+   - 恰為 1 → 該處記錄 `migrated`。
+   - 否則 → 該處記錄 `failed`，明確回報「<該處> 補入失敗（錨句計數為 <N>），請對照範本 `kunsu-claude.md` 手動補正」。**不回滾**已完成的另一處，繼續後續步驟。
+
+**②-c-3 列出環境限制段含版本號的行（不論前面結果為何皆執行，唯讀）：**
+
+規則補上不代表環境限制段已整理完，所以即使兩處皆 `ok` 也要列。掃描所有以 `### ` 開頭且標題含「環境限制」的小節（**不要求**符合 `### <顯示名稱> 環境限制` 的標準形狀——在地軍師的標題可能沒有空格或帶括號後綴，照標準形狀比對會漏掉最需要整理的小節），範圍到下一個 `##`／`###` 標題為止：
+
+```bash
+python3 - "<CURRENT_REPO_ROOT>/CLAUDE.md" <<'PYEOF'
+import re, sys
+precise = re.compile(r'\d+\.\d+\.\d+|[a-z][a-z0-9._/-]*:\d[\w.-]*')
+major_minor = re.compile(r'\d+\.\d+')
+inside, hits = False, 0
+for no, line in enumerate(open(sys.argv[1], encoding='utf-8'), 1):
+    if line.startswith('#'):
+        inside = line.startswith('### ') and '環境限制' in line
+        continue
+    if not inside:
+        continue
+    kind = 'PRECISE' if precise.search(line) else 'MAJOR_MINOR' if major_minor.search(line) else None
+    if kind:
+        hits += 1
+        print(f'{kind}:{no}:{line.strip()[:160]}')
+if not hits:
+    print('NONE')
+PYEOF
+```
+
+向使用者分兩類呈現，附行號：
+
+- `PRECISE`（三段數字或「映像名:tag」）→「精確版本號，待移入環境版本正本」。
+- `MAJOR_MINOR`（兩段數字）→「主次版本，可能是合法的上限，請逐條判斷」。
+- `NONE` →「環境限制段沒有含版本號的行」。
+
+**本段不改寫任何一行、不改動小節標題、不掃描 playbook 等其他文件。** 哪句是約束、哪句是現況要逐條判斷，無法機械判定；改寫由軍師 session 於本子指令結束後自行進行。樣式會誤列非版本的數字（如日期），清單只供檢視。
+
+**②-c-4 檢查環境版本正本是否已存在（唯讀）：**
+
+```bash
+test -f "<CURRENT_REPO_ROOT>/docs/modules/各環境版本現況.md" && echo "exists" || echo "missing"
+```
+
+- **exists** → **不覆寫、不修改該檔**。以 `Read` 讀取該檔與骨架 `<skill 目錄>/assets/templates/kunsu-env-versions.md`，對照下列三項並向使用者列出差異，由軍師決定是否跟進：
+  1. 來源層級是否為四級，且含「實查」並寫明只有實查代表已部署的事實。
+  2. 「最後查證」欄的日期語意：二手來源的列填的是來源記載的事實日期，還是軍師讀到來源的日期。
+  3. 更新時機是否含「某列更新後檢討環境限制段由它導出的上限」。
+- **missing** → **不建檔**，提示「環境版本正本尚未建立；第一次要引用某環境正在執行的版本時，依骨架建立於 `docs/modules/各環境版本現況.md`。沒有部署環境的專案群不必建立」。
+
+本段不自帶 commit：`add-project` 由步驟 ⑩ 的完成回報與確認 commit 收尾（CLAUDE.md 本就在其宣告範圍內）；`sync-rules` 由該子指令自己的收尾步驟處理。若 `add-project` 在 ②-c 之後中止而未走到 ⑩，回報「CLAUDE.md 已補入環境版本規則但尚未 commit」並印出 `git add -- CLAUDE.md && git commit -m "docs: 補入環境版本規則" -- CLAUDE.md`，由使用者決定是否執行。
+
+**②-c 完成後統一跳轉**：
 - `APP_MIGRATION=skipped` → 記錄「軍師未遷移，本次跳過申請掃描」，跳至步驟 ⑤（訪談路徑）。
 - `APP_MIGRATION=ok` 或 `APP_MIGRATION=migrated` → 繼續步驟 ③。
 
-（`REPORT_MIGRATION` 結果不影響此跳轉——上報信箱缺失僅擋 kunsu-report skill 投遞，不擋申請審核流程。）
+（`REPORT_MIGRATION`、`RULE_MIGRATION` 與 `POINTER_MIGRATION` 的結果不影響此跳轉——上報信箱缺失僅擋 kunsu-report skill 投遞，環境版本規則缺失不影響申請審核流程。）
 
 ---
 
@@ -608,6 +696,7 @@ bash "<skill 目錄>/scripts/registry-merge.sh" \
 | 申請處理摘要 | 核准 N 份（列出各定案角色代碼）、退回 M 份（列出退回原因）、格式異常 K 份（若走申請路徑）|
 | 軍師 CLAUDE.md 關聯專案表 | 新增列 or 更新角色代碼欄／角色說明欄（列出具體角色代碼）|
 | 環境限制小節 | 新增段落（若有）/ 略過（無環境限制）|
+| 環境版本規則（②-c） | 規則 bullet 與交接撰寫指向句各自的結果（已具備／已補上／略過／需手動放置／補入失敗）；環境限制段含版本號的行數（精確版本號 N 行、主次版本 M 行）；環境版本正本（已存在並列出差異／尚未建立）|
 | kunsu-registry.json | registry-merge.sh 回報結果（新增 / 已登記更新 / 略過），登記值為**角色代碼** |
 | 申請歸檔 | 各申請檔 → `docs/applications/archive/`（status 已更新）|
 
@@ -782,3 +871,71 @@ bash "<skill 目錄>/scripts/registry-remove.sh" \
    **若使用者想完全放棄本次移除，明確提醒：不可先執行 `git checkout CLAUDE.md` 再重跑 `add-project`**——CLAUDE.md 還原後，`add-project` 的重複登記預檢會判定該子專案「已登記」，若使用者在該分支回答角色代碼不需異動，`add-project` 不會呼叫 `registry-merge.sh`，導致 registry 停留在已移除狀態、與還原後的 CLAUDE.md 重新產生漂移。正確作法二擇一：
    - **(a)** 保持 CLAUDE.md 目前未 commit 的刪除狀態，直接執行 `add-project` 走「首次登記」分支，同步補回 CLAUDE.md 列與 registry 登記；或
    - **(b)** 若已誤先 `git checkout CLAUDE.md`，改直接呼叫 `registry-merge.sh <sub-repo-abs-path> <kunsu-abs-path> <角色代碼>` 補回 registry，不透過 `add-project`。
+
+---
+
+## sync-rules 子指令
+
+在既有軍師（已由 kunsu-init skill 建立）中補上現行範本的規則文字，不新增也不移除任何子專案。目前涵蓋一項：環境版本規則（副官慣例的「環境版本以正本為起點」bullet 與交接撰寫步驟的指向句）。`add-project` 的步驟 ②-c 會在新增子專案時順帶偵測同一件事；本子指令讓不新增子專案的軍師也能補上（ADR 006 Decision 5 修訂註記：僅限以 CLAUDE.md 錨句偵測的規則型遷移；目錄型遷移仍內建於 `add-project`）。
+
+**必須在軍師根目錄下的 session 執行此子指令。**
+
+**本子指令只寫入軍師自己的 CLAUDE.md；不讀寫任何子專案目錄、不建立目錄、不修改環境版本正本或 playbook 等其他文件、不動全域 registry——不構成「軍師對子專案唯讀」（Invariant 2）的例外。**
+
+---
+
+### ①：身分驗證
+
+與 `add-project` 步驟①完全相同：
+
+```bash
+git rev-parse --show-toplevel
+```
+
+```bash
+python3 - "<CURRENT_REPO_ROOT>" <<'PYEOF'
+import json, os, sys
+reg = os.path.expanduser("~/.claude/kunsu-registry.json")
+if not os.path.exists(reg):
+    print("not_found"); sys.exit(0)
+try:
+    data = json.load(open(reg))
+except Exception:
+    print("json_error"); sys.exit(0)
+kunsu_paths = {e["kunsu"] for entries in data.values() for e in entries}
+print("ok" if sys.argv[1] in kunsu_paths else "not_kunsu")
+PYEOF
+```
+
+- **`not_found`**：報錯「`~/.claude/kunsu-registry.json` 不存在，請先執行 kunsu-init skill 建立軍師並完成登記。」終止。
+- **`json_error`**：報錯「kunsu-registry.json 格式損壞，請手動修復後再執行 sync-rules。」終止。
+- **`not_kunsu`**：報錯「請於軍師根目錄執行 sync-rules（當前路徑 `<CURRENT_REPO_ROOT>` 未登記為任何軍師）。」終止。
+- **`ok`**：繼續步驟②。
+
+---
+
+### ②：執行環境版本規則遷移
+
+執行 `add-project` 步驟「②-c：環境版本規則遷移偵測」的 ②-c-1 至 ②-c-4，步驟與判斷完全相同，不在此重寫。該段末尾關於 `add-project` 中止時的提示不適用於本子指令。
+
+---
+
+### ③：完成回報與確認 commit
+
+以正體中文摘要：
+
+| 位置 | 結果 |
+|------|------|
+| 規則 bullet（副官慣例） | 已具備／已補上／略過／需手動放置（附待放置的整行文字）／補入失敗 |
+| 交接撰寫指向句（工作流程第 5 步） | 同上 |
+| 環境限制段含版本號的行 | 精確版本號 N 行（待移入環境版本正本）、主次版本 M 行（可能是上限，逐條判斷），附行號；或「無」 |
+| 環境版本正本 | 已存在（列出與骨架的差異，未修改該檔）／尚未建立（首次引用時依骨架自建） |
+
+列出的行由軍師 session 於本子指令結束後自行改寫：精確版本號移入環境版本正本並標明來源層級，環境限制段只留上限與理由；每一條改寫前向使用者確認。
+
+**確認 commit（協議步驟，比照 ADR 009）**：
+
+1. **核對**：`git status --porcelain -- CLAUDE.md` 確認 `<CURRENT_REPO_ROOT>/CLAUDE.md` 確有待提交變更。**無變更**（兩處皆已具備、略過或需手動放置）→ 回報「CLAUDE.md 無異動，無需 commit」，**不產生空 commit**。
+2. **確認**：以阻塞式確認（見 Agent 對應表；工具不可用時的 agent 判定規則依 handoff「確認 commit（協議步驟）」節）詢問「是否 commit 本次補入的環境版本規則？（訊息：`docs: 補入環境版本規則`）」。
+3. **確認後執行**：`git add -- <CURRENT_REPO_ROOT>/CLAUDE.md && git commit -m "docs: 補入環境版本規則" -- <CURRENT_REPO_ROOT>/CLAUDE.md`（只帶 CLAUDE.md 一個路徑；不用 `git add -A`——軍師 repo 常有未 commit 的回覆、申請與上報，寬範圍暫存會夾帶它們並清除「未 commit 即未處理」訊號；`-m` 在 `--` 之前，commit 收斂宣告範圍，ADR 018）。**絕不 push**。
+4. **取消時**：CLAUDE.md 的變更留在 working tree 未 commit，回報可稍後手動執行的 `git add`＋`git commit` 指令。

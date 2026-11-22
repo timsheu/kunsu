@@ -33,6 +33,7 @@ status: accepted
 3. **tripwire 分類規則**：申請信箱頂層 `*.md` 的新增＝新申請；「頂層→`archive/`」的搬移（可攜帶 frontmatter 更新）＝授權歸檔；`archive/` 內新增＝合法；反向搬移、頂層修改與刪除、外部搬入＝異常硬停。rename 豁免採雙側核驗（src 頂層＋dst archive/，缺一即異常）。掃描實作為 `scan-applications.sh`，置於 kunsu-inbox（信箱掃描域），`add-project` 跨 skill 呼叫部署路徑，不複製副本。
 4. **審核結果以 frontmatter 更新落檔**：歸檔當下由軍師更新申請檔 `status`（`approved`／`rejected`，退回附 `decision_note`）後 `git mv` 至 `archive/`。此處**刻意偏離** handoff 本體「絕不編輯」的嚴格慣例：該慣例防的是跨 repo 雙寫入方的版本漂移，而歸檔時點僅剩軍師單一寫入方、漂移條件不成立；換得單檔可查（Obsidian dataview 可依 `status` 檢視申請歷史）。申請檔於頂層待審期間仍為不可變快照，由 tripwire 守護。
 5. **既有軍師遷移內建於 add-project**：偵測缺 `docs/applications/` 時提議補建目錄並比照範本補協議文字，Grep 完成核查、失敗明確回報不回滾；子專案端投遞前檢查目標軍師已有信箱，未遷移即導引不投遞。不做獨立遷移指令。
+   > 修訂註記（2026-11-22，[計畫](../plans/2026-11-22-1651-feat-env-version-record-template-plan.md) KTD6）：「不做獨立遷移指令」放寬一項——以軍師 CLAUDE.md 錨句偵測的**規則型遷移**（首例：環境版本規則，add-project ②-c）可由 `sync-rules` 子指令直接叫用。原條文對目錄型遷移（申請信箱、上報信箱）仍成立：它們伴隨新增子專案發生，內建於 add-project 即可。放寬理由：規則型遷移沒有伴隨的新增動作，只掛在 add-project 時，不新增子專案的既有軍師永遠不會觸發偵測，拿不到新規則。邊界：`sync-rules` 不另寫遷移步驟，只做身分驗證後執行 ②-c 同一段，步驟本體仍只有一份；不建目錄、不寫入 CLAUDE.md 以外的檔案。
 
 ## Consequences
 
