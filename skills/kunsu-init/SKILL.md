@@ -403,7 +403,7 @@ test -d "<CURRENT_REPO_ROOT>/docs/applications" && echo "ok" || echo "missing"
 test -d "<CURRENT_REPO_ROOT>/docs/reports" && echo "ok" || echo "missing"
 ```
 
-- **ok** → 記錄 `REPORT_MIGRATION=ok`，繼續（見下方統一跳轉）。
+- **ok** → 記錄 `REPORT_MIGRATION=ok`，繼續執行 ②-c。
 - **missing**（尚未補建上報信箱的軍師）→ 以阻塞式確認（見 Agent 對應表）提議遷移：「本軍師尚無上報信箱（`docs/reports/`）。是否補建並在 CLAUDE.md 補入上報信箱協議？補建後子專案才能以 kunsu-report skill 投遞上報。（y/n）」
   - **y → 執行遷移三步：**
     1. **補建目錄**：
@@ -419,9 +419,9 @@ test -d "<CURRENT_REPO_ROOT>/docs/reports" && echo "ok" || echo "missing"
     3. **完成核查（兩條，防半更新）**：
        - `grep -c 'docs/reports/' "<CURRENT_REPO_ROOT>/CLAUDE.md"` 應大於 0（上報信箱協議已插入）。
        - `grep -c '兩個信箱是唯一的例外授權' "<CURRENT_REPO_ROOT>/CLAUDE.md"` 應為 0（雙信箱 bullet 已改寫為三信箱表述；此為軍師 CLAUDE.md 雙信箱版 bullet 的專屬前綴，三信箱改寫後不復存在）。**勿縮短核查字串為「唯一的例外授權」——三信箱新 bullet 本身即「三個信箱是唯一的例外授權…」，含該短子串，會把正確遷移誤判成半更新**。
-       任一條核查失敗 → 明確回報失敗項目：「目錄已補建，但 CLAUDE.md 協議文字補入不完整（上報信箱章節缺失／雙信箱 bullet 未改寫為三信箱表述）。請對照範本 `kunsu-claude.md` 手動補正。」**不回滾已建目錄**，記錄 `REPORT_MIGRATION=migrated`（目錄已建），繼續（見下方統一跳轉）。
-    → 三步執行完畢：記錄 `REPORT_MIGRATION=migrated`，繼續（見下方統一跳轉）。
-  - **n → 拒絕遷移**：記錄 `REPORT_MIGRATION=skipped`，繼續（見下方統一跳轉）。
+       任一條核查失敗 → 明確回報失敗項目：「目錄已補建，但 CLAUDE.md 協議文字補入不完整（上報信箱章節缺失／雙信箱 bullet 未改寫為三信箱表述）。請對照範本 `kunsu-claude.md` 手動補正。」**不回滾已建目錄**，記錄 `REPORT_MIGRATION=migrated`（目錄已建），繼續執行 ②-c。
+    → 三步執行完畢：記錄 `REPORT_MIGRATION=migrated`，繼續執行 ②-c。
+  - **n → 拒絕遷移**：記錄 `REPORT_MIGRATION=skipped`，繼續執行 ②-c。
 
 ---
 
@@ -469,31 +469,42 @@ grep -cF '環境版本引用：' "<CURRENT_REPO_ROOT>/CLAUDE.md"
 ```bash
 python3 - "<CURRENT_REPO_ROOT>/CLAUDE.md" <<'PYEOF'
 import re, sys
+noise = re.compile(r'\b\d+\.\d+\.\d+\.\d+\b|localhost:\d+')
 precise = re.compile(r'\d+\.\d+\.\d+|[a-z][a-z0-9._/-]*:\d[\w.-]*')
 major_minor = re.compile(r'\d+\.\d+')
-inside, hits = False, 0
+heading = re.compile(r'#{1,3} ')
+inside = fenced = False
+sections = hits = 0
 for no, line in enumerate(open(sys.argv[1], encoding='utf-8'), 1):
-    if line.startswith('#'):
+    if line.lstrip().startswith('```'):
+        fenced = not fenced
+        continue
+    if not fenced and heading.match(line):
         inside = line.startswith('### ') and '環境限制' in line
+        sections += inside
         continue
     if not inside:
         continue
-    kind = 'PRECISE' if precise.search(line) else 'MAJOR_MINOR' if major_minor.search(line) else None
+    text = noise.sub('', line)
+    kind = 'PRECISE' if precise.search(text) else 'MAJOR_MINOR' if major_minor.search(text) else None
     if kind:
         hits += 1
         print(f'{kind}:{no}:{line.strip()[:160]}')
-if not hits:
+if not sections:
+    print('NO_SECTION')
+elif not hits:
     print('NONE')
 PYEOF
 ```
 
 向使用者分兩類呈現，附行號：
 
-- `PRECISE`（三段數字或「映像名:tag」）→「精確版本號，待移入環境版本正本」。
+- `PRECISE`（三段數字或「映像名:tag」）→「疑似精確版本號，逐條確認後再移入環境版本正本」。
 - `MAJOR_MINOR`（兩段數字）→「主次版本，可能是合法的上限，請逐條判斷」。
 - `NONE` →「環境限制段沒有含版本號的行」。
+- `NO_SECTION` →「CLAUDE.md 沒有任何標題含『環境限制』的 `###` 小節，未掃描」（與 `NONE` 區分：沒有可掃的小節，不是掃了沒中）。
 
-**本段不改寫任何一行、不改動小節標題、不掃描 playbook 等其他文件。** 哪句是約束、哪句是現況要逐條判斷，無法機械判定；改寫由軍師 session 於本子指令結束後自行進行。樣式會誤列非版本的數字（如日期），清單只供檢視。
+**本段不改寫任何一行、不改動小節標題、不掃描 playbook 等其他文件。** 哪句是約束、哪句是現況要逐條判斷，無法機械判定；改寫由軍師 session 於本子指令結束後自行進行。小節範圍只以 fenced code block 之外的 `#`～`###` 標題為界，`####` 子標題與程式碼區塊內的 `#` 註解不中斷小節。樣式已排除 IPv4 位址與 `localhost:埠號`，仍可能誤列其他非版本的數字（如日期、其他主機的埠號），清單只供檢視，逐條確認後才動。
 
 **②-c-4 檢查環境版本正本是否已存在（唯讀）：**
 
@@ -556,7 +567,7 @@ git -C "<path>" rev-parse --show-toplevel 2>/dev/null || echo "invalid"
 
 每份申請以阻塞式確認呈現摘要（顯示名稱、路徑、提議角色代碼、角色說明、環境限制、自我驗證、技術棧），選項：
 
-**環境限制含精確版本號時的核准前改寫**：申請的環境限制若含執行中的精確版本（修補版號或映像 tag，例：「MariaDB 11.4.13」「`redis:6.2.21-alpine`」），核准前先改寫成上限與理由（例：「MariaDB 11.4 為上限」）再進步驟 ⑥ 寫入 CLAUDE.md，並在摘要中向使用者呈現改寫前後的文字；主版本.次版本形式的上限屬合法約束，不必改。移出的精確版本依環境版本正本（`docs/modules/各環境版本現況.md`）是否存在分兩種處理——**已存在**：在正本對應服務新增或更新一列，來源層級填「回覆」並註明申請檔名（子專案自述屬二手資訊，未實查）；**不存在**：不建檔，只在摘要提示「此版本尚未入環境版本正本，首次引用時依骨架建立並實查」。理由：申請的環境限制會逐字寫進 CLAUDE.md，精確版本寫進去就成了正本之外的第二份版本號，環境升版時無人更新。
+**環境限制含精確版本號時的核准前改寫**：申請的環境限制若含執行中的精確版本（修補版號或映像 tag，例：「MariaDB 11.4.13」「`redis:6.2.21-alpine`」），核准前先改寫成上限與理由（例：「MariaDB 11.4 為上限」）再進步驟 ⑥ 寫入 CLAUDE.md，並在摘要中向使用者呈現改寫前後的文字；主版本.次版本形式的上限屬合法約束，不必改。移出的精確版本**不在核准時寫入環境版本正本**（`docs/modules/各環境版本現況.md`，不論該檔是否存在）：只在摘要提示「申請自述版本 <版本> 未入環境版本正本；需要引用時由軍師實查後記入，或以來源層級『回覆』並註明申請檔名記入」。不在核准流程內寫入的原因有二——子專案自述屬二手資訊，直接寫入可能覆蓋正本中已實查的列；本子指令的確認 commit 宣告範圍不含正本，寫入後會留在 working tree 未被提交。理由：申請的環境限制會逐字寫進 CLAUDE.md，精確版本寫進去就成了正本之外的第二份版本號，環境升版時無人更新。
 
 - **核准（採用提議角色代碼）**
 - **修改角色代碼後核准**：追問定案角色代碼（代碼定案權在軍師）。追問時提醒：**此代碼即 handoff `to:` 的唯一來源，務必精確且為短、kebab-case（宜 ≤ 20 字、不含軍師名前綴）**——與既有交接文件的 `to:` 不一致會使 kunsu-inbox skill 篩選失效。（角色說明可一併調整，只寫入 CLAUDE.md 說明欄、不影響比對。）
@@ -916,6 +927,14 @@ PYEOF
 
 ### ②：執行環境版本規則遷移
 
+先記錄 CLAUDE.md 在本子指令開始前是否已有未 commit 的改動：
+
+```bash
+git status --porcelain -- CLAUDE.md
+```
+
+有輸出 → 記錄 `PRE_DIRTY=yes`（步驟③據此決定是否代為 commit）；無輸出 → `PRE_DIRTY=no`。
+
 執行 `add-project` 步驟「②-c：環境版本規則遷移偵測」的 ②-c-1 至 ②-c-4，步驟與判斷完全相同，不在此重寫。該段末尾關於 `add-project` 中止時的提示不適用於本子指令。
 
 ---
@@ -935,7 +954,7 @@ PYEOF
 
 **確認 commit（協議步驟，比照 ADR 009）**：
 
-1. **核對**：`git status --porcelain -- CLAUDE.md` 確認 `<CURRENT_REPO_ROOT>/CLAUDE.md` 確有待提交變更。**無變更**（兩處皆已具備、略過或需手動放置）→ 回報「CLAUDE.md 無異動，無需 commit」，**不產生空 commit**。
+1. **核對**：以 ②-c 的結果判斷，不以 `git status` 判斷——`RULE_MIGRATION` 與 `POINTER_MIGRATION` 皆非 `migrated`（兩處皆已具備、略過、需手動放置或補入失敗）→ 回報「本次未寫入 CLAUDE.md，無需 commit」，**不產生空 commit**。至少一處為 `migrated` 但 `PRE_DIRTY=yes` → **不代為 commit**：CLAUDE.md 在本子指令開始前已有未 commit 的改動，path-limited commit 無法只提交本次補入的行，代為提交會把那些無關改動記成「補入環境版本規則」；回報這一點，請使用者先分開在途改動後自行 commit。至少一處為 `migrated` 且 `PRE_DIRTY=no` → 繼續第 2 點。
 2. **確認**：以阻塞式確認（見 Agent 對應表；工具不可用時的 agent 判定規則依 handoff「確認 commit（協議步驟）」節）詢問「是否 commit 本次補入的環境版本規則？（訊息：`docs: 補入環境版本規則`）」。
 3. **確認後執行**：`git add -- <CURRENT_REPO_ROOT>/CLAUDE.md && git commit -m "docs: 補入環境版本規則" -- <CURRENT_REPO_ROOT>/CLAUDE.md`（只帶 CLAUDE.md 一個路徑；不用 `git add -A`——軍師 repo 常有未 commit 的回覆、申請與上報，寬範圍暫存會夾帶它們並清除「未 commit 即未處理」訊號；`-m` 在 `--` 之前，commit 收斂宣告範圍，ADR 018）。**絕不 push**。
 4. **取消時**：CLAUDE.md 的變更留在 working tree 未 commit，回報可稍後手動執行的 `git add`＋`git commit` 指令。

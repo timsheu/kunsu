@@ -440,10 +440,14 @@ if [[ -f "${REG}" ]] && command -v python3 >/dev/null; then
     if [[ "${csz}" -ge 52428 ]]; then
       wn "H  live 軍師 CLAUDE.md 達 ${csz} bytes（project_doc_max_bytes 65536 的 80% 以上，Codex 超限靜默截尾）：${kroot}"
     fi
-    if grep -q '規劃前既有盤點' "${kroot}/CLAUDE.md" && grep -q '勿自標' "${kroot}/CLAUDE.md" && grep -q 'corrected_by' "${kroot}/CLAUDE.md" && grep -q '副官' "${kroot}/CLAUDE.md" && grep -q '不豁免' "${kroot}/CLAUDE.md" && grep -q '宣告範圍' "${kroot}/CLAUDE.md" && grep -q '以原始碼為準' "${kroot}/CLAUDE.md" && grep -q 'Agent 對應表' "${kroot}/CLAUDE.md" && grep -qF '**環境版本以正本為起點**' "${kroot}/CLAUDE.md" && [[ -L "${kroot}/AGENTS.md" ]] && grep -q '不豁免' "${kroot}/CONCEPTS.md" 2>/dev/null && grep -q 'archive-handoff' "${kroot}/CONCEPTS.md" 2>/dev/null && grep -q 'archive-todo' "${kroot}/CONCEPTS.md" 2>/dev/null && grep -q 'depends_on' "${kroot}/CLAUDE.md" && grep -q 'depends_on' "${kroot}/CONCEPTS.md" 2>/dev/null && grep -q '線總表' "${kroot}/CLAUDE.md" && grep -q '線總表' "${kroot}/CONCEPTS.md" 2>/dev/null; then
+    if grep -q '規劃前既有盤點' "${kroot}/CLAUDE.md" && grep -q '勿自標' "${kroot}/CLAUDE.md" && grep -q 'corrected_by' "${kroot}/CLAUDE.md" && grep -q '副官' "${kroot}/CLAUDE.md" && grep -q '不豁免' "${kroot}/CLAUDE.md" && grep -q '宣告範圍' "${kroot}/CLAUDE.md" && grep -q '以原始碼為準' "${kroot}/CLAUDE.md" && grep -q 'Agent 對應表' "${kroot}/CLAUDE.md" && [[ -L "${kroot}/AGENTS.md" ]] && grep -q '不豁免' "${kroot}/CONCEPTS.md" 2>/dev/null && grep -q 'archive-handoff' "${kroot}/CONCEPTS.md" 2>/dev/null && grep -q 'archive-todo' "${kroot}/CONCEPTS.md" 2>/dev/null && grep -q 'depends_on' "${kroot}/CLAUDE.md" && grep -q 'depends_on' "${kroot}/CONCEPTS.md" 2>/dev/null && grep -q '線總表' "${kroot}/CLAUDE.md" && grep -q '線總表' "${kroot}/CONCEPTS.md" 2>/dev/null; then
       ok "H  live 軍師遷移標記齊全：${kroot}"
     else
-      wn "H  live 軍師疑似漏遷移（缺 規劃前既有盤點／勿自標／corrected_by／副官／不豁免（CLAUDE 與 CONCEPTS 各自）／宣告範圍／以原始碼為準／Agent 對應表（CLAUDE）／AGENTS.md symlink／archive-handoff／archive-todo（CONCEPTS）／depends_on（CLAUDE 與 CONCEPTS 各自）／線總表（CLAUDE 與 CONCEPTS 各自）／環境版本以正本為起點（CLAUDE；於該軍師 session 以 kunsu-init 的 sync-rules 子指令補上） 之一）：${kroot}"
+      wn "H  live 軍師疑似漏遷移（缺 規劃前既有盤點／勿自標／corrected_by／副官／不豁免（CLAUDE 與 CONCEPTS 各自）／宣告範圍／以原始碼為準／Agent 對應表（CLAUDE）／AGENTS.md symlink／archive-handoff／archive-todo（CONCEPTS）／depends_on（CLAUDE 與 CONCEPTS 各自）／線總表（CLAUDE 與 CONCEPTS 各自） 之一）：${kroot}"
+    fi
+    # 環境版本規則獨立一行：屬各軍師自助遷移，可能長期未補；併入上方 AND 鏈會讓常駐 WARN 遮蔽其他標記日後的真漏遷移
+    if ! grep -qF '**環境版本以正本為起點**' "${kroot}/CLAUDE.md"; then
+      wn "H  live 軍師尚未補上環境版本規則（缺「環境版本以正本為起點」；於該軍師 session 執行 kunsu-init 的 sync-rules 子指令補上）：${kroot}"
     fi
   done < <(python3 -c "
 import json
