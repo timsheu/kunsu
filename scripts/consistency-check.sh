@@ -44,6 +44,9 @@
 #      plist 範本只含五個白名單鍵且 RunAtLoad true、日誌固定 /tmp/kunsu-dashboard.log
 #   S. 本機 URL 白名單（ADR 020 第二支柱）：skills/（kunsu-dashboard 除外）不得出現本機 HTTP URL，
 #      白名單僅 KUNSU_ZOEKT_URL 所在行
+#   U. 環境版本正本錨句（2026-11-22）：範本規則 bullet 與交接撰寫指向句各恰一次且互不含對方字面、
+#      kunsu-init SKILL.md ②-c 與 sync-rules 存在並引用同一錨句、骨架檔四級來源與檢討上限條目、
+#      環境限制六處填寫指引皆含新措辭、範本與母體 CONCEPTS 詞條
 
 set -u
 cd "$(dirname "$0")/.." || exit 1
@@ -262,7 +265,8 @@ if command -v python3 >/dev/null; then
 import re
 files = ["skills/handoff/SKILL.md","skills/todo/SKILL.md","skills/kunsu-init/SKILL.md","skills/kunsu-inbox/SKILL.md",
          "skills/kunsu-apply/SKILL.md","skills/kunsu-report/SKILL.md","skills/kunsu-list/SKILL.md",
-         "skills/kunsu-init/assets/templates/kunsu-claude.md","skills/kunsu-init/assets/templates/kunsu-concepts.md","skills/kunsu-init/assets/templates/kunsu-docs-readme.md"]
+         "skills/kunsu-init/assets/templates/kunsu-claude.md","skills/kunsu-init/assets/templates/kunsu-concepts.md","skills/kunsu-init/assets/templates/kunsu-docs-readme.md",
+         "skills/kunsu-init/assets/templates/kunsu-env-versions.md"]
 LITERALS = ["AskUserQuestion","ListAgents","SendMessage","$CLAUDE_SKILL_DIR","~/.claude/settings.json","~/.claude/skills"]
 SLASH = re.compile(r'(?:^|[\s（「：(])/(?:handoff|todo|kunsu-(?:init|inbox|apply|report|list)|kb|ce-[a-z-]+)(?:[\s）」、。)]|$)', re.M)
 bad = []
@@ -436,10 +440,10 @@ if [[ -f "${REG}" ]] && command -v python3 >/dev/null; then
     if [[ "${csz}" -ge 52428 ]]; then
       wn "H  live 軍師 CLAUDE.md 達 ${csz} bytes（project_doc_max_bytes 65536 的 80% 以上，Codex 超限靜默截尾）：${kroot}"
     fi
-    if grep -q '規劃前既有盤點' "${kroot}/CLAUDE.md" && grep -q '勿自標' "${kroot}/CLAUDE.md" && grep -q 'corrected_by' "${kroot}/CLAUDE.md" && grep -q '副官' "${kroot}/CLAUDE.md" && grep -q '不豁免' "${kroot}/CLAUDE.md" && grep -q '宣告範圍' "${kroot}/CLAUDE.md" && grep -q '以原始碼為準' "${kroot}/CLAUDE.md" && grep -q 'Agent 對應表' "${kroot}/CLAUDE.md" && [[ -L "${kroot}/AGENTS.md" ]] && grep -q '不豁免' "${kroot}/CONCEPTS.md" 2>/dev/null && grep -q 'archive-handoff' "${kroot}/CONCEPTS.md" 2>/dev/null && grep -q 'archive-todo' "${kroot}/CONCEPTS.md" 2>/dev/null && grep -q 'depends_on' "${kroot}/CLAUDE.md" && grep -q 'depends_on' "${kroot}/CONCEPTS.md" 2>/dev/null && grep -q '線總表' "${kroot}/CLAUDE.md" && grep -q '線總表' "${kroot}/CONCEPTS.md" 2>/dev/null; then
+    if grep -q '規劃前既有盤點' "${kroot}/CLAUDE.md" && grep -q '勿自標' "${kroot}/CLAUDE.md" && grep -q 'corrected_by' "${kroot}/CLAUDE.md" && grep -q '副官' "${kroot}/CLAUDE.md" && grep -q '不豁免' "${kroot}/CLAUDE.md" && grep -q '宣告範圍' "${kroot}/CLAUDE.md" && grep -q '以原始碼為準' "${kroot}/CLAUDE.md" && grep -q 'Agent 對應表' "${kroot}/CLAUDE.md" && grep -qF '**環境版本以正本為起點**' "${kroot}/CLAUDE.md" && [[ -L "${kroot}/AGENTS.md" ]] && grep -q '不豁免' "${kroot}/CONCEPTS.md" 2>/dev/null && grep -q 'archive-handoff' "${kroot}/CONCEPTS.md" 2>/dev/null && grep -q 'archive-todo' "${kroot}/CONCEPTS.md" 2>/dev/null && grep -q 'depends_on' "${kroot}/CLAUDE.md" && grep -q 'depends_on' "${kroot}/CONCEPTS.md" 2>/dev/null && grep -q '線總表' "${kroot}/CLAUDE.md" && grep -q '線總表' "${kroot}/CONCEPTS.md" 2>/dev/null; then
       ok "H  live 軍師遷移標記齊全：${kroot}"
     else
-      wn "H  live 軍師疑似漏遷移（缺 規劃前既有盤點／勿自標／corrected_by／副官／不豁免（CLAUDE 與 CONCEPTS 各自）／宣告範圍／以原始碼為準／Agent 對應表（CLAUDE）／AGENTS.md symlink／archive-handoff／archive-todo（CONCEPTS）／depends_on（CLAUDE 與 CONCEPTS 各自）／線總表（CLAUDE 與 CONCEPTS 各自） 之一）：${kroot}"
+      wn "H  live 軍師疑似漏遷移（缺 規劃前既有盤點／勿自標／corrected_by／副官／不豁免（CLAUDE 與 CONCEPTS 各自）／宣告範圍／以原始碼為準／Agent 對應表（CLAUDE）／AGENTS.md symlink／archive-handoff／archive-todo（CONCEPTS）／depends_on（CLAUDE 與 CONCEPTS 各自）／線總表（CLAUDE 與 CONCEPTS 各自）／環境版本以正本為起點（CLAUDE；於該軍師 session 以 kunsu-init 的 sync-rules 子指令補上） 之一）：${kroot}"
     fi
   done < <(python3 -c "
 import json
@@ -522,6 +526,57 @@ if [[ -z "${t_fail}" ]]; then
   ok "T  推播匹配 offline 排除錨句：SKILL.md 恰 2、CONCEPTS／README／kc.fish ≥1、ADR 015 ≥2"
 else
   ng "T  推播匹配 offline 排除錨句缺漏：${t_fail}（活 session 會被同名 offline 殘影拖成多重命中而漏發，規則副本須同步載明排除）"
+fi
+
+# --- U. 環境版本正本錨句（2026-11-22）：規則、指向句、遷移偵測、骨架、六處填寫指引、CONCEPTS 詞條 ---
+# 規則錨句含粗體標記；範本、SKILL.md ②-c 偵測與 H 鏈三處使用同一字面，單側改字會讓遷移偵測靜默失效。
+ut="skills/kunsu-init/assets/templates/kunsu-claude.md"
+us="skills/kunsu-init/SKILL.md"
+ue="skills/kunsu-init/assets/templates/kunsu-env-versions.md"
+u_rule='**環境版本以正本為起點**'
+u_ptr='環境版本引用：'
+u_fail=""
+[[ "$(grep -cF -- "${u_rule}" "${ut}" || true)" -eq 1 ]] || u_fail+="範本規則錨句須恰 1 "
+[[ "$(grep -cF -- "${u_ptr}" "${ut}" || true)" -eq 1 ]] || u_fail+="範本指向句錨句須恰 1 "
+if grep -F -- "${u_ptr}" "${ut}" | grep -qF '環境版本以正本為起點'; then u_fail+="指向句不得含規則錨句字面 "; fi
+[[ "$(grep -cF -- "${u_rule}" "${us}" || true)" -ge 2 ]] || u_fail+="SKILL.md ②-c 須引用規則錨句（偵測與插入表） "
+[[ "$(grep -cF -- "${u_ptr}" "${us}" || true)" -ge 2 ]] || u_fail+="SKILL.md ②-c 須引用指向句錨句（偵測與插入表） "
+grep -q '^### ②-c：環境版本規則遷移偵測' "${us}" || u_fail+="SKILL.md 缺 ②-c 區段 "
+grep -q '^## sync-rules 子指令' "${us}" || u_fail+="SKILL.md 缺 sync-rules 子指令區段 "
+if [[ "${u_fail}" == "" ]]; then
+  ok "U  環境版本規則錨句：範本規則與指向句各恰 1、SKILL.md ②-c 與 sync-rules 引用同一字面"
+else
+  ng "U  環境版本規則錨句漂移：${u_fail}（遷移以錨句偵測，字面不一致時既有軍師會被誤判為已具備或重複插入）"
+fi
+u_fail=""
+if [[ -f "${ue}" ]]; then
+  for tier in '| 實查 |' '| 原始碼 |' '| 常駐文件 |' '| 回覆 |' '唯一代表已部署事實的層級' '由該版本導出的上限' '不填軍師讀到這份來源的日期'; do
+    grep -qF -- "${tier}" "${ue}" || u_fail+="骨架缺「${tier}」 "
+  done
+else
+  u_fail+="骨架檔不存在 "
+fi
+if [[ "${u_fail}" == "" ]]; then
+  ok "U  環境版本正本骨架：四級來源、實查為唯一已部署依據、最後查證日期語意、檢討上限條目齊全"
+else
+  ng "U  環境版本正本骨架缺漏：${u_fail}（缺來源層級或日期語意時，二手記載會被當成已查證的事實引用）"
+fi
+u_fail=""
+u_guide='歸環境版本正本'
+[[ "$(grep -cF -- "環境限制（選填）**：特殊限制或已知約束，只填上限與理由" "${us}" || true)" -eq 2 ]] || u_fail+="kunsu-init SKILL.md 兩處訪談說明 "
+[[ "$(grep -cF -- "環境限制（選填）**：特殊限制或已知約束，只填上限與理由" skills/kunsu-apply/SKILL.md || true)" -eq 1 ]] || u_fail+="kunsu-apply SKILL.md "
+[[ "$(grep -cF -- "${u_guide}" skills/kunsu-init/assets/templates/PLACEHOLDERS.md || true)" -ge 2 ]] || u_fail+="PLACEHOLDERS.md 兩處 "
+[[ "$(grep -c -- "constraints: .*${u_guide}" "${ut}" || true)" -eq 1 ]] || u_fail+="範本申請協議 constraints 欄 "
+grep -qF '環境限制含精確版本號時的核准前改寫' "${us}" || u_fail+="add-project 審核摘要的核准前改寫 "
+if [[ "${u_fail}" == "" ]]; then
+  ok "U  環境限制六處填寫指引皆指示只填上限、精確版本歸環境版本正本；審核摘要含核准前改寫"
+else
+  ng "U  環境限制填寫指引缺新措辭：${u_fail}（任一入口仍收精確版本號，就會經 add-project 寫進 CLAUDE.md 成為第二份版本號）"
+fi
+if grep -q '^### 環境版本正本' skills/kunsu-init/assets/templates/kunsu-concepts.md && grep -q '^### 環境版本正本' CONCEPTS.md; then
+  ok "U  範本與母體 CONCEPTS 皆有「環境版本正本」詞條"
+else
+  ng "U  範本 kunsu-concepts 或母體 CONCEPTS 缺「環境版本正本」詞條"
 fi
 
 echo "---"

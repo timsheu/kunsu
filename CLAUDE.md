@@ -30,10 +30,10 @@ skills/                → skill 原始碼
     SKILL.md           → add／list／done／rm 子指令，管理 docs/todos/ 一檔一項技術債（done 含殘項清點；done／rm 歸檔經 archive-todo.sh 腳本化，印待確認 commit 指令、不主動 commit）
     scripts/           → new-todo.sh、archive-todo.sh（todo 歸檔執行：status Edit＋依據回填→untracked 前置 add→git mv→add 目的地；`--done`／`--rm` 單一終態、`--from-handoff` 抑制指令輸出交由 archive-handoff.sh 聚合）
   kunsu-init/          → 軍師 scaffolding
-    SKILL.md           → 訪談→查證→產檔→vault→git→註冊表主流程＋add-project（申請審核制）＋remove-project（整筆移除）子指令
+    SKILL.md           → 訪談→查證→產檔→vault→git→註冊表主流程＋add-project（申請審核制；②-c 環境版本規則遷移偵測——錨句偵測、唯讀列出環境限制段含版本號的行、不覆寫既有環境版本正本）＋remove-project（整筆移除）＋sync-rules（既有軍師補範本規則，執行同一段 ②-c，ADR 006 Decision 5 修訂註記）子指令（v0.11.0）
     scripts/registry-merge.sh → 註冊表 read-merge-write（python3）
     scripts/registry-remove.sh → 註冊表 read-remove-write，獨立 exit code 區分冪等略過與成功移除（python3）
-    assets/templates/  → 軍師範本（CLAUDE.md／CONCEPTS.md／README／HOME dataview 區塊＋PLACEHOLDERS.md；工作流程第 3 步為條件式線總表——單／兩份交接不立 plan、同線 ≥3 份才由軍師自寫 `docs/plans/` 輕量總表、frontmatter `series` 與交接對齊；「Context 成本紀律」段——蒐集預設派副官、主線程輸出上限、一線一 session、brief 寫法配合委派路由器；工作流程第 1 步問「目標背後的目標」與同類問題第二次出現時提一次收口選項、第 5 步驗收標準優先指名外部裁判＋選附「拉高檢核」四問）
+    assets/templates/  → 軍師範本（CLAUDE.md／CONCEPTS.md／README／HOME dataview 區塊＋PLACEHOLDERS.md；工作流程第 3 步為條件式線總表——單／兩份交接不立 plan、同線 ≥3 份才由軍師自寫 `docs/plans/` 輕量總表、frontmatter `series` 與交接對齊；「Context 成本紀律」段——蒐集預設派副官、主線程輸出上限、一線一 session、brief 寫法配合委派路由器；工作流程第 1 步問「目標背後的目標」與同類問題第二次出現時提一次收口選項、第 5 步驗收標準優先指名外部裁判＋選附「拉高檢核」四問；副官慣例「環境版本以正本為起點」——引用執行中版本先讀環境版本正本、條件式自建、引用措辭帶查證日與來源層級、環境限制段只留上限；kunsu-env-versions.md 為環境版本正本骨架，只部署、不在 scaffold 時複製）
     assets/solutions/  → 兩篇種子沉澱文件（自母本通用化）
   kunsu-inbox/         → 跨 session 傳令自動化
     SKILL.md           → 模式偵測（獨立雙判斷）＋子 repo／軍師雙模式（軍師模式含收尾與分流提示行）
@@ -47,7 +47,7 @@ skills/                → skill 原始碼
     scripts/prompt_inbox_hook.py → UserPromptSubmit hook：軍師 repo 每句提問掃三信箱未 commit 新件，一行注入（首次列名、之後計數、輪替每份恰點名一次；自跑 git status 不呼叫 scan 腳本；狀態共用 kunsu-hook-state.json 的 prompt_inbox 鍵、差集自清；斜線指令與非軍師 repo 快退不啟動 git；fail-open，ADR 014 修訂註記）
     tests/             → pytest，session hook、UserPromptSubmit hook、git guard 與 handoff-graph CLI 測試
   kunsu-apply/         → 子專案端投遞申請加入
-    SKILL.md           → 自動偵測＋registry 選軍師＋守門與冪等預檢
+    SKILL.md           → 自動偵測＋registry 選軍師＋守門與冪等預檢（v0.2.1；環境限制只填上限與理由，精確版本歸環境版本正本）
     scripts/new-application.sh → 申請檔產檔（frontmatter＋防撞）
   kunsu-report/        → 子專案端投遞主動上報
     SKILL.md           → 僅服務已登記 repo＋信箱守門＋反向重導（是否其實是回覆）
@@ -98,6 +98,7 @@ install.sh             → 部署至 ~/.claude/skills/ 與 ~/.agents/skills/（C
 - 掃描統計檔的並發防護（2026-08-31 code review 發現）：多寫入端（scan／沙盤／hook／guard）無鎖且共用固定同名 .tmp，併寫可致半截 JSON 靜默重建、基線歸零且不記事件——候選修法 mkstemp＋flock＋重建時記 STATS_RESET 事件；advisory 體系實害低，另案評估。
 - `HISTORY_WARN` 一次性與 tripwire 同輪的呈現降級（2026-08-31 code review 發現）：同輪出現時 4b-3「立即停止」使警示被略過且基線照樣前進、警示不再現，僅剩統計檔可查（ADR 018 已明文「以統計檔為準」）；候選修法為未消費 warns 時基線不前進或 pending 重報，與沙盤／hook 顯示項合場評估。
 - 歸檔腳本與統計 IO 的複製體收斂（2026-08-31 code review cleanup 級發現；2026-09-01 archive-todo.sh 成為第三份同構複製體，債加深）：archive-report.sh、archive-handoff.sh 與 archive-todo.sh 約 200 行同構（含 frontmatter python heredoc、專案根定位、resolve_arg），pretooluse_git_guard.py 的 `_log_deny` 重抄 scan-replies.sh 統計寫入且漏 stale 自清——契約再修訂時單側改動會靜默漂移；候選修法為抽參數化共用入口與 `scan_stats.py`，屬重構級另案評估。
+- 環境版本正本規則的喚起率觀察（2026-11-22）：規則為純文字、無工具提示（使用者選定），本專案有同形失效先例（2026-09-28 條件式線總表 139 次產檔零喚起）。觀察方式——各軍師以 sync-rules 補上規則後，檢查新發交接是否出現未連結正本的執行中版本號；出現即代表文字規則不足，屆時重啟「刷新正本的獨立指令」或提示機制的另案評估。骨架格式源自尚未經實際引用的 ebook 藍本，格式若需調整，骨架、consistency-check U 項與 ②-c-4 差異項須一起改。
 - 產檔查重的觀察項（2026-09-01）：時間窗天數／筆數上限現為腳本頂部常數（14 天／8 筆），依實際使用噪訊比再調；上報查重（new-report.sh）與 reply 側維持不查重的界線照舊。
 
 ### 相關資產（唯讀參考）

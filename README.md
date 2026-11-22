@@ -16,7 +16,7 @@
 
 | Skill（Claude Code `/<name>`、Codex `$<name>`；沙盤與 hook 除外） | 用途 |
 |--------|------|
-| `kunsu-init` | 訪談式 scaffolding 建軍師（CLAUDE.md 五條不變量＋三信箱協議、規劃前既有盤點與副官慣例、Obsidian vault、git、註冊表登記）；含 `add-project`（申請審核制登記）與 `remove-project`（整筆移除登記）子指令 |
+| `kunsu-init` | 訪談式 scaffolding 建軍師（CLAUDE.md 五條不變量＋三信箱協議、規劃前既有盤點與副官慣例、Obsidian vault、git、註冊表登記）；含 `add-project`（申請審核制登記）、`remove-project`（整筆移除登記）與 `sync-rules`（既有軍師補上範本新增的規則，目前為環境版本規則）子指令 |
 | `kunsu-apply` | 子專案端投遞「申請加入軍師」到申請信箱，路徑與技術棧自動偵測；正式登記留給軍師端審核 |
 | `kunsu-inbox` | 跨 session 傳令：子專案列出待接手交接，軍師回報新回覆／新申請／新上報並跑 tripwire 核對，回報附收尾與分流提示（行動項落 todo、答案回填）；另含歷史夾帶偵測（歸檔 commit 夾帶未讀回覆、非歸檔 commit 新增 archive 檔）與掃描統計（`~/.claude/kunsu-scan-stats.json`，供評估「未 commit 即未處理」訊號的脆弱度）、上報歸檔腳本 `archive-report.sh`；兩支 hook 隨本 skill 一併部署 |
 | `kunsu-report` | 子專案端投遞「主動上報」到上報信箱；單向情報傳遞，不設軍師回覆義務 |
