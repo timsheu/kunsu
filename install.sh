@@ -193,7 +193,7 @@ fi
 echo ""
 echo "新開 agent session 即可使用 handoff、todo、kunsu-init、kunsu-inbox、kunsu-apply、kunsu-report 與 kunsu-list skill"
 echo "（Claude Code 以 /<name> 呼叫；Codex 以 \$<name> 呼叫或依 description 自動選用）。"
-echo "hook 與 config 為機器層級設定，須手動掛載：見 kunsu-inbox/SKILL.md 的「SessionStart hook」「PreToolUse git add 守門」與「Codex config 設定」三節。"
+echo "hook 與 config 為機器層級設定，須手動掛載：見 kunsu-inbox/SKILL.md 的「SessionStart hook」「UserPromptSubmit hook」「PreToolUse git add 守門」與「Codex config 設定」四節。"
 echo ""
 echo "kunsu-dashboard 不是可觸發的 skill（frontmatter 已以兩 agent 原生旗標停用選用）——"
 echo "見 <部署目錄>/kunsu-dashboard/SKILL.md 的安裝說明（pip install -r requirements.txt）；"
