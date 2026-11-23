@@ -35,12 +35,16 @@ def load(path):
 def analyze(path):
     usage = collections.Counter(); turns = 0; models = collections.Counter()
     id2name = {}; result_chars = collections.Counter(); agents = []
+    counted = set()   # 同一次模型回應（同 message id）會依 content block 拆成多行寫入，每行都帶同一份 usage，只計一次
     for e in load(path):
         m = e.get("message") or {}; c = m.get("content")
         if e.get("type") == "assistant":
-            turns += 1; models[m.get("model", "?")] += 1
-            for k in KEYS:
-                usage[k] += (m.get("usage") or {}).get(k, 0) or 0
+            mid = m.get("id") or id(m)
+            if mid not in counted:
+                counted.add(mid)
+                turns += 1; models[m.get("model", "?")] += 1
+                for k in KEYS:
+                    usage[k] += (m.get("usage") or {}).get(k, 0) or 0
             for b in c or []:
                 if b.get("type") == "tool_use":
                     id2name[b["id"]] = b["name"]
