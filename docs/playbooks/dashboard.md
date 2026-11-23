@@ -14,6 +14,8 @@ pip install -r requirements.txt    # 首次安裝，需 Python 3.10+
 
 重新整理瀏覽器頁面即觸發全新掃描，不跑背景服務；要停止服務直接在終端機 Ctrl-C。
 
+已安裝登入自動啟動的 LaunchAgent 時注意兩件事：LaunchAgent 的 port 不要與 `start.sh` 預設的 8000 共用，網址以你安裝時填的 port 為準；LaunchAgent 執行的是部署副本而非 repo 工作樹，每次重跑 `install.sh` 後須執行 `launchctl kickstart -k gui/$(id -u)/<label>` 重啟，否則服務仍在跑舊版程式（指令與 `<label>` 見 SKILL.md「登入自動啟動（選用）」）。
+
 ## 頁面一覽
 
 | 路由 | 用途 |
@@ -23,7 +25,7 @@ pip install -r requirements.txt    # 首次安裝，需 Python 3.10+
 | `/archive?k=<軍師目錄名>` | 已完成（archive）：所選軍師已歸檔的交接 |
 | `/handoff?k=<軍師目錄名>&f=<相對路徑>` | 全文頁：單份交接／申請／上報的 Markdown 渲染與同串回覆（舊→新） |
 
-`k` 只接受註冊表中的軍師目錄名，不符時改顯示第一個軍師並提示；不帶 `k` 時顯示目錄名排序第一的軍師。
+`k` 只接受註冊表中的軍師目錄名，不符時改顯示第一個軍師並提示；不帶 `k` 時顯示依軍師完整路徑排序第一的軍師（軍師切換列也是這個順序）。
 
 ## 看板（首頁）
 
@@ -64,11 +66,11 @@ pip install -r requirements.txt    # 首次安裝，需 Python 3.10+
 
 ## 全文頁（/handoff）
 
-看板卡片與 archive 列表的「全文」連結開啟 `/handoff?k=<軍師目錄名>&f=<相對軍師根目錄的路徑>`：上方為 frontmatter 鍵值表，中段為交接本體的 Markdown 伺服器端渲染（markdown-it-py，CommonMark＋表格），交接另列依賴區塊（`depends_on` 各項的標題與是否已完成、`corrected_by`）與同串回覆（依 `in_reply_to` 比對，舊→新，各附 status／verify／created）；申請與上報只渲染本文。頁面只回 text/html；唯一的 JS 是主題切換（見下）。
+看板卡片與 archive 列表的「全文」連結開啟 `/handoff?k=<軍師目錄名>&f=<相對軍師根目錄的路徑>`：上方為 frontmatter 鍵值表，中段為交接本體的 Markdown 伺服器端渲染（markdown-it-py，CommonMark＋表格），交接另列依賴區塊（`depends_on` 各項的標題與是否已完成、`corrected_by`）與同串回覆（依 `in_reply_to` 比對，舊→新，各附 status／verify／created）；申請與上報只渲染本文。頁面只回 text/html；唯一的 JS 是主題切換（見上方「配色主題」）。
 
 - `f` 只接受四個目錄（`docs/handoffs/`、`docs/handoffs/archive/`、`docs/applications/`、`docs/reports/`）底下的單層 `.md` 檔名，含 `..`、反斜線、多層目錄、其他目錄或不存在的檔案一律回 404，並以實體路徑核對擋 symlink 逃逸；`k` 不命中軍師也回 404（不像看板會退回第一個軍師）。
 - 原文中的 HTML 標籤一律轉義為文字，`javascript:` 等協定的連結不會成為可點連結。
-- 未安裝 markdown-it-py 時降級為純文字 `<pre>` 並顯示提示句，不影響其他頁面。
+- 未安裝 markdown-it-py 時降級為純文字 `<pre>` 並顯示提示句，不影響其他頁面。這個降級只在直接以 `python3 app/main.py` 啟動（含 LaunchAgent）時發生；`./start.sh` 啟動前會檢查四個 pip 依賴，缺 markdown-it-py 即印出錯誤並退出、不啟動服務。
 - 全文頁純讀檔，不執行信箱掃描腳本。
 
 ## 完整彙整頁（/overview）
@@ -81,7 +83,7 @@ pip install -r requirements.txt    # 首次安裝，需 Python 3.10+
 
 ### 全域總覽列
 
-頁首先給出跨軍師的整體態勢：⚠ 未接手・⛔ 卡關・⚡ 馬上可測・其餘待確認・📨 新訊息・待辦 N，另含 tripwire／腳本錯誤的軍師計數；全部為零時整列不顯示。
+頁首先給出跨軍師的整體態勢：⚠ 未接手・⛔ 卡關・⚡ 馬上可測・其餘待確認・異常 N・待辦 N・⏳ 等依賴・⟳ 依賴圖異常・📨 新訊息，另含 tripwire／腳本錯誤的軍師計數；每一項只在非零時出現，全部為零時整列不顯示。
 
 ### 軍師分組與子專案巢狀
 
@@ -96,6 +98,12 @@ pip install -r requirements.txt    # 首次安裝，需 Python 3.10+
 - **已回覆待確認**：依回覆 `verify:` 欄位拆成子分組——⚡ 馬上可測 → 📱 需實機測試 → 🚀 需上線測試 → 自由字串各 distinct 值一組 → 未標示驗收方式。愈接近「現在就能以 handoff skill 的 done 子指令收尾」的排愈前，組內等最久的陳年件排最前；每筆附 verify 推導的白話下一步提示與停留天數（自最新回覆日起算）。
 
 每筆交接／訊息可展開（原生 `<details>`，零 JS）看完整 md 內容與最後修改時間；軍師的新回覆／新申請／新上報三個分類標題列各顯示「最新」時間。
+
+### 交接依賴圖
+
+每個軍師分組內有一個依賴圖區塊，資料來自交接 frontmatter 的 `depends_on`（頂層與 `archive/` 一起建圖）。摘要列顯示「活節點 N・等依賴 N」；有交接在等依賴或依賴圖有異常時預設展開。內容是 inline SVG（零 JS）：上游在左、下游在右，節點可點擊跳到該交接的明細，循環依賴的邊標紅；活節點超過 8 筆時改列文字清單。圖下方列出異常——循環依賴、無法解析的 `depends_on`（找不到檔案、指到回覆檔、型別錯誤）、已歸檔未標 done 與重複檔名。軍師沒有任何依賴宣告也沒有異常時，只顯示一行「交接依賴圖：無依賴宣告」。
+
+交接明細的標題旁另附依賴圖推導態標籤（可開工／等依賴／已被更正／異常），與 ⛔ 卡關等既有標籤並列；沒有任何依賴關係的交接不附標籤。
 
 ### 待辦技術債卡片
 

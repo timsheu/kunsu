@@ -4,7 +4,8 @@ kunsu 同一份原始碼雙部署至 Claude Code 與 Codex（[ADR 019](../adr/20
 
 ## 前置條件
 
-- Codex CLI 已安裝（試點於 0.142.5 撰寫；官方文件內容領先此版，升版後重跑本腳本並重驗掛載說明）。
+- Codex CLI 已安裝（試點於 0.142.5 撰寫，最近一次單輪 25 項全數 PASS 為 2026-10-03 的 codex-cli 0.154.0、模型 gpt-5.5；官方文件內容領先撰寫時的版本，升版後重跑本腳本並重驗掛載說明）。
+- GNU coreutils 的 `timeout` 可用：腳本依序尋找 `timeout` 與 `gtimeout`，兩者皆無即在前置檢查中止、不進入任何斷言。macOS 預設沒有這支指令，以 `brew install coreutils` 取得 `gtimeout`。
 - 已執行 `./install.sh`（偵測到 `~/.codex/` 即一併部署至 `~/.agents/skills/`）。
 - `python3` 可用；試點目錄固定為 `${TMPDIR:-/tmp}/kunsu-codex-pilot/`，每輪先刪再建。
 - 不需先掛載 hook：試點以 `-c hooks.*` 注入兩支 hook（與使用者 `~/.codex/hooks.json` 為合併而非取代）並帶 `--dangerously-bypass-hook-trust`；正式使用時的掛載與信任步驟見 `skills/kunsu-inbox/SKILL.md`。
@@ -22,7 +23,7 @@ KUNSU_PILOT_MODEL=gpt-5.5 KUNSU_PILOT_KEEP=1 bash scripts/codex-pilot.sh   # 保
 
 1. **第 0 步四探針**（任一失敗即中止，不進入斷言）：`.git/` 在 workspace-write 下可寫（試點路徑在 `$TMPDIR` 屬例外，真實路徑見手動核對）；`KUNSU_SCAN_STATS_FILE` 隔離路徑傳入模型 shell；`-c features.hooks=false` 能關閉 hook（對照組）；SessionStart 注入落 rollout。
 2. **接手方鏈**：腳本先以 `new-handoff.sh` 派發一份交接，Codex 在已登記子專案以 `$handoff reply` 回覆（斷言回覆檔落軍師信箱、`scan-replies.sh` 偵測、回報推播跳過）；`$kunsu-report` 上報與 `$kunsu-apply` 申請各一（斷言檔案落地與兩支掃描腳本偵測）。
-3. **軍師端鏈**：`$handoff add` 派發（斷言本體與 `to:`、回報未推播、確認 commit 印指令後零新 commit）；`$handoff done` 同意分支以 `codex exec resume <thread_id>` 第二回合送同意（斷言 commit 存在、本體在 `archive/`、commit 含 rename）；否定分支另建交接、不 resume（斷言零新 commit、歸檔停在 index 中間態）；canary（斷言 rollout 內專案指引注入含末節 sentinel，證明 `AGENTS.md → CLAUDE.md` symlink 完整讀入、未被截尾）；`$kunsu-inbox` 於關 hook 對照下使隔離統計檔 `total_runs` 遞增；最後 `git add -A` 被 PreToolUse 守門 deny（斷言隔離統計檔 `GUARD_DENY` 遞增、`--json` 內該呼叫零痕跡、porcelain 與快照一致）。
+3. **軍師端鏈**：`$handoff add` 派發（斷言本體與 `to:`、回報未推播、確認 commit 印指令後零新 commit）；`$handoff done` 同意分支以 `codex exec resume <thread_id>` 第二回合送同意（斷言 commit 存在、本體在 `archive/`、commit 含 rename）；否定分支另建交接、不 resume（斷言零新 commit、歸檔停在 index 中間態）；canary 兩段式——試點軍師的 CLAUDE.md 被填充至超過 32 KiB、末節放 sentinel：第一段不帶額外設定，斷言 rollout 內的專案指引注入**不含** sentinel（證明 Codex 預設 `project_doc_max_bytes` 32768 位元組確實會截尾）；第二段帶 `-c project_doc_max_bytes=65536`，斷言 rollout 與回覆皆含 sentinel（證明上調後 `AGENTS.md → CLAUDE.md` symlink 完整讀入）。正式使用時須依 `skills/kunsu-inbox/SKILL.md`「Codex config 設定」一節上調此值，否則軍師 CLAUDE.md 的後段規則不會進入 Codex 的 context；`$kunsu-inbox` 於關 hook 對照下使隔離統計檔 `total_runs` 遞增；最後 `git add -A` 被 PreToolUse 守門 deny（斷言隔離統計檔 `GUARD_DENY` 遞增、`--json` 內該呼叫零痕跡、porcelain 與快照一致）。
 4. 印出 pass／fail 與手動核對清單；trap 以 `registry-remove.sh` 移除試點子專案的暫登（不整檔還原，避免覆蓋他 session 的寫入）。
 
 日誌落在試點目錄 `logs/`：每步一份 `*.jsonl`（`codex exec --json` 事件）與 `*.err`。

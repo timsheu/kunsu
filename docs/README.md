@@ -10,7 +10,8 @@ kunsu 專案的文件集合。專案定位與核心規範見上層 [CLAUDE.md](.
 | `plans/` | 實作計畫 | `/ce-plan` |
 | `adr/` | 架構決策紀錄與候選 | 先產出 Candidate，審定後正式化 |
 | `solutions/` | 可重用學習與解法 | `/ce-compound` |
-| `playbooks/` | 操作教學（端到端工作流程、軍師沙盤導覽） | 手工維護 |
+| `playbooks/` | 操作教學（端到端工作流程、軍師沙盤導覽、Codex 雙端試點） | 手工維護 |
+| `history/` | 開發日誌（已完成條目自 CLAUDE.md 遷出，新條目追加於此） | 手工維護 |
 
 ## 目前狀態
 
@@ -78,7 +79,8 @@ kunsu 專案的文件集合。專案定位與核心規範見上層 [CLAUDE.md](.
 | [adr/2026-08-14-adr-candidate-016-lifecycle-metadata-boundary.md](adr/2026-08-14-adr-candidate-016-lifecycle-metadata-boundary.md) | ADR 016（candidate，待審定）：Invariant #5 例外邊界重述——內文不可變、frontmatter 生命週期 metadata 由發起方維護 |
 | [adr/2026-08-29-adr-candidate-017-pretooluse-git-add-guard.md](adr/2026-08-29-adr-candidate-017-pretooluse-git-add-guard.md) | ADR 017（accepted）：軍師 repo `git add` 寬範圍守門——kunsu 首個行為強制點，四要件判準、環境變數逃生門、deny 入統計 |
 | [adr/2026-08-31-adr-candidate-018-commit-declared-scope-contract.md](adr/2026-08-31-adr-candidate-018-commit-declared-scope-contract.md) | ADR 018（accepted）：確認 commit 自「提交 index」改為「提交宣告範圍」——pathspec 兩形契約、上報歸檔腳本化、`MISDECLARED_ARCHIVE_ADD` 偵測 |
-| [adr/2026-09-06-adr-candidate-019-agent-neutral-deployment.md](adr/2026-09-06-adr-candidate-019-agent-neutral-deployment.md) | ADR 019（candidate，待審定）：kunsu 通用化——adapter＝部署目標＋字面對應、Invariant 3 擴為各 agent skill 目錄、ADR 009 第二種確認形態、ADR 001 Consequences 翻案 |
+| [adr/2026-09-06-adr-candidate-019-agent-neutral-deployment.md](adr/2026-09-06-adr-candidate-019-agent-neutral-deployment.md) | ADR 019（accepted，2026-10-03 審定）：kunsu 通用化——adapter＝部署目標＋字面對應、Invariant 3 擴為各 agent skill 目錄、ADR 009 第二種確認形態、ADR 001 Consequences 翻案 |
+| [adr/2026-10-01-adr-candidate-020-dashboard-login-autostart.md](adr/2026-10-01-adr-candidate-020-dashboard-login-autostart.md) | ADR 020（accepted）：軍師沙盤登入自動啟動——修訂 ADR 010 Decision 第 1 項第 3 條，允許使用者親手安裝只含 `RunAtLoad` 的 LaunchAgent |
 | [brainstorms/2026-09-06-codex-agent-neutral-deployment-requirements.md](brainstorms/2026-09-06-codex-agent-neutral-deployment-requirements.md) | 需求：kunsu 通用化雙部署（R1–R19、AE1–AE8；5-persona review 13 筆） |
 | [plans/2026-09-06-001-feat-codex-agent-neutral-deployment-plan.md](plans/2026-09-06-001-feat-codex-agent-neutral-deployment-plan.md) | 實作計畫：雙部署（U1–U9；4-persona review 14 筆；U8 試點 2026-10-03 單輪全綠、ADR 019 accepted） |
 | [playbooks/codex-pilot.md](playbooks/codex-pilot.md) | 操作教學：Codex 雙端試點腳本用法、可觀測面與手動核對清單 |
@@ -100,3 +102,32 @@ kunsu 專案的文件集合。專案定位與核心規範見上層 [CLAUDE.md](.
 | [plans/2026-08-15-001-feat-mechanism-reach-signpost-plan.md](plans/2026-08-15-001-feat-mechanism-reach-signpost-plan.md) | 實作計畫：觸及率三件套（五個實作單元，已執行完畢） |
 | [playbooks/end-to-end-workflow.md](playbooks/end-to-end-workflow.md) | 操作教學：從建立軍師到一輪交接完成收尾的完整工作流程（自 README 拆出，操作教學唯一落點） |
 | [playbooks/dashboard.md](playbooks/dashboard.md) | 操作教學：軍師沙盤安裝、啟動與頁面導覽（自 README 拆出） |
+| [brainstorms/2026-07-11-kunsu-dashboard-requirements.md](brainstorms/2026-07-11-kunsu-dashboard-requirements.md) | 需求：kunsu 訊息聚合儀表板（軍師沙盤） |
+| [brainstorms/2026-07-13-handoff-done-closure-requirements.md](brainstorms/2026-07-13-handoff-done-closure-requirements.md) | 需求：handoff done 收尾閉環 |
+| [plans/2026-07-13-001-feat-handoff-done-closure-plan.md](plans/2026-07-13-001-feat-handoff-done-closure-plan.md) | 實作計畫：handoff done 收尾閉環（已執行完畢） |
+| [brainstorms/2026-07-19-handoff-done-todo-closure-requirements.md](brainstorms/2026-07-19-handoff-done-todo-closure-requirements.md) | 需求：handoff done 來源 todo 一併收尾 |
+| [plans/2026-07-19-001-feat-handoff-done-todo-closure-plan.md](plans/2026-07-19-001-feat-handoff-done-todo-closure-plan.md) | 實作計畫：handoff done 來源 todo 查核與 /todo 0.1.2 缺陷修正（已執行完畢） |
+| [brainstorms/2026-07-24-committed-orphan-detection-requirements.md](brainstorms/2026-07-24-committed-orphan-detection-requirements.md) | 需求：投遞檔已 commit 漏收偵測（遺漏提醒） |
+| [plans/2026-07-24-002-feat-committed-orphan-detection-plan.md](plans/2026-07-24-002-feat-committed-orphan-detection-plan.md) | 實作計畫：投遞檔已 commit 漏收偵測（frontmatter 為 `status: active`） |
+| [brainstorms/2026-07-24-handoff-redact-grill-prompts-requirements.md](brainstorms/2026-07-24-handoff-redact-grill-prompts-requirements.md) | 需求：handoff redact 與 grill 議題硬化提示 |
+| [plans/2026-07-25-001-feat-handoff-pause-report-plan.md](plans/2026-07-25-001-feat-handoff-pause-report-plan.md) | 實作計畫：handoff 暫離回報慣例（已執行完畢） |
+| [brainstorms/2026-08-31-commit-declared-scope-requirements.md](brainstorms/2026-08-31-commit-declared-scope-requirements.md) | 需求：確認 commit 宣告範圍契約——pathspec 定型化、上報歸檔腳本與夾帶偵測 |
+| [plans/2026-08-31-001-feat-commit-declared-scope-plan.md](plans/2026-08-31-001-feat-commit-declared-scope-plan.md) | 實作計畫：確認 commit 宣告範圍契約（已執行完畢） |
+| [brainstorms/2026-08-31-dedup-and-todo-archive-scripts-requirements.md](brainstorms/2026-08-31-dedup-and-todo-archive-scripts-requirements.md) | 需求：產檔查重與 todo 歸檔腳本化——會飄移的紀律改用腳本 |
+| [plans/2026-08-31-002-feat-dedup-and-todo-archive-scripts-plan.md](plans/2026-08-31-002-feat-dedup-and-todo-archive-scripts-plan.md) | 實作計畫：產檔查重與 todo 歸檔腳本化（已執行完畢） |
+| [brainstorms/2026-09-01-current-state-assertion-dual-side-requirements.md](brainstorms/2026-09-01-current-state-assertion-dual-side-requirements.md) | 需求：實作現況斷言的讀寫雙側補強 |
+| [plans/2026-09-01-001-feat-current-state-assertion-dual-side-plan.md](plans/2026-09-01-001-feat-current-state-assertion-dual-side-plan.md) | 實作計畫：實作現況斷言的讀寫雙側補強（已執行完畢） |
+| [brainstorms/2026-09-08-handoff-dependency-dag-requirements.md](brainstorms/2026-09-08-handoff-dependency-dag-requirements.md) | 需求：交接依賴圖——以 `depends_on` 邊推導 DAG 式依賴追蹤 |
+| [plans/2026-09-08-001-feat-handoff-dependency-dag-plan.md](plans/2026-09-08-001-feat-handoff-dependency-dag-plan.md) | 實作計畫：交接依賴圖——`depends_on` 邊、推導態與沙盤 inline SVG（已執行完畢） |
+| [plans/2026-09-27-1232-feat-kunsu-prompt-inbox-notice-plan.md](plans/2026-09-27-1232-feat-kunsu-prompt-inbox-notice-plan.md) | 實作計畫：軍師提問時三信箱新件提示（UserPromptSubmit hook） |
+| [plans/2026-09-27-1709-feat-reply-excerpt-visibility-plan.md](plans/2026-09-27-1709-feat-reply-excerpt-visibility-plan.md) | 實作計畫：久懸交接帶最新回覆摘錄 |
+| [plans/2026-09-28-1117-feat-conditional-series-index-plan.md](plans/2026-09-28-1117-feat-conditional-series-index-plan.md) | 實作計畫：條件式線總表與產檔訊號 |
+| [plans/2026-10-02-1327-feat-dashboard-kanban-board-plan.md](plans/2026-10-02-1327-feat-dashboard-kanban-board-plan.md) | 實作計畫：軍師沙盤看板化 |
+| [plans/2026-10-03-1034-fix-push-match-exclude-offline-plan.md](plans/2026-10-03-1034-fix-push-match-exclude-offline-plan.md) | 實作計畫：推播匹配排除 offline session |
+| [plans/2026-11-22-1651-feat-env-version-record-template-plan.md](plans/2026-11-22-1651-feat-env-version-record-template-plan.md) | 實作計畫：環境版本正本進軍師範本 |
+| [solutions/best-practices/git-porcelain-scan-script-pitfalls.md](solutions/best-practices/git-porcelain-scan-script-pitfalls.md) | 學習：撰寫 git porcelain 掃描腳本的四個陷阱 |
+| [solutions/workflow-issues/handoff-done-closure-gap.md](solutions/workflow-issues/handoff-done-closure-gap.md) | 學習：handoff done 收尾閉環四斷點——觸發詞、流程步驟、輸出提示與憲章同步 |
+| [solutions/workflow-issues/handoff-intercept-point-selection.md](solutions/workflow-issues/handoff-intercept-point-selection.md) | 學習：handoff 暫離回報與攔截點選擇——切任務無回報導致交接狀態失真 |
+| [solutions/workflow-issues/assertion-level-discipline-coverage-gap.md](solutions/workflow-issues/assertion-level-discipline-coverage-gap.md) | 學習：斷言層級紀律兩輪演進——掛載點覆蓋缺口、時效陷阱與讀寫雙態措辭 |
+| [solutions/workflow-issues/literal-replacement-residue-and-review-triage.md](solutions/workflow-issues/literal-replacement-residue-and-review-triage.md) | 學習：大範圍字面替換的正確性後檢查與語言審查工具的分流判準 |
+| [history/development-log.md](history/development-log.md) | 開發日誌：2026-07-06 起的功能落地紀錄（來源回饋、決策取捨、審查與 dogfooding 結果） |
