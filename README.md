@@ -123,7 +123,7 @@ skills/
   handoff/             → 通用交接 skill（SKILL.md＋new-handoff.sh／new-handoff-reply.sh／archive-handoff.sh）
   todo/                → 技術債清單 skill（SKILL.md＋new-todo.sh／archive-todo.sh）
   kunsu-init/          → scaffolding skill（SKILL.md＋registry-merge.sh／registry-remove.sh＋範本與種子文件）
-  kunsu-inbox/         → 傳令 skill（SKILL.md＋scan-replies.sh／scan-applications.sh／scan-reports.sh／archive-report.sh／handoff-graph.py＋session_hook.py／prompt_inbox_hook.py／pretooluse_git_guard.py 三支 hook＋tests）
+  kunsu-inbox/         → 傳令 skill（SKILL.md＋scan-replies.sh／scan-applications.sh／scan-reports.sh／archive-report.sh／handoff-graph.py／uv_reexec.py＋session_hook.py／prompt_inbox_hook.py／pretooluse_git_guard.py 三支 hook＋tests）
   kunsu-apply/         → 申請投遞 skill（SKILL.md＋new-application.sh）
   kunsu-report/        → 上報投遞 skill（SKILL.md＋new-report.sh）
   kunsu-list/          → 全域登記清單查詢 skill（SKILL.md＋registry-list.sh）

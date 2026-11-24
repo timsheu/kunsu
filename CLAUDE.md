@@ -43,9 +43,10 @@ skills/                → skill 原始碼
     scripts/archive-report.sh → 上報歸檔執行（status Edit→untracked 前置 add→git mv→add 目的地，印出帶兩形 pathspec 的待確認 commit 指令、不 commit）
     scripts/session_hook.py → SessionStart hook：session 啟動（含 /clear）自動注入信箱摘要（ADR 014，複用沙盤分類模組；含 handoff skill 版號變動提示——狀態檔 ~/.claude/kunsu-hook-state.json；子專案行尾附交接依賴圖推導態與最新回覆首句摘錄（「｜摘錄「…」」、空值零後綴）、軍師模式加依賴圖異常一行，建圖失敗只降級該行）
     scripts/handoff-graph.py → 交接依賴圖 CLI（匯入沙盤 handoff_graph 模組，印 DEP:／DEP_CYCLE:／DEP_UNRESOLVED:／DEP_ANOMALY:／DEP_NONE 固定前綴行供 4a／4b 讀取，`--role` 過濾，一律 exit 0）
+    scripts/uv_reexec.py → 缺 PyYAML 時的自救入口：handoff-graph.py 與 session_hook.py 的 `python3` 缺 PyYAML 且有 uv 時，依檔頭 PEP 723 宣告以 `uv run --script` 重跑一次（`KUNSU_UV_REEXEC` 防重入、無 uv 或 execv 失敗照既有降級路徑）
     scripts/pretooluse_git_guard.py → PreToolUse hook：軍師 repo 攔寬範圍 git add（ADR 017，凍結三形狀＋逃生門＋deny 入統計，fail-open）
     scripts/prompt_inbox_hook.py → UserPromptSubmit hook：軍師 repo 每句提問掃三信箱未 commit 新件，一行注入（首次列名、之後計數、輪替每份恰點名一次；自跑 git status 不呼叫 scan 腳本；狀態共用 kunsu-hook-state.json 的 prompt_inbox 鍵、差集自清；斜線指令與非軍師 repo 快退不啟動 git；fail-open，ADR 014 修訂註記）
-    tests/             → pytest，session hook、UserPromptSubmit hook、git guard 與 handoff-graph CLI 測試
+    tests/             → pytest，session hook、UserPromptSubmit hook、git guard、handoff-graph CLI 與 uv 自救入口測試
   kunsu-apply/         → 子專案端投遞申請加入
     SKILL.md           → 自動偵測＋registry 選軍師＋守門與冪等預檢（v0.2.1；環境限制只填上限與理由，精確版本歸環境版本正本）
     scripts/new-application.sh → 申請檔產檔（frontmatter＋防撞）

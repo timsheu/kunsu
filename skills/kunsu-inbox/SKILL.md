@@ -1,6 +1,6 @@
 ---
 name: kunsu-inbox
-version: 0.15.1
+version: 0.15.2
 description: |
   查詢跨 repo 協作信箱：列出軍師（規劃協調中心）中待接手的交接文件，或回報新抵達的回覆。
   觸發語：/kunsu-inbox、檢查信箱、有沒有待接手的交接、有沒有新的 handoff、
@@ -432,7 +432,11 @@ context——長駐 session 按 `/clear` 即攤開信箱，不必再手動觸發
   啟動——身分確認前（如註冊表毀損）靜默，身分確認後（如沙盤模組／PyYAML
   缺失）輸出單行降級提示。
 - **依賴**：軍師沙盤已部署（`install.sh` 一併部署）且其 PyYAML 依賴已安裝
-  （見 kunsu-dashboard SKILL.md）。
+  （見 kunsu-dashboard SKILL.md）。執行本腳本的 `python3` 缺 PyYAML 而機器上有 uv 時，
+  腳本依檔頭的 PEP 723 依賴宣告以 `uv run --script` 自行重跑一次（`scripts/uv_reexec.py`，
+  不往任何全域環境安裝套件；首次重跑須能連網下載 PyYAML）；沒有 uv 時照上述降級。
+  `scripts/handoff-graph.py` 同此機制——同一台機器上不同 shell 的 `python3` 可能指向
+  不同直譯器，agent 的 shell 剛好落在沒裝 PyYAML 的那一個時，依賴圖不再只剩 `DEP_ERROR`。
 - **skill 版號變動提示**：身分確認後比對部署
   handoff SKILL.md 版號與狀態檔 `~/.claude/kunsu-hook-state.json`（機器層級，
   不進任何 repo），版號變動時於信箱摘要前輸出一行「handoff skill 已更新至

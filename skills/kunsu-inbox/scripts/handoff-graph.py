@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["PyYAML"]
+# ///
 """
 handoff-graph.py — 交接依賴圖 CLI：印固定前綴文字行供 kunsu-inbox skill 步驟 4a／4b 讀取
 
@@ -86,4 +90,11 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
+    # 當前 python3 缺 PyYAML 且有 uv 時，依檔頭 PEP 723 宣告以 uv 重跑一次（見 uv_reexec.py）
+    try:
+        from uv_reexec import reexec_with_uv_if_missing
+
+        reexec_with_uv_if_missing(__file__, sys.argv[1:])
+    except ImportError:
+        pass  # 部署不完整缺 uv_reexec.py：不自救，照當前直譯器走既有降級路徑
     sys.exit(main(sys.argv[1:]))
