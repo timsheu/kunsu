@@ -100,6 +100,7 @@ install.sh             → 部署至 ~/.claude/skills/ 與 ~/.agents/skills/（C
 - `HISTORY_WARN` 一次性與 tripwire 同輪的呈現降級（2026-08-31 code review 發現）：同輪出現時 4b-3「立即停止」使警示被略過且基線照樣前進、警示不再現，僅剩統計檔可查（ADR 018 已明文「以統計檔為準」）；候選修法為未消費 warns 時基線不前進或 pending 重報，與沙盤／hook 顯示項合場評估。
 - 歸檔腳本與統計 IO 的複製體收斂（2026-08-31 code review cleanup 級發現；2026-09-01 archive-todo.sh 成為第三份同構複製體，債加深）：archive-report.sh、archive-handoff.sh 與 archive-todo.sh 約 200 行同構（含 frontmatter python heredoc、專案根定位、resolve_arg），pretooluse_git_guard.py 的 `_log_deny` 重抄 scan-replies.sh 統計寫入且漏 stale 自清——契約再修訂時單側改動會靜默漂移；候選修法為抽參數化共用入口與 `scan_stats.py`，屬重構級另案評估。
 - 環境版本正本規則的喚起率觀察（2026-11-22）：規則為純文字、無工具提示（使用者選定），本專案有同形失效先例（2026-09-28 條件式線總表 139 次產檔零喚起）。觀察方式——各軍師以 sync-rules 補上規則後，檢查新發交接是否出現未連結正本的執行中版本號；出現即代表文字規則不足，屆時重啟「刷新正本的獨立指令」或提示機制的另案評估。骨架格式源自尚未經實際引用的 ebook 藍本，格式若需調整，骨架、consistency-check U 項與 ②-c-4 差異項須一起改。
+- 投遞檔已 commit 漏收偵測（遺漏提醒）——[計畫](docs/plans/2026-07-24-002-feat-committed-orphan-detection-plan.md)七個實作單元皆未執行（2026-11-24 查證：`scan-committed-orphans.sh` 不存在，沙盤與 kunsu-inbox 無對應段落），計畫 frontmatter 標 `status: deferred`。需求為預防性——面向「環境主動 auto-commit 軍師 repo 工作樹」使未 commit 即新件的訊號消失的情境，[需求文件](docs/brainstorms/2026-07-24-committed-orphan-detection-requirements.md)記載當時無實際漏收案例。重啟條件：出現實際漏收，或 kunsu 公開給會 auto-commit 的環境使用。重啟時計畫須先修訂——U1 的「ADR candidate 014」編號已被 SessionStart hook 佔用，且計畫早於 ADR 017／018 與看板化，沙盤與 kunsu-inbox 的整合點已變。
 - 產檔查重的觀察項（2026-09-01）：時間窗天數／筆數上限現為腳本頂部常數（14 天／8 筆），依實際使用噪訊比再調；上報查重（new-report.sh）與 reply 側維持不查重的界線照舊。
 
 ### 相關資產（唯讀參考）

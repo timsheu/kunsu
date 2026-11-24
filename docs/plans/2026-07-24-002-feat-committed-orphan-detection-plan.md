@@ -1,7 +1,7 @@
 ---
 title: "feat: 投遞檔已 commit 漏收偵測（遺漏提醒）"
 type: feat
-status: active
+status: deferred
 date: 2026-07-24
 origin: docs/brainstorms/2026-07-24-committed-orphan-detection-requirements.md
 ---

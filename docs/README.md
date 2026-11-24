@@ -84,7 +84,7 @@ kunsu 專案的文件集合。專案定位與核心規範見上層 [CLAUDE.md](.
 | [brainstorms/2026-07-19-handoff-done-todo-closure-requirements.md](brainstorms/2026-07-19-handoff-done-todo-closure-requirements.md) | 需求：handoff done 來源 todo 一併收尾 |
 | [plans/2026-07-19-001-feat-handoff-done-todo-closure-plan.md](plans/2026-07-19-001-feat-handoff-done-todo-closure-plan.md) | 實作計畫：handoff done 來源 todo 查核與 /todo 0.1.2 缺陷修正（已執行完畢） |
 | [brainstorms/2026-07-24-committed-orphan-detection-requirements.md](brainstorms/2026-07-24-committed-orphan-detection-requirements.md) | 需求：投遞檔已 commit 漏收偵測（遺漏提醒） |
-| [plans/2026-07-24-002-feat-committed-orphan-detection-plan.md](plans/2026-07-24-002-feat-committed-orphan-detection-plan.md) | 實作計畫：投遞檔已 commit 漏收偵測（frontmatter 為 `status: active`） |
+| [plans/2026-07-24-002-feat-committed-orphan-detection-plan.md](plans/2026-07-24-002-feat-committed-orphan-detection-plan.md) | 實作計畫：投遞檔已 commit 漏收偵測（未執行，`status: deferred`；重啟條件見上層 CLAUDE.md「尚未實作／後續評估」） |
 | [brainstorms/2026-07-24-handoff-redact-grill-prompts-requirements.md](brainstorms/2026-07-24-handoff-redact-grill-prompts-requirements.md) | 需求：handoff redact 與 grill 議題硬化提示 |
 | [plans/2026-07-25-001-feat-handoff-pause-report-plan.md](plans/2026-07-25-001-feat-handoff-pause-report-plan.md) | 實作計畫：handoff 暫離回報慣例（已執行完畢） |
 | [brainstorms/2026-08-31-commit-declared-scope-requirements.md](brainstorms/2026-08-31-commit-declared-scope-requirements.md) | 需求：確認 commit 宣告範圍契約——pathspec 定型化、上報歸檔腳本與夾帶偵測 |

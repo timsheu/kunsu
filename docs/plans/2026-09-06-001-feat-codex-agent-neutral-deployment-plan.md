@@ -1,7 +1,7 @@
 ---
 title: "feat: kunsu 通用化——同一份原始碼雙部署至 Claude Code 與 Codex"
 type: feat
-status: active
+status: completed
 date: 2026-09-06
 origin: docs/brainstorms/2026-09-06-codex-agent-neutral-deployment-requirements.md
 deepened: 2026-09-06

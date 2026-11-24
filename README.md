@@ -26,7 +26,7 @@
 | 軍師沙盤 | 本機網頁：看板首頁依「球在誰手上」攤開每個軍師的未收尾交接與信箱新件，另有全文頁、已完成頁與完整彙整頁；可選登入自動啟動（非 skill，見 [ADR 010](docs/adr/2026-07-11-adr-candidate-010-dashboard-service-exception.md)、[ADR 020](docs/adr/2026-10-01-adr-candidate-020-dashboard-login-autostart.md)） |
 | SessionStart hook | session 啟動（含 `/clear`）自動攤開 kunsu 信箱摘要；handoff skill 升版後另提示一行「handoff skill 已更新至 vX」使長駐 session 得知指引有變。未登記 repo 靜默、fail-open 不阻斷 session（隨 kunsu-inbox skill 部署，於各 agent 的 hook 設定檔掛載後生效，見 [ADR 014](docs/adr/2026-08-13-adr-candidate-014-sessionstart-hook-activation.md)） |
 | UserPromptSubmit hook | 在軍師 repo 內，使用者每送出一句提問就掃描三信箱的未 commit 新件，以一行注入 context：新件首次出現時列出檔名，之後只報份數並輪替點名；斜線指令與非軍師 repo 直接略過、fail-open 不阻擋提問。補的是「派發之後、動手之前」這個時點的抵達訊號——回覆方未走 handoff skill 而直接落檔時，回覆即推播不會觸發，SessionStart hook 也只在 session 啟動時執行（隨 kunsu-inbox skill 部署，見 ADR 014 修訂註記） |
-| PreToolUse git add 守門 | 在軍師 repo 內攔下 `git add -A`／`.`／涵蓋信箱路徑的整目錄 add，deny 訊息內嵌逐檔列名與歸檔腳本的正確做法；`KUNSU_ADD_GUARD_OFF=1` 前綴單次放行、deny 事件記入掃描統計。這是 kunsu 唯一的行為強制點，判準四要件：機械可判、規則已明文、可逆、零能力限縮（[ADR 017](docs/adr/2026-08-29-adr-candidate-017-pretooluse-git-add-guard.md)） |
+| PreToolUse git add 守門 | 在軍師 repo 內攔下 `git add -A`／`--all`、`.`／`:/` 與涵蓋信箱路徑的整目錄 add，deny 訊息內嵌逐檔列名與歸檔腳本的正確做法；`KUNSU_ADD_GUARD_OFF=1` 前綴單次放行、deny 事件記入掃描統計。這是 kunsu 唯一的行為強制點，判準四要件：機械可判、規則已明文、可逆、零能力限縮（[ADR 017](docs/adr/2026-08-29-adr-candidate-017-pretooluse-git-add-guard.md)） |
 | `kc` 啟動函式 | fish 函式：依註冊表以 kunsu session 命名慣例自動 `claude -n` 啟動，使推播匹配走精確比對；`--slot <後綴>` 區分同資料夾多 session（`scripts/kc.fish`；Claude Code 限定，Codex 無 session 命名與推播、不需此函式） |
 
 核心設計（詳見 `docs/adr/`）：
@@ -50,6 +50,7 @@ git clone <this-repo>
 cd kunsu
 ./install.sh          # 複製部署至 ~/.claude/skills/；偵測到 ~/.codex/ 時一併部署至 ~/.agents/skills/（Codex）
 ./install.sh --link   # 開發者模式：目錄 symlink 部署，改原始碼即時生效（repo 搬家後需重跑）
+./install.sh --target <dir>  # 只部署到指定的單一目錄（供測試用；此模式不偵測 Codex，不會部署至 ~/.agents/skills/）
 ./install.sh --adopt  # 既有舊版 copy 部署（無 .kunsu-origin 標記）首次升級時採納覆寫：列出候選、互動確認後才覆寫（非互動環境須另設 KUNSU_INSTALL_YES=1）
 ```
 
@@ -101,7 +102,7 @@ cd kunsu
 | 能力 | Claude Code | Codex |
 |------|-------------|-------|
 | skill 呼叫形 | `/<name>` 斜線指令 | `$<name>` 顯式呼叫，或依 description 自動選用 |
-| 阻塞式確認（確認 commit 等） | AskUserQuestion 提問後執行 | 預設無阻塞式工具：印出定型指令與狀態宣告後結束回合，下一回合收到明確同意文字才執行；同意只對緊接的下一回合有效 |
+| 阻塞式確認（確認 commit 等） | AskUserQuestion 提問後執行 | 預設無阻塞式工具：印出定型指令與狀態宣告後結束回合，下一回合收到明確同意文字才執行；同意只對緊接的下一回合有效。於 `~/.codex/config.toml` 的 `[features]` 開啟 `default_mode_request_user_input` 後，Codex 有阻塞式提問工具可用，確認 commit 即改走當回合提問（設定片段見 `skills/kunsu-inbox/SKILL.md`「Codex config 設定」節） |
 | 跨 session 推播 | ListAgents＋SendMessage | 無對應物，整步跳過 |
 | hook 設定檔 | `~/.claude/settings.json` | `~/.codex/hooks.json`，改動後須於 TUI 重新信任 |
 | 子 agent（副官） | Agent 工具 | `spawn_agent` |
